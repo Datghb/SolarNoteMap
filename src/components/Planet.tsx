@@ -1,4 +1,4 @@
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, type ReactNode } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
@@ -27,6 +27,7 @@ interface PlanetProps {
   speedMultiplier: number;
   onClick: () => void;
   showLabel: boolean;
+  children?: ReactNode;
 }
 
 export function Planet({
@@ -47,6 +48,7 @@ export function Planet({
   speedMultiplier,
   onClick,
   showLabel,
+  children,
 }: PlanetProps) {
   const planetRef = useRef<THREE.Mesh>(null);
   const atmosphereRef = useRef<THREE.Mesh>(null);
@@ -427,6 +429,7 @@ export function Planet({
           </div>
         </Html>
       )}
+      {children}
     </group>
   );
 }

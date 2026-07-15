@@ -1,114 +1,23 @@
-import { useRef, useMemo } from 'react';
-import * as THREE from 'three';
+import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
+import { Line } from '@react-three/drei';
+import * as THREE from 'three';
 import { Planet } from './Planet';
 import { Sun } from './Sun';
-import { Line } from '@react-three/drei';
+import { LESSONS } from '../data/lessons';
 
-// Real orbital data (scaled for visualization)
-const PLANETS_DATA = [
-  {
-    name: 'Mercury',
-    radius: 0.5,
-    distance: 12,
-    orbitalPeriod: 88,
-    rotationPeriod: 58.6,
-    colors: ['#8C8C8C', '#A0A0A0', '#696969'],
-    tilt: 0.03,
-    eccentricity: 0.205,
-    atmosphere: null,
-    features: 'craters',
-  },
-  {
-    name: 'Venus',
-    radius: 1.1,
-    distance: 18,
-    orbitalPeriod: 225,
-    rotationPeriod: -243,
-    colors: ['#E6C87A', '#D4A84B', '#C9922A'],
-    tilt: 177.4,
-    eccentricity: 0.007,
-    atmosphere: { color: '#E6D5A8', opacity: 0.6, scale: 1.08 },
-    features: 'clouds',
-  },
-  {
-    name: 'Earth',
-    radius: 1.2,
-    distance: 24,
-    orbitalPeriod: 365,
-    rotationPeriod: 1,
-    colors: ['#4A90D9', '#2E5A1C', '#8B7355'],
-    tilt: 23.4,
-    eccentricity: 0.017,
-    hasMoon: true,
-    atmosphere: { color: '#87CEEB', opacity: 0.3, scale: 1.05 },
-    features: 'continents',
-  },
-  {
-    name: 'Mars',
-    radius: 0.7,
-    distance: 32,
-    orbitalPeriod: 687,
-    rotationPeriod: 1.03,
-    colors: ['#C1440E', '#8B2500', '#CD5C5C'],
-    tilt: 25.2,
-    eccentricity: 0.093,
-    atmosphere: { color: '#FFB6C1', opacity: 0.15, scale: 1.03 },
-    features: 'terrain',
-  },
-  {
-    name: 'Jupiter',
-    radius: 4,
-    distance: 52,
-    orbitalPeriod: 4333,
-    rotationPeriod: 0.41,
-    colors: ['#D8CA9D', '#C4A668', '#8B7355', '#CD853F'],
-    tilt: 3.1,
-    eccentricity: 0.049,
-    atmosphere: { color: '#DEB887', opacity: 0.2, scale: 1.02 },
-    features: 'bands',
-  },
-  {
-    name: 'Saturn',
-    radius: 3.5,
-    distance: 70,
-    orbitalPeriod: 10759,
-    rotationPeriod: 0.45,
-    colors: ['#C9A227', '#DAA520', '#F4A460'],
-    tilt: 26.7,
-    eccentricity: 0.057,
-    hasRings: true,
-    atmosphere: { color: '#F5DEB3', opacity: 0.15, scale: 1.02 },
-    features: 'bands',
-  },
-  {
-    name: 'Uranus',
-    radius: 2.2,
-    distance: 90,
-    orbitalPeriod: 30687,
-    rotationPeriod: -0.72,
-    colors: ['#7FDBFF', '#5CACEE', '#87CEEB'],
-    tilt: 97.8,
-    eccentricity: 0.046,
-    hasRings: true,
-    ringColor: '#B0C4DE',
-    ringOpacity: 0.3,
-    atmosphere: { color: '#B0E0E6', opacity: 0.3, scale: 1.04 },
-    features: 'ice',
-  },
-  {
-    name: 'Neptune',
-    radius: 2.1,
-    distance: 110,
-    orbitalPeriod: 60190,
-    rotationPeriod: 0.67,
-    colors: ['#4169E1', '#1E90FF', '#0000CD'],
-    tilt: 28.3,
-    eccentricity: 0.009,
-    atmosphere: { color: '#6495ED', opacity: 0.35, scale: 1.04 },
-    features: 'storms',
-  },
-];
+const PLANETS_DATA = LESSONS.map((lesson, index) => ({
+  name: lesson.shortName,
+  radius: 1.8 + index * 0.32,
+  distance: 18 + index * 14,
+  orbitalPeriod: 300 + index * 180,
+  rotationPeriod: 1.2 + index * 0.3,
+  colors: lesson.colors,
+  tilt: 8 + index * 6,
+  eccentricity: 0.01 + index * 0.008,
+  atmosphere: { color: lesson.color, opacity: 0.28, scale: 1.08 },
+  features: index === 0 ? 'craters' : index === 1 ? 'clouds' : index === 2 ? 'continents' : index === 3 ? 'terrain' : 'storms',
+}));
 
 interface SolarSystemProps {
   speedMultiplier: number;
@@ -116,119 +25,91 @@ interface SolarSystemProps {
   showOrbits: boolean;
   showLabels: boolean;
   accentColor: string;
+  savedMaps: Record<string, number>;
 }
 
-export function SolarSystem({ speedMultiplier, onPlanetClick, showOrbits, showLabels, accentColor }: SolarSystemProps) {
-  const groupRef = useRef<THREE.Group>(null);
+export function SolarSystem({ speedMultiplier, onPlanetClick, showOrbits, showLabels, accentColor, savedMaps }: SolarSystemProps) {
+  return (
+    <group>
+      <Sun />
+      <AsteroidBelt innerRadius={44} outerRadius={49} count={140} speedMultiplier={speedMultiplier} />
+      {PLANETS_DATA.map((planet, index) => (
+        <Planet key={planet.name} {...planet} speedMultiplier={speedMultiplier} onClick={() => onPlanetClick(planet.name)} showLabel={showLabels}>
+          {savedMaps[LESSONS[index].id] > 0 && (
+            <KnowledgeSatellite
+              nodeCount={savedMaps[LESSONS[index].id]}
+              planetRadius={planet.radius}
+              color={LESSONS[index].color}
+              speedMultiplier={speedMultiplier}
+            />
+          )}
+        </Planet>
+      ))}
+      {showOrbits && PLANETS_DATA.map((planet) => <OrbitPath key={planet.name} distance={planet.distance} eccentricity={planet.eccentricity} color={accentColor} />)}
+    </group>
+  );
+}
+
+function KnowledgeSatellite({ nodeCount, planetRadius, color, speedMultiplier }: { nodeCount: number; planetRadius: number; color: string; speedMultiplier: number }) {
+  const orbitRef = useRef<THREE.Group>(null);
+  const satelliteRef = useRef<THREE.Mesh>(null);
+  const distance = planetRadius * 2.4 + Math.min(nodeCount, 12) * 0.08;
+  const size = Math.min(0.85, 0.34 + nodeCount * 0.045);
+
+  useFrame((state, delta) => {
+    if (orbitRef.current) orbitRef.current.rotation.y = state.clock.getElapsedTime() * 0.9 * speedMultiplier;
+    if (satelliteRef.current) satelliteRef.current.rotation.y += delta * 0.8 * speedMultiplier;
+  });
 
   return (
-    <group ref={groupRef}>
-      {/* Sun at center */}
-      <Sun />
-
-      {/* Asteroid belt between Mars and Jupiter */}
-      <AsteroidBelt innerRadius={40} outerRadius={48} count={200} speedMultiplier={speedMultiplier} />
-
-      {/* Planets */}
-      {PLANETS_DATA.map((planet) => (
-        <Planet
-          key={planet.name}
-          {...planet}
-          speedMultiplier={speedMultiplier}
-          onClick={() => onPlanetClick(planet.name)}
-          showLabel={showLabels}
-        />
-      ))}
-
-      {/* Orbit paths */}
-      {showOrbits && PLANETS_DATA.map((planet) => (
-        <OrbitPath 
-          key={`orbit-${planet.name}`} 
-          distance={planet.distance} 
-          eccentricity={planet.eccentricity}
-          color={accentColor}
-        />
-      ))}
+    <group rotation={[0.35, 0, 0.2]}>
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[distance, 0.012, 6, 96]} />
+        <meshBasicMaterial color={color} transparent opacity={0.28} />
+      </mesh>
+      <group ref={orbitRef}>
+        <mesh ref={satelliteRef} position={[distance, 0, 0]}>
+          <icosahedronGeometry args={[size, 2]} />
+          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.55} roughness={0.38} />
+          <pointLight color={color} intensity={1.2} distance={5} />
+        </mesh>
+      </group>
     </group>
   );
 }
 
 function OrbitPath({ distance, eccentricity, color }: { distance: number; eccentricity: number; color: string }) {
-  const points = useMemo(() => {
-    const pts: [number, number, number][] = [];
-    const segments = 128;
-
-    for (let i = 0; i <= segments; i++) {
-      const theta = (i / segments) * Math.PI * 2;
-      const r = distance * (1 - eccentricity * eccentricity) / (1 + eccentricity * Math.cos(theta));
-      pts.push([Math.cos(theta) * r, 0, Math.sin(theta) * r]);
-    }
-
-    return pts;
-  }, [distance, eccentricity]);
-
-  return (
-    <Line
-      points={points}
-      color={color}
-      lineWidth={1}
-      transparent
-      opacity={0.2}
-    />
-  );
+  const points = useMemo(() => Array.from({ length: 129 }, (_, index) => {
+    const theta = (index / 128) * Math.PI * 2;
+    const radius = distance * (1 - eccentricity * eccentricity) / (1 + eccentricity * Math.cos(theta));
+    return [Math.cos(theta) * radius, 0, Math.sin(theta) * radius] as [number, number, number];
+  }), [distance, eccentricity]);
+  return <Line points={points} color={color} lineWidth={1} transparent opacity={0.22} />;
 }
 
-function AsteroidBelt({ innerRadius, outerRadius, count, speedMultiplier }: { 
-  innerRadius: number; 
-  outerRadius: number; 
-  count: number;
-  speedMultiplier: number;
-}) {
-  const asteroidRef = useRef<THREE.InstancedMesh>(null);
-  
-  const { speeds, basePositions } = useMemo(() => {
-    const speeds: number[] = [];
-    const basePositions: { angle: number; radius: number; y: number }[] = [];
-    
-    for (let i = 0; i < count; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const radius = innerRadius + Math.random() * (outerRadius - innerRadius);
-      const y = (Math.random() - 0.5) * 2;
-      
-      basePositions.push({ angle, radius, y });
-      speeds.push(0.1 + Math.random() * 0.2);
-    }
-    
-    return { speeds, basePositions };
-  }, [innerRadius, outerRadius, count]);
+function AsteroidBelt({ innerRadius, outerRadius, count, speedMultiplier }: { innerRadius: number; outerRadius: number; count: number; speedMultiplier: number }) {
+  const ref = useRef<THREE.InstancedMesh>(null);
+  const particles = useMemo(() => Array.from({ length: count }, () => ({
+    angle: Math.random() * Math.PI * 2,
+    radius: innerRadius + Math.random() * (outerRadius - innerRadius),
+    y: (Math.random() - 0.5) * 2,
+    speed: 0.1 + Math.random() * 0.2,
+    scale: 0.04 + Math.random() * 0.13,
+  })), [count, innerRadius, outerRadius]);
 
   useFrame((state) => {
-    if (!asteroidRef.current) return;
-    
+    if (!ref.current) return;
     const time = state.clock.getElapsedTime();
-    
-    for (let i = 0; i < count; i++) {
-      const { angle, radius, y } = basePositions[i];
-      const currentAngle = angle + time * speeds[i] * 0.1 * speedMultiplier;
-      
+    particles.forEach((particle, index) => {
+      const angle = particle.angle + time * particle.speed * speedMultiplier;
       const matrix = new THREE.Matrix4();
-      const scale = 0.05 + (i % 10) * 0.015;
-      matrix.compose(
-        new THREE.Vector3(Math.cos(currentAngle) * radius, y, Math.sin(currentAngle) * radius),
-        new THREE.Quaternion().setFromEuler(new THREE.Euler(time * speeds[i], time * speeds[i] * 0.5, 0)),
-        new THREE.Vector3(scale, scale, scale)
-      );
-      asteroidRef.current.setMatrixAt(i, matrix);
-    }
-    asteroidRef.current.instanceMatrix.needsUpdate = true;
+      matrix.compose(new THREE.Vector3(Math.cos(angle) * particle.radius, particle.y, Math.sin(angle) * particle.radius), new THREE.Quaternion(), new THREE.Vector3(particle.scale, particle.scale, particle.scale));
+      ref.current!.setMatrixAt(index, matrix);
+    });
+    ref.current.instanceMatrix.needsUpdate = true;
   });
 
-  return (
-    <instancedMesh ref={asteroidRef} args={[undefined, undefined, count]}>
-      <dodecahedronGeometry args={[1, 0]} />
-      <meshStandardMaterial color="#8B7355" roughness={0.9} metalness={0.1} />
-    </instancedMesh>
-  );
+  return <instancedMesh ref={ref} args={[undefined, undefined, count]}><dodecahedronGeometry args={[1, 0]} /><meshStandardMaterial color="#9a6e43" roughness={0.9} /></instancedMesh>;
 }
 
 export { PLANETS_DATA };
