@@ -1,7 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Lesson } from '../data/lessons';
 
-type Importance = 'core' | 'support' | 'detail';
+type Importance = 'minor' | 'detail' | 'support' | 'important' | 'core';
+
+const IMPORTANCE_LEVELS: { value: Importance; label: string; description: string }[] = [
+  { value: 'minor', label: 'Mức 1 · Tham khảo', description: 'Thông tin mở rộng' },
+  { value: 'detail', label: 'Mức 2 · Bổ trợ', description: 'Ví dụ hoặc chi tiết phụ' },
+  { value: 'support', label: 'Mức 3 · Quan trọng', description: 'Ý cần ghi nhớ' },
+  { value: 'important', label: 'Mức 4 · Trọng yếu', description: 'Ý chính của một phần' },
+  { value: 'core', label: 'Mức 5 · Cốt lõi', description: 'Trọng tâm của bài học' },
+];
 
 interface KnowledgeNode {
   id: string;
@@ -96,8 +104,12 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
       if (!bounds) return;
       const rawX = ((pointerEvent.clientX - bounds.left) / bounds.width) * 100;
       const rawY = ((pointerEvent.clientY - bounds.top) / bounds.height) * 100;
-      const x = Math.min(94, Math.max(6, 50 + (rawX - 50) / zoom));
-      const y = Math.min(90, Math.max(10, 50 + (rawY - 50) / zoom));
+      const minX = 50 + (4 - 50) / zoom;
+      const maxX = 50 + (96 - 50) / zoom;
+      const minY = 50 + (5 - 50) / zoom;
+      const maxY = 50 + (95 - 50) / zoom;
+      const x = Math.min(maxX, Math.max(minX, 50 + (rawX - 50) / zoom));
+      const y = Math.min(maxY, Math.max(minY, 50 + (rawY - 50) / zoom));
       setMap((current) => ({ ...current, nodes: current.nodes.map((node) => node.id === id ? { ...node, x, y } : node) }));
     };
     const stop = () => {
@@ -189,7 +201,11 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
                 <input value={selected.title} onChange={(event) => updateNode({ title: event.target.value })} placeholder="Tên kiến thức" />
                 <textarea value={selected.note} onChange={(event) => updateNode({ note: event.target.value })} placeholder="Giải thích bằng lời của bạn…" />
                 <div className="importance-options">
-                  {(['detail', 'support', 'core'] as Importance[]).map((level) => <button key={level} className={selected.importance === level ? 'active' : ''} onClick={() => updateNode({ importance: level })}>{level === 'detail' ? 'Chi tiết' : level === 'support' ? 'Quan trọng' : 'Cốt lõi'}</button>)}
+                  {IMPORTANCE_LEVELS.map((level) => (
+                    <button key={level.value} className={`${level.value} ${selected.importance === level.value ? 'active' : ''}`} onClick={() => updateNode({ importance: level.value })}>
+                      <i /><span>{level.label}</span><small>{level.description}</small>
+                    </button>
+                  ))}
                 </div>
               </div>
             )}

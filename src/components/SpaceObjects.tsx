@@ -109,10 +109,10 @@ export function MilkyWayGalaxy({ color = '#4a00e0', onSelect }: { color: string 
         </bufferGeometry>
         <pointsMaterial
           map={glowTexture}
-          size={1.5}
+          size={1.85}
           vertexColors
           transparent
-          opacity={0.8}
+          opacity={0.95}
           blending={THREE.AdditiveBlending}
           sizeAttenuation
           alphaTest={0.01}
@@ -215,9 +215,9 @@ export function StarCluster({
         <pointsMaterial
           map={glowTexture}
           color={color}
-          size={1}
+          size={1.35}
           transparent
-          opacity={0.9}
+          opacity={1}
           blending={THREE.AdditiveBlending}
           sizeAttenuation
           alphaTest={0.01}
@@ -239,6 +239,58 @@ export function StarCluster({
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
+      </sprite>
+    </group>
+  );
+}
+
+export function LuminousStarBand({
+  position,
+  rotation = [0, 0, 0],
+  length = 120,
+  width = 18,
+  count = 1800,
+  color = '#b9c8ff',
+}: {
+  position: [number, number, number];
+  rotation?: [number, number, number];
+  length?: number;
+  width?: number;
+  count?: number;
+  color?: string;
+}) {
+  const bandRef = useRef<THREE.Group>(null);
+  const glowTexture = useGlowTexture();
+  const positions = useMemo(() => {
+    const points: number[] = [];
+    for (let i = 0; i < count; i++) {
+      const progress = Math.random() - 0.5;
+      const gaussian = Math.sqrt(-2 * Math.log(Math.max(Math.random(), 0.001))) * Math.cos(Math.PI * 2 * Math.random());
+      const edgeFade = Math.cos(progress * Math.PI);
+      const spread = width * (0.18 + Math.random() * 0.82) * edgeFade;
+      const x = progress * length;
+      const curve = Math.sin(progress * Math.PI * 1.6) * width * 0.55;
+      const y = curve + gaussian * spread * 0.32;
+      const z = (Math.random() - 0.5) * spread;
+      points.push(x, y, z);
+    }
+    return new Float32Array(points);
+  }, [count, length, width]);
+
+  useFrame((state) => {
+    if (bandRef.current) bandRef.current.rotation.y = rotation[1] + state.clock.getElapsedTime() * 0.003;
+  });
+
+  return (
+    <group ref={bandRef} position={position} rotation={rotation}>
+      <points>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+        </bufferGeometry>
+        <pointsMaterial map={glowTexture} color={color} size={1.05} transparent opacity={1} blending={THREE.AdditiveBlending} alphaTest={0.01} depthWrite={false} sizeAttenuation />
+      </points>
+      <sprite scale={[length * 0.72, width * 2.5, 1]}>
+        <spriteMaterial map={glowTexture} color={color} transparent opacity={0.09} blending={THREE.AdditiveBlending} depthWrite={false} />
       </sprite>
     </group>
   );
@@ -898,7 +950,7 @@ export function ShootingStars({ count = 5, color = '#ffffff' }: { count?: number
         -100 - Math.random() * 200,
       ] as [number, number, number],
       speed: 50 + Math.random() * 100,
-      delay: Math.random() * 10,
+      delay: Math.random() * 1.4,
       direction: new THREE.Vector3(
         -0.5 + Math.random() * 0.3,
         -0.3 - Math.random() * 0.2,
@@ -910,7 +962,7 @@ export function ShootingStars({ count = 5, color = '#ffffff' }: { count?: number
   return (
     <group ref={starsRef}>
       {shootingStars.map((star, i) => (
-        <ShootingStar key={i} {...star} color={color} />
+        <ShootingStar key={i} {...star} color={color} cycleTime={22} />
       ))}
     </group>
   );
@@ -922,12 +974,14 @@ function ShootingStar({
   delay,
   direction,
   color,
+  cycleTime,
 }: {
   startPos: [number, number, number];
   speed: number;
   delay: number;
   direction: THREE.Vector3;
   color: string;
+  cycleTime: number;
 }) {
   const ref = useRef<THREE.Group>(null);
   const meshRef = useRef<THREE.Mesh>(null);
@@ -936,11 +990,10 @@ function ShootingStar({
     const time = state.clock.getElapsedTime();
     if (!ref.current || !meshRef.current) return;
 
-    const cycleTime = 8;
     const t = ((time + delay) % cycleTime) / cycleTime;
 
-    if (t < 0.2) {
-      const progress = t / 0.2;
+    if (t < 0.075) {
+      const progress = t / 0.075;
       ref.current.visible = true;
       ref.current.position.set(
         startPos[0] + direction.x * progress * speed,
@@ -1124,9 +1177,9 @@ export function SpaceDust({ count = 3000, color = '#ffffff' }: { count?: number;
       <pointsMaterial
         map={glowTexture}
         color={color}
-        size={0.3}
+        size={0.42}
         transparent
-        opacity={0.3}
+        opacity={0.48}
         blending={THREE.AdditiveBlending}
         sizeAttenuation
         alphaTest={0.01}

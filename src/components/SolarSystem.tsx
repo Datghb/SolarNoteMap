@@ -33,46 +33,80 @@ export function SolarSystem({ speedMultiplier, onPlanetClick, showOrbits, showLa
     <group>
       <Sun />
       <AsteroidBelt innerRadius={44} outerRadius={49} count={140} speedMultiplier={speedMultiplier} />
-      {PLANETS_DATA.map((planet, index) => (
-        <Planet key={planet.name} {...planet} speedMultiplier={speedMultiplier} onClick={() => onPlanetClick(planet.name)} showLabel={showLabels}>
-          {savedMaps[LESSONS[index].id] > 0 && (
-            <KnowledgeSatellite
-              nodeCount={savedMaps[LESSONS[index].id]}
-              planetRadius={planet.radius}
-              color={LESSONS[index].color}
-              speedMultiplier={speedMultiplier}
-            />
-          )}
-        </Planet>
+      {PLANETS_DATA.map((planet) => <Planet key={planet.name} {...planet} speedMultiplier={speedMultiplier} onClick={() => onPlanetClick(planet.name)} showLabel={showLabels} />)}
+      {[27, 38, 59, 76].map((distance, index) => (
+        <SystemSatellite
+          key={distance}
+          distance={distance}
+          color={LESSONS[index % LESSONS.length].color}
+          speedMultiplier={speedMultiplier}
+          orbitIndex={index}
+          phase={index * 1.55 + 0.4}
+          isOwn={index === 3 && Object.keys(savedMaps).length > 0}
+        />
       ))}
       {showOrbits && PLANETS_DATA.map((planet) => <OrbitPath key={planet.name} distance={planet.distance} eccentricity={planet.eccentricity} color={accentColor} />)}
     </group>
   );
 }
 
-function KnowledgeSatellite({ nodeCount, planetRadius, color, speedMultiplier }: { nodeCount: number; planetRadius: number; color: string; speedMultiplier: number }) {
+function SystemSatellite({ distance, color, speedMultiplier, orbitIndex, phase, isOwn }: { distance: number; color: string; speedMultiplier: number; orbitIndex: number; phase: number; isOwn: boolean }) {
   const orbitRef = useRef<THREE.Group>(null);
-  const satelliteRef = useRef<THREE.Mesh>(null);
-  const distance = planetRadius * 2.4 + Math.min(nodeCount, 12) * 0.08;
-  const size = Math.min(0.85, 0.34 + nodeCount * 0.045);
+  const satelliteRef = useRef<THREE.Group>(null);
+  const size = isOwn ? 1.15 : 0.92 + orbitIndex * 0.05;
+  const orbitSpeed = 0.18 + orbitIndex * 0.035;
+  const trail = useMemo(() => Array.from({ length: isOwn ? 22 : 14 }, (_, index) => ({
+    z: 0.65 + index * 0.14 + Math.random() * 0.09,
+    x: (Math.random() - 0.5) * (0.05 + index * 0.018),
+    y: (Math.random() - 0.5) * (0.05 + index * 0.018),
+    scale: Math.max(0.018, 0.07 - index * 0.0025),
+  })), [isOwn]);
 
   useFrame((state, delta) => {
-    if (orbitRef.current) orbitRef.current.rotation.y = state.clock.getElapsedTime() * 0.9 * speedMultiplier;
+    if (orbitRef.current) orbitRef.current.rotation.y = phase + state.clock.getElapsedTime() * orbitSpeed * speedMultiplier;
     if (satelliteRef.current) satelliteRef.current.rotation.y += delta * 0.8 * speedMultiplier;
   });
 
   return (
-    <group rotation={[0.35, 0, 0.2]}>
+    <group rotation={[0.08 + orbitIndex * 0.055, 0, 0.04 + orbitIndex * 0.035]}>
       <mesh rotation={[Math.PI / 2, 0, 0]}>
         <torusGeometry args={[distance, 0.012, 6, 96]} />
-        <meshBasicMaterial color={color} transparent opacity={0.28} />
+        <meshBasicMaterial color={color} transparent opacity={0.1} />
       </mesh>
       <group ref={orbitRef}>
-        <mesh ref={satelliteRef} position={[distance, 0, 0]}>
-          <icosahedronGeometry args={[size, 2]} />
-          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.55} roughness={0.38} />
-          <pointLight color={color} intensity={1.2} distance={5} />
-        </mesh>
+        <group ref={satelliteRef} position={[distance, 0, 0]} rotation={[0.2, -Math.PI / 2, 0]} scale={size}>
+          <mesh rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.22, 0.28, 0.5, 16]} />
+            <meshStandardMaterial color="#a8afbd" metalness={0.85} roughness={0.28} />
+          </mesh>
+          <mesh position={[0, 0, -0.24]}>
+            <sphereGeometry args={[0.19, 20, 20]} />
+            <meshStandardMaterial color="#d9dfeb" emissive={color} emissiveIntensity={isOwn ? 1.4 : 0.8} metalness={0.55} roughness={0.22} />
+          </mesh>
+          {[0, Math.PI / 2].map((rotation) => (
+            <group key={rotation} rotation={[0, 0, rotation]}>
+              <mesh position={[0, 0.62, 0]}>
+                <boxGeometry args={[0.08, 0.82, 0.018]} />
+                <meshStandardMaterial color="#243d68" emissive="#10264d" emissiveIntensity={0.5} metalness={0.7} roughness={0.35} transparent opacity={0.9} />
+              </mesh>
+              <mesh position={[0, -0.62, 0]}>
+                <boxGeometry args={[0.08, 0.82, 0.018]} />
+                <meshStandardMaterial color="#243d68" emissive="#10264d" emissiveIntensity={0.5} metalness={0.7} roughness={0.35} transparent opacity={0.9} />
+              </mesh>
+            </group>
+          ))}
+          <mesh position={[0, 0, -0.47]} rotation={[Math.PI / 2, 0, 0]}>
+            <coneGeometry args={[0.2, 0.22, 20, 1, true]} />
+            <meshStandardMaterial color="#c5cad4" metalness={0.9} roughness={0.2} side={THREE.DoubleSide} />
+          </mesh>
+          {trail.map((particle, index) => (
+            <mesh key={index} position={[particle.x, particle.y, particle.z]} scale={particle.scale}>
+              <sphereGeometry args={[1, 6, 6]} />
+              <meshBasicMaterial color={index < 5 ? color : '#dbe7ff'} transparent opacity={Math.max(0.15, 0.85 - index * 0.035)} />
+            </mesh>
+          ))}
+          <pointLight color={color} intensity={isOwn ? 1.8 : 0.65} distance={5} />
+        </group>
       </group>
     </group>
   );

@@ -348,6 +348,19 @@ export function Planet({
         </sprite>
       )}
 
+      {atmosphere && (
+        <sprite scale={[radius * 6.4, radius * 6.4, 1]}>
+          <spriteMaterial
+            map={glowTexture}
+            color={atmosphere.color}
+            transparent
+            opacity={0.09}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+          />
+        </sprite>
+      )}
+
       {/* Clouds for Earth/Venus */}
       {(name === 'Earth' || name === 'Venus') && (
         <mesh ref={cloudsRef} scale={1.02} rotation={[THREE.MathUtils.degToRad(tilt), 0, 0]}>

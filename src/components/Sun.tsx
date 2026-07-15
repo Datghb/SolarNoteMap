@@ -136,7 +136,7 @@ export function Sun() {
         <meshBasicMaterial 
           color="#FF6B00" 
           transparent 
-          opacity={0.4} 
+          opacity={0.58} 
           side={THREE.BackSide}
           blending={THREE.AdditiveBlending}
         />
@@ -148,7 +148,7 @@ export function Sun() {
         <meshBasicMaterial 
           color="#FF4500" 
           transparent 
-          opacity={0.15} 
+          opacity={0.24} 
           side={THREE.BackSide}
           blending={THREE.AdditiveBlending}
         />
@@ -171,7 +171,7 @@ export function Sun() {
           color="#FFD700"
           size={0.15}
           transparent
-          opacity={0.6}
+          opacity={0.82}
           blending={THREE.AdditiveBlending}
           sizeAttenuation
           alphaTest={0.01}
@@ -182,7 +182,7 @@ export function Sun() {
       {/* Main light source */}
       <pointLight 
         color="#FFF5E1" 
-        intensity={3} 
+        intensity={5.5} 
         distance={500} 
         decay={0.3}
         castShadow
@@ -191,7 +191,7 @@ export function Sun() {
       {/* Secondary warm light */}
       <pointLight 
         color="#FF8C00" 
-        intensity={1} 
+        intensity={2.2} 
         distance={300} 
         decay={0.5}
       />
@@ -202,7 +202,7 @@ export function Sun() {
           map={glowTexture}
           color="#FFA500"
           transparent
-          opacity={0.3}
+          opacity={0.48}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
@@ -214,7 +214,7 @@ export function Sun() {
           map={glowTexture}
           color="#FF6347"
           transparent
-          opacity={0.1}
+          opacity={0.18}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
@@ -226,7 +226,7 @@ export function Sun() {
           map={glowTexture}
           color="#FFFFFF"
           transparent
-          opacity={0.2}
+          opacity={0.3}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
