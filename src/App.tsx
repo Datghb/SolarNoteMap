@@ -55,7 +55,7 @@ export function App() {
             <Stars radius={250} depth={80} count={1800} factor={7} saturation={0.4} fade speed={0.12} />
             <SpaceDust count={1800} color="#c9d6ff" />
             <ShootingStars count={3} color="#ffffff" />
-            <SolarSystem speedMultiplier={speedMultiplier} onPlanetClick={selectByPlanetName} showOrbits={showOrbits} showLabels accentColor="#7085ff" savedMaps={savedMaps} />
+            <SolarSystem speedMultiplier={speedMultiplier} onPlanetClick={selectByPlanetName} showOrbits={showOrbits} showLabels={!selectedLesson} accentColor="#7085ff" savedMaps={savedMaps} />
             <OrbitControls enablePan enableZoom enableRotate minDistance={28} maxDistance={250} autoRotate={!selectedLesson} autoRotateSpeed={0.18} />
           </Suspense>
         </Canvas>

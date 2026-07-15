@@ -35,6 +35,7 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [linkFrom, setLinkFrom] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [zoom, setZoom] = useState(1);
   const boardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -43,6 +44,7 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
     setSelectedId(null);
     setLinkFrom(null);
     setTab('brief');
+    setZoom(1);
   }, [lesson.id]);
 
   const selected = map.nodes.find((node) => node.id === selectedId);
@@ -92,8 +94,10 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
     const move = (pointerEvent: PointerEvent) => {
       const bounds = boardRef.current?.getBoundingClientRect();
       if (!bounds) return;
-      const x = Math.min(94, Math.max(6, ((pointerEvent.clientX - bounds.left) / bounds.width) * 100));
-      const y = Math.min(90, Math.max(10, ((pointerEvent.clientY - bounds.top) / bounds.height) * 100));
+      const rawX = ((pointerEvent.clientX - bounds.left) / bounds.width) * 100;
+      const rawY = ((pointerEvent.clientY - bounds.top) / bounds.height) * 100;
+      const x = Math.min(94, Math.max(6, 50 + (rawX - 50) / zoom));
+      const y = Math.min(90, Math.max(10, 50 + (rawY - 50) / zoom));
       setMap((current) => ({ ...current, nodes: current.nodes.map((node) => node.id === id ? { ...node, x, y } : node) }));
     };
     const stop = () => {
@@ -114,7 +118,7 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
   };
 
   return (
-    <aside className="learning-console" style={{ '--lesson-color': lesson.color } as React.CSSProperties}>
+    <aside className={`learning-console ${tab === 'map' ? 'map-open' : ''}`} style={{ '--lesson-color': lesson.color } as React.CSSProperties}>
       <header className="console-header">
         <div>
           <span className="eyebrow">{lesson.subtitle}</span>
@@ -154,20 +158,30 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
               <button disabled={!selectedId} className={linkFrom ? 'linking' : ''} onClick={() => setLinkFrom(selectedId)}>{linkFrom ? 'Chọn hạt đích…' : '↗ Tạo liên kết'}</button>
               <button onClick={saveMap}>{saved ? '✓ Đã lưu' : 'Lưu sơ đồ'}</button>
             </div>
-            <div className="knowledge-board" ref={boardRef}>
-              {map.nodes.length === 0 && <button className="empty-map" onClick={addNode}><b>＋</b><span>Tạo hạt kiến thức đầu tiên</span><small>Mỗi hạt là một điều bạn hiểu sau buổi học</small></button>}
-              <svg className="edge-layer" viewBox="0 0 100 100" preserveAspectRatio="none">
-                {map.edges.map((edge, index) => {
-                  const from = map.nodes.find((node) => node.id === edge.from);
-                  const to = map.nodes.find((node) => node.id === edge.to);
-                  return from && to ? <line key={index} x1={from.x} y1={from.y} x2={to.x} y2={to.y} /> : null;
-                })}
-              </svg>
-              {map.nodes.map((node) => (
-                <button key={node.id} className={`knowledge-node ${node.importance} ${selectedId === node.id ? 'selected' : ''} ${linkFrom === node.id ? 'link-source' : ''}`} style={{ left: `${node.x}%`, top: `${node.y}%` }} onClick={() => chooseNode(node.id)} onPointerDown={(event) => moveNode(event, node.id)}>
-                  <span>{node.title}</span>
-                </button>
-              ))}
+            <div className="knowledge-board" ref={boardRef} onWheel={(event) => {
+              event.preventDefault();
+              setZoom((value) => Math.min(1.8, Math.max(0.45, value + (event.deltaY < 0 ? 0.1 : -0.1))));
+            }}>
+              <div className="zoom-controls">
+                <button onClick={() => setZoom((value) => Math.max(0.45, value - 0.1))} aria-label="Thu nhỏ">−</button>
+                <button className="zoom-value" onClick={() => setZoom(1)} title="Đặt lại 100%">{Math.round(zoom * 100)}%</button>
+                <button onClick={() => setZoom((value) => Math.min(1.8, value + 0.1))} aria-label="Phóng to">＋</button>
+              </div>
+              <div className="knowledge-stage" style={{ transform: `scale(${zoom})` }}>
+                {map.nodes.length === 0 && <button className="empty-map" onClick={addNode}><b>＋</b><span>Tạo hạt kiến thức đầu tiên</span><small>Mỗi hạt là một điều bạn hiểu sau buổi học</small></button>}
+                <svg className="edge-layer" viewBox="0 0 100 100" preserveAspectRatio="none">
+                  {map.edges.map((edge, index) => {
+                    const from = map.nodes.find((node) => node.id === edge.from);
+                    const to = map.nodes.find((node) => node.id === edge.to);
+                    return from && to ? <line key={index} x1={from.x} y1={from.y} x2={to.x} y2={to.y} /> : null;
+                  })}
+                </svg>
+                {map.nodes.map((node) => (
+                  <button key={node.id} className={`knowledge-node ${node.importance} ${selectedId === node.id ? 'selected' : ''} ${linkFrom === node.id ? 'link-source' : ''}`} style={{ left: `${node.x}%`, top: `${node.y}%` }} onClick={() => chooseNode(node.id)} onPointerDown={(event) => moveNode(event, node.id)}>
+                    <span>{node.title}</span>
+                  </button>
+                ))}
+              </div>
             </div>
             {selected && (
               <div className="node-editor">
