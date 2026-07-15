@@ -2,6 +2,10 @@
 
 `Solar Note Map` là một ứng dụng học tập tương tác viết bằng React + Three.js. Dự án biến mỗi bài học AI thành một hành tinh trong không gian 3D, để người học vừa khám phá nội dung vừa tự tạo sơ đồ kiến thức ngay trong giao diện.
 
+## Preview
+
+![Solar Note Map Preview](./image.png)
+
 ## Mục tiêu dự án
 
 - Trực quan hóa lộ trình học AI cơ bản bằng mô hình vũ trụ.
