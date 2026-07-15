@@ -1,253 +1,130 @@
-# 🌌 Interactive Solar System Explorer
+# Solar Note Map
 
-<div align="center">
+`Solar Note Map` là một ứng dụng học tập tương tác viết bằng React + Three.js. Dự án biến mỗi bài học AI thành một hành tinh trong không gian 3D, để người học vừa khám phá nội dung vừa tự tạo sơ đồ kiến thức ngay trong giao diện.
 
-![Solar System](https://img.shields.io/badge/Solar%20System-3D%20Interactive-blueviolet?style=for-the-badge)
-![React](https://img.shields.io/badge/React-19.2.3-61DAFB?style=for-the-badge&logo=react)
-![Three.js](https://img.shields.io/badge/Three.js-0.182.0-000000?style=for-the-badge&logo=three.js)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.9.3-3178C6?style=for-the-badge&logo=typescript)
+## Mục tiêu dự án
 
-**A breathtaking 3D journey through our solar system and beyond**
+- Trực quan hóa lộ trình học AI cơ bản bằng mô hình vũ trụ.
+- Cho phép người học ghi lại ý chính dưới dạng `knowledge map`.
+- Tạo cảm giác học tập giàu tương tác thay vì đọc nội dung tĩnh.
 
-[Live Demo](https://solar-system-explorer-gold.vercel.app/) • [Features](#-features) • [Quick Start](#-quick-start) • [Controls](#-controls)
+## Tính năng chính
 
-</div>
+- Mô phỏng hệ hành tinh 3D bằng `@react-three/fiber` và `three`.
+- Mỗi hành tinh đại diện cho một bài học trong hành trình AI căn bản.
+- Bảng học (`LearningConsole`) gồm 3 chế độ:
+  - `Nhiệm vụ`: giới thiệu bài học và câu hỏi dẫn đường.
+  - `Sơ đồ`: tạo, kéo thả, nối và phân cấp các hạt kiến thức.
+  - `Cộng đồng`: hiển thị dữ liệu mẫu về cách học viên khác ghi chú.
+- Lưu sơ đồ của từng bài học vào `localStorage`.
+- Bật/tắt quỹ đạo và dừng/chạy chuyển động của hệ hành tinh.
+- Hiển thị tiến độ sơ đồ đã lưu qua các vệ tinh bay quanh hệ.
 
----
+## Công nghệ sử dụng
 
-## ✨ What Makes This Special?
+- `React 19`
+- `TypeScript`
+- `Vite`
+- `Three.js`
+- `@react-three/fiber`
+- `@react-three/drei`
+- `Tailwind CSS 4`
+- `vite-plugin-singlefile`
 
-Ever wanted to explore space from your browser? This isn't just another solar system visualization - it's an **interactive cosmic playground** where you can:
+## Cài đặt và chạy local
 
-- 🪐 **Explore all 8 planets** with scientifically accurate orbital mechanics
-- 🌈 **Switch between 8 stunning space themes** (from Classic Dark to Aurora Green)
-- 🌌 **Discover deep space objects**: black holes, wormholes, nebulae, pulsars, and more
-- ⏱️ **Control time itself** with adjustable orbital speeds (0x to 10x)
-- 🎮 **Fully interactive 3D controls** - rotate, zoom, and pan freely
-- 📚 **Learn as you explore** with detailed information panels for every celestial body
+Yêu cầu:
 
-## 🎬 Preview
+- `Node.js` 18 trở lên
+- `npm`
 
-<div align="center">
-
-```
-     ✨        🌍         ☄️
-        🌞              
-   🪐              🌙
-        ⭐    🌌    ⭐
-```
-
-*Imagine this, but in stunning 3D with real physics*
-
-</div>
-
-## 🚀 Features
-
-### 🌍 Realistic Solar System
-- **8 Planets** with accurate:
-  - Orbital distances and periods
-  - Rotation speeds and axial tilts
-  - Colors and atmospheric effects
-  - Moons (Earth's moon included!)
-  - Planetary rings (Saturn & Uranus)
-- **Asteroid Belt** with 200+ animated asteroids
-- **The Sun** with dynamic glow and corona effects
-
-### 🌌 Deep Space Objects
-Toggle visibility of cosmic wonders:
-- 🌌 **Milky Way Galaxy** - Our home in the cosmos
-- ✨ **Star Clusters** - Globular clusters scattered across space
-- 🕳️ **Wormhole** - Einstein-Rosen bridge (theoretical!)
-- ⚫ **Black Hole** - With gravitational lensing effects
-- ☄️ **Comets** - Orbiting with beautiful tails
-- 🌫️ **Nebulae** - Stellar nurseries in vibrant colors
-- 💫 **Pulsar** - Rotating neutron star with beams
-- 🌠 **Shooting Stars** - Meteors streaking across the sky
-- 🔭 **Distant Galaxies** - Billions of light years away
-
-### 🎨 Customization
-- **8 Space Themes**:
-  - Classic Dark
-  - Deep Blue
-  - Cosmic Purple
-  - Warm Nebula
-  - Aurora Green
-  - Blood Moon
-  - Ice Cold
-  - Galaxy Pink
-- Toggle orbits, labels, and individual space objects
-- Adjustable time speed (pause, slow-mo, or time-lapse)
-
-### 📖 Educational Content
-Click any planet or space object to learn:
-- Physical characteristics (size, mass, temperature)
-- Distance from Earth/Sun
-- Fascinating facts and trivia
-- Scientific classifications
-
-## 🛠️ Tech Stack
-
-Built with cutting-edge web technologies:
-
-- **React 19** - Latest React with concurrent features
-- **Three.js** - Powerful 3D graphics engine
-- **React Three Fiber** - React renderer for Three.js
-- **React Three Drei** - Useful helpers for R3F
-- **TypeScript** - Type-safe development
-- **Tailwind CSS 4** - Modern utility-first styling
-- **Vite** - Lightning-fast build tool
-
-## 📦 Quick Start
-
-### Prerequisites
-- Node.js 18+ installed
-- npm or yarn package manager
-
-### Installation
+Chạy dự án:
 
 ```bash
-# Clone the repository
-git clone <your-repo-url>
-cd solar-system-explorer
-
-# Install dependencies
 npm install
-
-# Start the development server
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173) and start exploring! 🚀
+Sau đó mở `http://localhost:5173`.
 
-### Build for Production
+Build production:
 
 ```bash
-# Create optimized production build
 npm run build
-
-# Preview production build locally
 npm run preview
 ```
 
-## 🎮 Controls
+## Cấu trúc thư mục
 
-| Action | Control |
-|--------|---------|
-| **Rotate View** | Click + Drag |
-| **Zoom In/Out** | Mouse Wheel / Pinch |
-| **Pan Camera** | Right Click + Drag |
-| **Select Planet** | Click on any planet |
-| **View Info** | Click planet/object for details |
-| **Change Theme** | Click "Space Theme" button |
-| **Adjust Speed** | Use time speed slider |
-| **Toggle Objects** | Use "Space Objects" panel |
-
-## 🎯 Usage Tips
-
-1. **Start Slow**: Begin with 1x speed to appreciate the orbital mechanics
-2. **Explore Themes**: Try different color palettes - each creates a unique atmosphere
-3. **Hide Clutter**: Toggle off space objects for a cleaner view of the solar system
-4. **Learn**: Click everything! Each object has fascinating information
-5. **Find Hidden Details**: Zoom in close to planets to see surface details and atmospheres
-6. **Time Travel**: Crank up the speed to 10x and watch years pass in seconds
-
-## 📁 Project Structure
-
-```
+```text
 src/
-├── components/
-│   ├── Planet.tsx          # Individual planet component
-│   ├── Sun.tsx             # Sun with corona effects
-│   ├── SolarSystem.tsx     # Main solar system orchestrator
-│   ├── SpaceObjects.tsx    # Deep space objects (black holes, nebulae, etc.)
-│   ├── PlanetInfo.tsx      # Planet information panel
-│   └── SpaceObjectInfo.tsx # Space object information panel
-├── data/
-│   └── spaceObjects.ts     # Educational content and data
-├── utils/
-│   └── cn.ts               # Utility functions
-├── App.tsx                 # Main application component
-├── main.tsx                # Application entry point
-└── index.css               # Global styles
+  components/
+    LearningConsole.tsx   # Panel học tập và sơ đồ kiến thức
+    SolarSystem.tsx       # Hệ hành tinh và quỹ đạo
+    Planet.tsx            # Hành tinh riêng lẻ
+    Sun.tsx               # Mặt trời
+    SpaceObjects.tsx      # Tinh vân, sao băng, sao chổi...
+    PlanetInfo.tsx
+    SpaceObjectInfo.tsx
+  data/
+    lessons.ts            # Nội dung metadata cho các bài học
+    spaceObjects.ts
+  utils/
+    cn.ts
+  App.tsx                 # Bố cục chính và điều phối trạng thái
+  index.css               # Toàn bộ giao diện
+  main.tsx                # Entry point
 ```
 
-## 🎨 Customization
+## Dữ liệu bài học hiện có
 
-### Adding a New Planet
+Hiện tại dự án có 5 bài học:
 
-Edit `src/components/SolarSystem.tsx`:
+1. `AI Foundations`
+2. `Machine Learning`
+3. `Data & Features`
+4. `Learning Types`
+5. `Neural Networks`
 
-```typescript
-const PLANETS_DATA = [
-  // ... existing planets
-  {
-    name: 'YourPlanet',
-    radius: 1.5,
-    distance: 45,
-    orbitalPeriod: 1000,
-    rotationPeriod: 2,
-    colors: ['#FF0000', '#00FF00'],
-    tilt: 15,
-    eccentricity: 0.05,
-  }
-];
-```
+Bạn có thể chỉnh danh sách này trong [src/data/lessons.ts](/Users/apple/SolarNoteMap/src/data/lessons.ts).
 
-### Creating a New Theme
+## Cách hoạt động của sơ đồ kiến thức
 
-Edit the `SPACE_PALETTES` array in `src/App.tsx`:
+- Mỗi bài học có một map riêng.
+- Dữ liệu được lưu theo key dạng `solar-note-map:<lesson-id>` trong `localStorage`.
+- Mỗi node gồm:
+  - tiêu đề
+  - ghi chú
+  - mức độ quan trọng
+  - vị trí trên board
+- Người dùng có thể tạo liên kết giữa các node để thể hiện quan hệ ý tưởng.
 
-```typescript
-{
-  name: 'Your Theme',
-  bg: '#000000',
-  stars: '#ffffff',
-  nebula: '#1a0033',
-  accent: '#4a00e0',
-  nebulaColors: ['#4a00e0', '#1a0033', '#6600ff']
-}
-```
+## Tùy biến nhanh
 
-## 🤝 Contributing
+Thêm bài học mới:
 
-Contributions are welcome! Here are some ideas:
+- cập nhật `LESSONS` trong [src/data/lessons.ts](/Users/apple/SolarNoteMap/src/data/lessons.ts)
+- hành tinh sẽ được tạo tự động từ dữ liệu bài học trong [src/components/SolarSystem.tsx](/Users/apple/SolarNoteMap/src/components/SolarSystem.tsx)
 
-- 🌙 Add more moons to other planets
-- 🛸 Include spacecraft or satellites
-- 🌟 Add more space phenomena (supernovae, quasars)
-- 📱 Improve mobile responsiveness
-- 🎵 Add ambient space sounds
-- 🌐 Internationalization support
+Điều chỉnh giao diện chính:
 
-## 📝 License
+- sửa layout và logic tổng trong [src/App.tsx](/Users/apple/SolarNoteMap/src/App.tsx)
+- sửa phong cách hiển thị trong [src/index.css](/Users/apple/SolarNoteMap/src/index.css)
 
-This project is open source and available under the MIT License.
+## Ghi chú phát triển
 
-## 🙏 Acknowledgments
+- Dự án hiện đang dùng `vite-plugin-singlefile`, phù hợp nếu muốn xuất gói tĩnh gọn hơn.
+- Dữ liệu cộng đồng trong `LearningConsole` đang là mock data.
+- Chưa có backend; toàn bộ dữ liệu người học hiện lưu cục bộ trên trình duyệt.
 
-- Planetary data based on NASA's solar system exploration
-- Three.js community for amazing 3D capabilities
-- React Three Fiber team for the excellent React integration
+## Hướng mở rộng phù hợp
 
-## 🐛 Known Issues
+- Đồng bộ sơ đồ kiến thức lên database.
+- Thêm đăng nhập và lưu tiến độ theo tài khoản.
+- Mở rộng thêm lesson, quiz hoặc flashcard.
+- Cho phép chia sẻ sơ đồ giữa người học.
+- Thêm analytics cho hành trình học tập.
 
-- Performance may vary on older devices (3D rendering is intensive)
-- Some space objects may overlap at certain camera angles
-- Mobile touch controls could be improved
+## License
 
-## 📮 Contact
-
-Have questions or suggestions? Feel free to open an issue!
-OR you can mail me at yaksh.inbox@gmail.com
-
----
-
-<div align="center">
-
-**Made with ❤️ by Yaksh Devani**
-
-*"The cosmos is within us. We are made of star-stuff."* - Carl Sagan
-
-⭐ Star this repo if you enjoyed exploring space!
-
-</div>
+Chưa khai báo license chính thức trong repo. Nếu bạn muốn public dự án, nên bổ sung file `LICENSE`.
