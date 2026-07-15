@@ -6,12 +6,34 @@ interface SpaceObjectProps {
   onSelect?: () => void;
 }
 
+function useGlowTexture() {
+  return useMemo(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d')!;
+
+    const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+    gradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.6)');
+    gradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.12)');
+    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+  }, []);
+}
+
 // ============================================
 // MILKY WAY GALAXY BACKGROUND
 // ============================================
 export function MilkyWayGalaxy({ color = '#4a00e0', onSelect }: { color: string } & SpaceObjectProps) {
   const galaxyRef = useRef<THREE.Points>(null);
   const coreRef = useRef<THREE.Mesh>(null);
+  const glowTexture = useGlowTexture();
 
   const { positions, colors, sizes } = useMemo(() => {
     const positions: number[] = [];
@@ -86,12 +108,15 @@ export function MilkyWayGalaxy({ color = '#4a00e0', onSelect }: { color: string 
           <bufferAttribute attach="attributes-size" args={[sizes, 1]} />
         </bufferGeometry>
         <pointsMaterial
+          map={glowTexture}
           size={1.5}
           vertexColors
           transparent
           opacity={0.8}
           blending={THREE.AdditiveBlending}
           sizeAttenuation
+          alphaTest={0.01}
+          depthWrite={false}
         />
       </points>
 
@@ -109,10 +134,12 @@ export function MilkyWayGalaxy({ color = '#4a00e0', onSelect }: { color: string 
       {/* Core bright center */}
       <sprite scale={[150, 150, 1]}>
         <spriteMaterial
+          map={glowTexture}
           color="#ffffff"
           transparent
           opacity={0.4}
           blending={THREE.AdditiveBlending}
+          depthWrite={false}
         />
       </sprite>
     </group>
@@ -135,6 +162,7 @@ export function StarCluster({
   color?: string;
 } & SpaceObjectProps) {
   const clusterRef = useRef<THREE.Points>(null);
+  const glowTexture = useGlowTexture();
 
   const { positions, sizes } = useMemo(() => {
     const positions: number[] = [];
@@ -185,12 +213,15 @@ export function StarCluster({
           <bufferAttribute attach="attributes-size" args={[sizes, 1]} />
         </bufferGeometry>
         <pointsMaterial
+          map={glowTexture}
           color={color}
           size={1}
           transparent
           opacity={0.9}
           blending={THREE.AdditiveBlending}
           sizeAttenuation
+          alphaTest={0.01}
+          depthWrite={false}
         />
       </points>
 
@@ -201,10 +232,12 @@ export function StarCluster({
 
       <sprite scale={[radius * 2, radius * 2, 1]}>
         <spriteMaterial
+          map={glowTexture}
           color={color}
           transparent
           opacity={0.15}
           blending={THREE.AdditiveBlending}
+          depthWrite={false}
         />
       </sprite>
     </group>
@@ -227,6 +260,7 @@ export function Wormhole({
   const wormholeRef = useRef<THREE.Group>(null);
   const ringRefs = useRef<THREE.Mesh[]>([]);
   const particlesRef = useRef<THREE.Points>(null);
+  const glowTexture = useGlowTexture();
 
   const { particlePositions, particleSpeeds } = useMemo(() => {
     const particlePositions: number[] = [];
@@ -326,22 +360,27 @@ export function Wormhole({
             <bufferAttribute attach="attributes-position" args={[particlePositions, 3]} />
           </bufferGeometry>
           <pointsMaterial
+            map={glowTexture}
             color={color}
             size={0.3}
             transparent
             opacity={0.6}
             blending={THREE.AdditiveBlending}
             sizeAttenuation
+            alphaTest={0.01}
+            depthWrite={false}
           />
         </points>
 
         {/* Outer glow */}
         <sprite scale={[40, 40, 1]}>
           <spriteMaterial
+            map={glowTexture}
             color={color}
             transparent
             opacity={0.3}
             blending={THREE.AdditiveBlending}
+            depthWrite={false}
           />
         </sprite>
 
@@ -375,6 +414,7 @@ export function BlackHole({
   const blackHoleRef = useRef<THREE.Group>(null);
   const accretionRef = useRef<THREE.Mesh>(null);
   const lensRef = useRef<THREE.Mesh>(null);
+  const glowTexture = useGlowTexture();
 
   const accretionTexture = useMemo(() => {
     const canvas = document.createElement('canvas');
@@ -491,10 +531,12 @@ export function BlackHole({
       {/* Gravitational distortion effect */}
       <sprite scale={[50, 50, 1]}>
         <spriteMaterial
+          map={glowTexture}
           color="#ff6600"
           transparent
           opacity={0.15}
           blending={THREE.AdditiveBlending}
+          depthWrite={false}
         />
       </sprite>
     </group>
@@ -516,6 +558,7 @@ export function Comet({
 } & SpaceObjectProps) {
   const cometRef = useRef<THREE.Group>(null);
   const tailRef = useRef<THREE.Points>(null);
+  const glowTexture = useGlowTexture();
 
   const tailParticles = useMemo(() => {
     const positions: number[] = [];
@@ -605,12 +648,15 @@ export function Comet({
           <bufferAttribute attach="attributes-size" args={[tailParticles.sizes, 1]} />
         </bufferGeometry>
         <pointsMaterial
+          map={glowTexture}
           color={color}
           size={0.5}
           transparent
           opacity={0.6}
           blending={THREE.AdditiveBlending}
           sizeAttenuation
+          alphaTest={0.01}
+          depthWrite={false}
         />
       </points>
 
@@ -719,6 +765,7 @@ export function Nebula({
 }
 
 function NebulaStars({ count, radius }: { count: number; radius: number }) {
+  const glowTexture = useGlowTexture();
   const positions = useMemo(() => {
     const pos: number[] = [];
     for (let i = 0; i < count; i++) {
@@ -740,11 +787,14 @@ function NebulaStars({ count, radius }: { count: number; radius: number }) {
         <bufferAttribute attach="attributes-position" args={[positions, 3]} />
       </bufferGeometry>
       <pointsMaterial
+        map={glowTexture}
         color="#ffffff"
         size={0.8}
         transparent
         opacity={0.9}
         blending={THREE.AdditiveBlending}
+        alphaTest={0.01}
+        depthWrite={false}
       />
     </points>
   );
@@ -764,6 +814,7 @@ export function Pulsar({
   const pulsarRef = useRef<THREE.Group>(null);
   const beamRef1 = useRef<THREE.Mesh>(null);
   const beamRef2 = useRef<THREE.Mesh>(null);
+  const glowTexture = useGlowTexture();
 
   useFrame((state) => {
     const time = state.clock.getElapsedTime();
@@ -822,10 +873,12 @@ export function Pulsar({
       {/* Glow */}
       <sprite scale={[15, 15, 1]}>
         <spriteMaterial
+          map={glowTexture}
           color={color}
           transparent
           opacity={0.3}
           blending={THREE.AdditiveBlending}
+          depthWrite={false}
         />
       </sprite>
     </group>
@@ -972,6 +1025,7 @@ function DistantGalaxy({
   onSelect?: () => void;
 }) {
   const ref = useRef<THREE.Group>(null);
+  const glowTexture = useGlowTexture();
 
   useFrame((state) => {
     if (ref.current) {
@@ -1001,28 +1055,34 @@ function DistantGalaxy({
         <>
           <sprite scale={[scale, scale * 0.3, 1]} rotation={[0, 0, rotation]}>
             <spriteMaterial
+              map={glowTexture}
               color={color}
               transparent
               opacity={0.6}
               blending={THREE.AdditiveBlending}
+              depthWrite={false}
             />
           </sprite>
           <sprite scale={[scale * 0.4, scale * 0.4, 1]}>
             <spriteMaterial
+              map={glowTexture}
               color="#ffffff"
               transparent
               opacity={0.8}
               blending={THREE.AdditiveBlending}
+              depthWrite={false}
             />
           </sprite>
         </>
       ) : (
         <sprite scale={[scale * 0.6, scale * 0.4, 1]}>
           <spriteMaterial
+            map={glowTexture}
             color={color}
             transparent
             opacity={0.5}
             blending={THREE.AdditiveBlending}
+            depthWrite={false}
           />
         </sprite>
       )}
@@ -1035,6 +1095,7 @@ function DistantGalaxy({
 // ============================================
 export function SpaceDust({ count = 3000, color = '#ffffff' }: { count?: number; color?: string }) {
   const dustRef = useRef<THREE.Points>(null);
+  const glowTexture = useGlowTexture();
 
   const positions = useMemo(() => {
     const pos: number[] = [];
@@ -1061,12 +1122,15 @@ export function SpaceDust({ count = 3000, color = '#ffffff' }: { count?: number;
         <bufferAttribute attach="attributes-position" args={[positions, 3]} />
       </bufferGeometry>
       <pointsMaterial
+        map={glowTexture}
         color={color}
         size={0.3}
         transparent
         opacity={0.3}
         blending={THREE.AdditiveBlending}
         sizeAttenuation
+        alphaTest={0.01}
+        depthWrite={false}
       />
     </points>
   );

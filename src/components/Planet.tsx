@@ -58,6 +58,25 @@ export function Planet({
   // Random starting position
   const startAngle = useMemo(() => Math.random() * Math.PI * 2, []);
 
+  const glowTexture = useMemo(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d')!;
+
+    const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+    gradient.addColorStop(0.35, 'rgba(255, 255, 255, 0.45)');
+    gradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.08)');
+    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+  }, []);
+
   // Create procedural texture for planet
   const planetTexture = useMemo(() => {
     const canvas = document.createElement('canvas');
@@ -317,10 +336,12 @@ export function Planet({
       {atmosphere && (
         <sprite scale={[radius * 4, radius * 4, 1]}>
           <spriteMaterial
+            map={glowTexture}
             color={atmosphere.color}
             transparent
             opacity={0.15}
             blending={THREE.AdditiveBlending}
+            depthWrite={false}
           />
         </sprite>
       )}

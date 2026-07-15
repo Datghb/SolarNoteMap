@@ -7,6 +7,25 @@ export function Sun() {
   const coronaRef = useRef<THREE.Mesh>(null);
   const flareRef = useRef<THREE.Points>(null);
 
+  const glowTexture = useMemo(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d')!;
+
+    const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+    gradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.55)');
+    gradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.12)');
+    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+  }, []);
+
   // Create procedural sun texture
   const sunTexture = useMemo(() => {
     const canvas = document.createElement('canvas');
@@ -148,12 +167,15 @@ export function Sun() {
           />
         </bufferGeometry>
         <pointsMaterial
+          map={glowTexture}
           color="#FFD700"
           size={0.15}
           transparent
           opacity={0.6}
           blending={THREE.AdditiveBlending}
           sizeAttenuation
+          alphaTest={0.01}
+          depthWrite={false}
         />
       </points>
 
@@ -177,30 +199,36 @@ export function Sun() {
       {/* Corona glow sprite */}
       <sprite scale={[30, 30, 1]}>
         <spriteMaterial
+          map={glowTexture}
           color="#FFA500"
           transparent
           opacity={0.3}
           blending={THREE.AdditiveBlending}
+          depthWrite={false}
         />
       </sprite>
 
       {/* Outer halo */}
       <sprite scale={[50, 50, 1]}>
         <spriteMaterial
+          map={glowTexture}
           color="#FF6347"
           transparent
           opacity={0.1}
           blending={THREE.AdditiveBlending}
+          depthWrite={false}
         />
       </sprite>
 
       {/* Lens flare effect */}
       <sprite scale={[15, 15, 1]} position={[3, 3, 0]}>
         <spriteMaterial
+          map={glowTexture}
           color="#FFFFFF"
           transparent
           opacity={0.2}
           blending={THREE.AdditiveBlending}
+          depthWrite={false}
         />
       </sprite>
     </group>
