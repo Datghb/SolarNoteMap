@@ -30,11 +30,27 @@ interface KnowledgeMap {
   edges: KnowledgeEdge[];
 }
 
+interface ReviewComment {
+  id: string;
+  author: string;
+  content: string;
+  target: string;
+  replyTo?: string;
+  createdAt: string;
+}
+
 const EMPTY_MAP: KnowledgeMap = { nodes: [], edges: [] };
 const COMMUNITY = [
   { name: 'Minh Anh', nodes: 8, comment: 'Phân biệt ví dụ AI và automation rất rõ.' },
   { name: 'Gia Huy', nodes: 6, comment: 'Sơ đồ gọn, có thể thêm phần dữ liệu đầu vào.' },
   { name: 'Thảo Linh', nodes: 11, comment: 'Nhiều liên kết thực tế, dễ hình dung.' },
+];
+const COMMUNITY_PREVIEW_NODES = [
+  { title: 'Khái niệm chính', level: 5, x: 50, y: 48, note: 'AI là khả năng của máy tính thực hiện các nhiệm vụ thường cần trí thông minh con người.', example: 'Nhận diện hình ảnh, hiểu ngôn ngữ và hỗ trợ ra quyết định.' },
+  { title: 'Dữ liệu', level: 4, x: 23, y: 24, note: 'Dữ liệu là nguyên liệu giúp hệ thống AI học được các mẫu và quy luật.', example: 'Ảnh đã gắn nhãn được dùng để huấn luyện mô hình phân loại.' },
+  { title: 'Mô hình', level: 3, x: 78, y: 27, note: 'Mô hình là kết quả của quá trình học từ dữ liệu và được dùng để dự đoán.', example: 'Mô hình dự đoán một email có phải thư rác hay không.' },
+  { title: 'Ứng dụng', level: 2, x: 25, y: 76, note: 'AI được ứng dụng để tự động hóa hoặc hỗ trợ con người xử lý vấn đề.', example: 'Trợ lý học tập, chẩn đoán hình ảnh và hệ thống gợi ý.' },
+  { title: 'Rủi ro', level: 1, x: 75, y: 75, note: 'Kết quả AI có thể sai lệch nếu dữ liệu thiếu đại diện hoặc mục tiêu thiết kế chưa phù hợp.', example: 'Mô hình nhận diện hoạt động kém với nhóm dữ liệu ít xuất hiện.' },
 ];
 
 export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: () => void }) {
@@ -44,6 +60,13 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
   const [linkFrom, setLinkFrom] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [reviewingStudent, setReviewingStudent] = useState<string | null>(null);
+  const [comments, setComments] = useState<ReviewComment[]>([]);
+  const [commentText, setCommentText] = useState('');
+  const [commentTarget, setCommentTarget] = useState('Toàn bộ sơ đồ');
+  const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [selectedPreviewNode, setSelectedPreviewNode] = useState<string | null>(null);
+  const [hoveredPreviewNode, setHoveredPreviewNode] = useState<string | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -53,7 +76,23 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
     setLinkFrom(null);
     setTab('brief');
     setZoom(1);
+    setReviewingStudent(null);
   }, [lesson.id]);
+
+  useEffect(() => {
+    if (!reviewingStudent) return;
+    const stored = localStorage.getItem(`solar-note-reviews:${lesson.id}:${reviewingStudent}`);
+    try {
+      setComments(stored ? JSON.parse(stored) : []);
+    } catch {
+      setComments([]);
+    }
+    setCommentText('');
+    setCommentTarget('Toàn bộ sơ đồ');
+    setReplyTo(null);
+    setSelectedPreviewNode(null);
+    setHoveredPreviewNode(null);
+  }, [lesson.id, reviewingStudent]);
 
   const selected = map.nodes.find((node) => node.id === selectedId);
 
@@ -129,8 +168,25 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
     window.setTimeout(() => setSaved(false), 1800);
   };
 
+  const submitComment = () => {
+    const content = commentText.trim();
+    if (!content || !reviewingStudent) return;
+    const next = [...comments, {
+      id: crypto.randomUUID(),
+      author: 'Anh Nguyen',
+      content,
+      target: commentTarget,
+      replyTo: replyTo ?? undefined,
+      createdAt: new Date().toISOString(),
+    }];
+    setComments(next);
+    localStorage.setItem(`solar-note-reviews:${lesson.id}:${reviewingStudent}`, JSON.stringify(next));
+    setCommentText('');
+    setReplyTo(null);
+  };
+
   return (
-    <aside className={`learning-console ${tab === 'map' ? 'map-open' : ''}`} style={{ '--lesson-color': lesson.color } as React.CSSProperties}>
+    <aside className={`learning-console ${tab === 'map' ? 'map-open' : ''} ${tab === 'community' && reviewingStudent ? 'community-open' : ''}`} style={{ '--lesson-color': lesson.color } as React.CSSProperties}>
       <header className="console-header">
         <div>
           <span className="eyebrow">{lesson.subtitle}</span>
@@ -214,14 +270,55 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
 
         {tab === 'community' && (
           <section className="community-view">
-            <div className="community-intro"><span>12 sơ đồ đang bay quanh hành tinh</span><p>Xem cách mỗi học viên kết nối cùng một bài học theo góc nhìn riêng.</p></div>
-            {COMMUNITY.map((student, index) => (
-              <article className="student-map" key={student.name}>
-                <div className="avatar">{student.name.slice(0, 1)}</div>
-                <div><b>{student.name}</b><span>{student.nodes} hạt kiến thức · {index + 2} liên kết</span><p>“{student.comment}”</p></div>
-                <button>Xem</button>
-              </article>
-            ))}
+            {!reviewingStudent ? <>
+              <div className="community-intro"><span>12 sơ đồ đang bay quanh hành tinh</span><p>Xem cách mỗi học viên kết nối cùng một bài học theo góc nhìn riêng.</p></div>
+              {COMMUNITY.map((student, index) => (
+                <article
+                  className="student-map"
+                  key={student.name}
+                  role="button"
+                  tabIndex={0}
+                  onPointerDown={() => setReviewingStudent(student.name)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') setReviewingStudent(student.name);
+                  }}
+                >
+                  <div className="avatar">{student.name.slice(0, 1)}</div>
+                  <div><b>{student.name}</b><span>{student.nodes} hạt kiến thức · {index + 2} liên kết</span><p>“{student.comment}”</p></div>
+                  <button type="button" onPointerDown={(event) => { event.stopPropagation(); setReviewingStudent(student.name); }}>Xem →</button>
+                </article>
+              ))}
+            </> : (
+              <div className="review-workspace">
+                <div className="review-topline"><button onClick={() => setReviewingStudent(null)}>← Danh sách</button><div><b>Sơ đồ của {reviewingStudent}</b><span>{lesson.shortName}</span></div></div>
+                <div className="community-map-preview">
+                  <svg viewBox="0 0 100 100" preserveAspectRatio="none"><line x1="50" y1="48" x2="23" y2="24"/><line x1="50" y1="48" x2="78" y2="27"/><line x1="50" y1="48" x2="25" y2="76"/><line x1="50" y1="48" x2="75" y2="75"/></svg>
+                  {COMMUNITY_PREVIEW_NODES.map((node) => <button key={node.title} className={`preview-node level-${node.level} ${selectedPreviewNode === node.title ? 'active' : ''}`} style={{ left: `${node.x}%`, top: `${node.y}%` }} onPointerEnter={() => setHoveredPreviewNode(node.title)} onPointerLeave={() => setHoveredPreviewNode(null)} onFocus={() => setHoveredPreviewNode(node.title)} onBlur={() => setHoveredPreviewNode(null)} onClick={() => { setSelectedPreviewNode(node.title); setCommentTarget(node.title); }}><span>{node.title}</span></button>)}
+                  {hoveredPreviewNode && (() => {
+                    const node = COMMUNITY_PREVIEW_NODES.find((item) => item.title === hoveredPreviewNode)!;
+                    return <div className={`node-hover-card ${node.x > 60 ? 'place-left' : ''}`} style={{ left: `${node.x}%`, top: `${node.y}%` }}><small>Mức {node.level}</small><b>{node.title}</b><p>{node.note}</p><span>{node.example}</span><i>Nhấn để ghim và nhận xét</i></div>;
+                  })()}
+                </div>
+                <aside className="review-panel">
+                  {selectedPreviewNode && (() => {
+                    const node = COMMUNITY_PREVIEW_NODES.find((item) => item.title === selectedPreviewNode)!;
+                    return <section className="preview-node-detail"><div><span>Mức {node.level} · Nội dung node</span><button onClick={() => setSelectedPreviewNode(null)}>×</button></div><h3>{node.title}</h3><p>{node.note}</p><small>Ví dụ / ghi chú</small><blockquote>{node.example}</blockquote></section>;
+                  })()}
+                  <div className="review-heading"><b>Nhận xét</b><span>{comments.length}</span></div>
+                  <div className="comment-list">
+                    {comments.length === 0 && <p className="no-comments">Chưa có nhận xét. Hãy đặt một câu hỏi hoặc góp ý cụ thể.</p>}
+                    {comments.map((comment) => <article key={comment.id} className={comment.replyTo ? 'reply' : ''}><div><b>{comment.author}</b><small>{comment.target}</small></div><p>{comment.content}</p><button onClick={() => setReplyTo(comment.id)}>Phản hồi</button></article>)}
+                  </div>
+                  <div className="comment-composer">
+                    {replyTo && <div className="replying">Đang phản hồi một nhận xét <button onClick={() => setReplyTo(null)}>×</button></div>}
+                    <label>Nhận xét về</label>
+                    <select value={commentTarget} onChange={(event) => { setCommentTarget(event.target.value); setSelectedPreviewNode(event.target.value === 'Toàn bộ sơ đồ' ? null : event.target.value); }}><option>Toàn bộ sơ đồ</option>{COMMUNITY_PREVIEW_NODES.map((item) => <option key={item.title}>{item.title}</option>)}</select>
+                    <textarea value={commentText} onChange={(event) => setCommentText(event.target.value)} placeholder="Đặt câu hỏi hoặc đưa ra góp ý cụ thể…" />
+                    <button className="send-comment" disabled={!commentText.trim()} onClick={submitComment}>Gửi nhận xét →</button>
+                  </div>
+                </aside>
+              </div>
+            )}
           </section>
         )}
       </div>
