@@ -1,27 +1,27 @@
 # Solar Note Map
 
-> Biến hành trình học AI thành một vũ trụ 3D, nơi mỗi bài học là một hành tinh và mỗi ghi chú là một hạt kiến thức có thể kết nối.
+> Turn your AI learning journey into a 3D universe where every lesson is a planet and every note is a connectable knowledge node.
 
-![Ảnh giao diện Solar Note Map](./image.png)
+![Solar Note Map interface](./image.png)
 
-## Giới thiệu
+## Overview
 
-Solar Note Map là một ứng dụng web học tập tương tác được xây dựng bằng React, TypeScript và Three.js. Thay vì ghi chú theo danh sách, người học khám phá khóa AI căn bản qua một hệ hành tinh 3D, sau đó tự tổ chức kiến thức thành sơ đồ trực quan cho từng bài.
+Solar Note Map is an interactive learning application built with React, TypeScript, and Three.js. Instead of organizing notes as a list, learners explore a beginner AI course through a 3D planetary system and build a visual knowledge map for each lesson.
 
-Ứng dụng hiện chạy hoàn toàn trên trình duyệt, không cần tài khoản hay backend. Sơ đồ và nhận xét được lưu cục bộ bằng `localStorage`.
+The application currently runs entirely in the browser and requires neither an account nor a backend. Knowledge maps and review comments are stored locally using `localStorage`.
 
-## Tính năng
+## Features
 
-### Khám phá vũ trụ học tập
+### Explore a Learning Universe
 
-- Hệ hành tinh 3D có quỹ đạo, vành đai tiểu hành tinh, vệ tinh, sao, tinh vân và sao chổi.
-- Kéo để xoay, cuộn để thu phóng và nhấp vào hành tinh để mở bài học.
-- Bật hoặc ẩn quỹ đạo; tạm dừng hoặc tiếp tục chuyển động.
-- Hiển thị vệ tinh tri thức khi người học đã lưu sơ đồ.
+- A 3D planetary system with orbits, an asteroid belt, satellites, stars, nebulae, and comets.
+- Drag to rotate, scroll to zoom, and select a planet to open its lesson.
+- Show or hide orbital paths and pause or resume planetary motion.
+- Display a knowledge satellite after the learner saves a map.
 
-### Học theo từng nhiệm vụ
+### Follow Lesson Missions
 
-Mỗi bài học có phần mô tả, câu hỏi dẫn đường và quy trình gợi ý. Nội dung hiện gồm 5 chủ đề:
+Each lesson includes a description, a guiding question, and a suggested learning process. The current course contains five topics:
 
 1. AI Foundations
 2. Machine Learning
@@ -29,43 +29,43 @@ Mỗi bài học có phần mô tả, câu hỏi dẫn đường và quy trình 
 4. Learning Types
 5. Neural Networks
 
-### Xây dựng sơ đồ kiến thức
+### Build Knowledge Maps
 
-- Tạo, chỉnh sửa, kéo thả và xóa các hạt kiến thức.
-- Viết tiêu đề, ghi chú và chọn một trong 5 mức độ quan trọng.
-- Tạo liên kết giữa các hạt để biểu diễn quan hệ giữa các ý tưởng.
-- Phóng to, thu nhỏ hoặc đặt lại vùng làm việc.
-- Lưu một sơ đồ riêng cho từng bài học.
+- Create, edit, drag, and delete knowledge nodes.
+- Add a title and notes, then choose from five importance levels.
+- Connect nodes to represent relationships between ideas.
+- Zoom in, zoom out, or reset the workspace.
+- Save a separate map for each lesson.
 
-### Không gian cộng đồng
+### Explore the Community Space
 
-- Xem các sơ đồ học viên mẫu và nội dung của từng node.
-- Ghim node để đọc chi tiết hoặc viết nhận xét đúng ngữ cảnh.
-- Phản hồi nhận xét và lưu nội dung đánh giá trên trình duyệt.
+- View sample student maps and inspect individual nodes.
+- Pin a node to read its details or leave contextual feedback.
+- Reply to comments and save reviews in the browser.
 
 > [!NOTE]
-> Danh sách học viên và sơ đồ cộng đồng hiện là dữ liệu minh họa. Ứng dụng chưa đồng bộ dữ liệu giữa các thiết bị.
+> The student list and community maps currently contain demonstration data. The application does not yet synchronize data between devices.
 
-## Công nghệ
+## Tech Stack
 
-| Thành phần | Công nghệ |
+| Area | Technology |
 | --- | --- |
-| Giao diện | React 19, TypeScript |
-| Đồ họa 3D | Three.js, React Three Fiber, Drei |
+| Interface | React 19, TypeScript |
+| 3D graphics | Three.js, React Three Fiber, Drei |
 | Styling | Tailwind CSS 4, CSS |
 | Build tool | Vite 7 |
-| Đóng gói | vite-plugin-singlefile |
-| Lưu trữ | Web Storage API (`localStorage`) |
+| Bundling | vite-plugin-singlefile |
+| Storage | Web Storage API (`localStorage`) |
 
-## Bắt đầu
+## Getting Started
 
-### Yêu cầu
+### Requirements
 
-- Node.js `20.19+` hoặc `22.12+`
+- Node.js `20.19+` or `22.12+`
 - npm
-- Trình duyệt hiện đại có hỗ trợ WebGL
+- A modern browser with WebGL support
 
-### Cài đặt
+### Installation
 
 ```bash
 git clone https://github.com/Datghb/SolarNoteMap2.git
@@ -74,111 +74,111 @@ npm install
 npm run dev
 ```
 
-Mở địa chỉ Vite hiển thị trong terminal, mặc định là [http://localhost:5173](http://localhost:5173).
+Open the address shown by Vite in your terminal. The default is [http://localhost:5173](http://localhost:5173).
 
-### Build production
+### Production Build
 
 ```bash
 npm run build
 npm run preview
 ```
 
-Lệnh `npm run build` tạo bản tĩnh trong `dist/`. Cấu hình hiện tại sử dụng `vite-plugin-singlefile`, vì vậy mã JavaScript và CSS được nhúng vào `dist/index.html`, thuận tiện để triển khai trên các dịch vụ static hosting.
+Running `npm run build` creates a static production bundle in `dist/`. The current configuration uses `vite-plugin-singlefile`, which embeds the JavaScript and CSS in `dist/index.html` for convenient deployment to static hosting services.
 
-## Cách sử dụng
+## Controls
 
-| Thao tác | Cách thực hiện |
+| Action | Control |
 | --- | --- |
-| Xoay góc nhìn | Kéo chuột trên không gian 3D |
-| Thu phóng | Cuộn chuột |
-| Di chuyển camera | Kéo bằng chuột phải |
-| Mở bài học | Nhấp vào hành tinh hoặc chọn bài ở thanh phía dưới |
-| Bật/tắt quỹ đạo | Nhấp nút `◎` |
-| Dừng/chạy chuyển động | Nhấp nút `Ⅱ` hoặc `▶` |
-| Tạo liên kết | Chọn node nguồn → **Tạo liên kết** → chọn node đích |
-| Lưu sơ đồ | Chọn **Lưu sơ đồ** trong thanh công cụ |
+| Rotate the view | Drag over the 3D scene |
+| Zoom | Scroll the mouse wheel |
+| Move the camera | Right-click and drag |
+| Open a lesson | Select a planet or use the lesson dock at the bottom |
+| Show or hide orbits | Select the `◎` button |
+| Pause or resume motion | Select the `Ⅱ` or `▶` button |
+| Connect nodes | Select the source node → **Create Link** → select the target node |
+| Save a map | Select **Save Map** in the toolbar |
 
-## Cấu trúc dự án
+## Project Structure
 
 ```text
 SolarNoteMap2/
 ├── src/
 │   ├── components/
-│   │   ├── LearningConsole.tsx  # Bài học, sơ đồ và khu vực cộng đồng
-│   │   ├── Planet.tsx           # Hình học, hiệu ứng và tương tác hành tinh
-│   │   ├── SolarSystem.tsx      # Hệ hành tinh, quỹ đạo và vệ tinh
-│   │   ├── SpaceObjects.tsx     # Các hiệu ứng không gian
-│   │   └── Sun.tsx              # Mặt trời và hiệu ứng phát sáng
+│   │   ├── LearningConsole.tsx  # Lessons, knowledge maps, and community space
+│   │   ├── Planet.tsx           # Planet geometry, effects, and interactions
+│   │   ├── SolarSystem.tsx      # Planetary system, orbits, and satellites
+│   │   ├── SpaceObjects.tsx     # Deep-space visual effects
+│   │   └── Sun.tsx              # Sun and glow effects
 │   ├── data/
-│   │   └── lessons.ts           # Nội dung và màu sắc của bài học
+│   │   └── lessons.ts           # Lesson content and color palettes
 │   ├── utils/
-│   │   └── cn.ts                # Tiện ích ghép class CSS
-│   ├── App.tsx                  # Bố cục và trạng thái cấp ứng dụng
-│   ├── index.css                # Style toàn cục và responsive
-│   └── main.tsx                 # Entry point React
-├── image.png                    # Ảnh preview
+│   │   └── cn.ts                # CSS class-name utility
+│   ├── App.tsx                  # Application layout and top-level state
+│   ├── index.css                # Global and responsive styles
+│   └── main.tsx                 # React entry point
+├── image.png                    # Preview image
 ├── index.html
 ├── package.json
 ├── tsconfig.json
 └── vite.config.ts
 ```
 
-## Dữ liệu lưu trên trình duyệt
+## Browser Storage
 
-Ứng dụng sử dụng hai nhóm key:
+The application uses two groups of storage keys:
 
 ```text
 solar-note-map:<lesson-id>
 solar-note-reviews:<lesson-id>:<student-name>
 ```
 
-Xóa site data hoặc `localStorage` của trình duyệt sẽ xóa toàn bộ sơ đồ và nhận xét đã lưu. Không nên dùng dữ liệu hiện tại như một bản sao lưu lâu dài.
+Clearing the browser's site data or `localStorage` removes all saved maps and reviews. The current storage mechanism should not be treated as a long-term backup.
 
-## Tùy biến nội dung
+## Customizing Lessons
 
-Để thêm hoặc sửa bài học, cập nhật mảng `LESSONS` trong `src/data/lessons.ts`. Mỗi phần tử định nghĩa nội dung, màu chủ đạo và bảng màu của hành tinh:
+To add or edit a lesson, update the `LESSONS` array in `src/data/lessons.ts`. Each entry defines the lesson content, primary color, and planet palette:
 
 ```ts
 {
   id: 'prompt-engineering',
   name: 'Prompt Engineering',
   shortName: 'Prompt Design',
-  subtitle: 'Buổi 06 · Tín hiệu dẫn đường',
-  description: 'Học cách thiết kế chỉ dẫn rõ ràng cho mô hình AI.',
-  prompt: 'Một prompt tốt cần cung cấp những ngữ cảnh và ràng buộc nào?',
+  subtitle: 'Lesson 06 · Navigation Signals',
+  description: 'Learn how to write clear instructions for an AI model.',
+  prompt: 'What context and constraints should an effective prompt provide?',
   color: '#7dd3fc',
   colors: ['#dbeafe', '#38bdf8', '#164e63'],
 }
 ```
 
-`SolarSystem` sinh hành tinh từ danh sách này, nên bài mới sẽ tự xuất hiện trong không gian 3D và thanh điều hướng.
+`SolarSystem` generates planets from this list, so new lessons automatically appear in both the 3D scene and the navigation dock.
 
-## Giới hạn hiện tại
+## Current Limitations
 
-- Chưa có backend, đăng nhập hoặc đồng bộ đám mây.
-- Nội dung cộng đồng và hồ sơ người dùng là dữ liệu mẫu.
-- Chỉ số tiến độ `1 / 5` trên thanh đầu trang hiện là nội dung tĩnh.
-- Hiệu năng phụ thuộc vào khả năng WebGL/GPU của thiết bị.
-- Repo chưa khai báo license.
+- No backend, authentication, or cloud synchronization.
+- Community content and the user profile contain sample data.
+- The `1 / 5` progress indicator in the header is currently static.
+- Performance depends on the device's WebGL and GPU capabilities.
+- The repository does not currently declare a license.
 
-## Hướng phát triển
+## Roadmap
 
-- Đồng bộ sơ đồ theo tài khoản và thiết bị.
-- Cho phép chia sẻ, cộng tác và đánh giá sơ đồ thật.
-- Tính tiến độ tự động từ trạng thái từng bài học.
-- Bổ sung quiz, flashcard và nhiều lộ trình học.
-- Thêm kiểm thử tự động và chế độ giảm hiệu ứng cho thiết bị yếu.
+- Synchronize maps across user accounts and devices.
+- Support real map sharing, collaboration, and peer review.
+- Calculate course progress from lesson completion data.
+- Add quizzes, flashcards, and more learning paths.
+- Add automated tests and a reduced-effects mode for lower-powered devices.
 
-## Đóng góp
+## Contributing
 
-Bạn có thể fork repo, tạo branch cho thay đổi, kiểm tra bản build rồi mở pull request:
+Fork the repository, create a branch for your changes, verify the production build, and open a pull request:
 
 ```bash
 npm run build
 ```
 
-Khi báo lỗi, vui lòng kèm trình duyệt, hệ điều hành và các bước tái hiện. Nếu thay đổi giao diện 3D, ảnh hoặc video ngắn trước/sau sẽ giúp việc review dễ hơn.
+When reporting a bug, include your browser, operating system, and reproduction steps. For 3D interface changes, a short before-and-after recording or screenshot will make the review process easier.
 
 ## License
 
-Dự án hiện chưa có file `LICENSE`. Mọi quyền mặc định thuộc về chủ sở hữu repository cho đến khi một giấy phép được bổ sung.
+This project does not currently include a `LICENSE` file. All rights remain with the repository owner until a license is added.
