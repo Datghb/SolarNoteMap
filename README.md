@@ -8,7 +8,7 @@
 
 Solar Note Map is an interactive learning application built with React, TypeScript, and Three.js. Instead of organizing notes as a list, learners explore a beginner AI course through a 3D planetary system and build a visual knowledge map for each lesson.
 
-The application currently runs entirely in the browser and requires neither an account nor a backend. Knowledge maps and review comments are stored locally using `localStorage`.
+The application uses a small Node server to protect the OpenAI API key. Live map generation calls the OpenAI Responses API and falls back to browser-based concept detection when the API is unavailable. Knowledge maps and review comments are stored locally using `localStorage`.
 
 ## Features
 
@@ -29,29 +29,42 @@ Each lesson includes a description, a guiding question, and a suggested learning
 4. Learning Types
 5. Neural Networks
 
+Each lesson opens as an interactive slide workspace. Learners can select concepts, mark a slide as understood or unclear, write slide-specific notes, and watch a compact knowledge map grow beside the lecture.
+
+The first lesson uses the bundled `day01-llm-foundation.pdf` as its 42-page lecture deck. The PDF remains selectable and sharp in the browser. Learners can navigate pages, place contextual pins directly over a page, write page-specific notes, and open a community question linked to that exact PDF page.
+
 ### Build Knowledge Maps
 
-- Create, edit, drag, and delete knowledge nodes.
-- Add a title and notes, then choose from five importance levels.
-- Connect nodes to represent relationships between ideas.
+- Capture an explanation naturally in the learner's own words while the map updates in real time.
+- Store notes separately for each slide and combine them with slide context for AI analysis.
+- Preview the evolving map without leaving the lecture, then open the full graph when needed.
+- Generate concepts and semantic relationships through OpenAI Structured Outputs after a short typing debounce.
+- Fall back to local concept detection when OpenAI is unavailable.
+- Render an interactive radial knowledge constellation with React Flow.
+- Focus one branch at a time while unrelated concepts fade into the background.
+- Review, edit, confirm, drag, and delete suggested knowledge nodes.
+- Use an AI-style reflection review to identify strengths and a question worth exploring next.
 - Zoom in, zoom out, or reset the workspace.
 - Save a separate map for each lesson.
 
-### Explore the Community Space
+### Ask the Learning Community
 
-- View sample student maps and inspect individual nodes.
-- Pin a node to read its details or leave contextual feedback.
-- Reply to comments and save reviews in the browser.
+- Ask questions that are linked to the exact lecture slide where confusion appears.
+- Filter discussions by slide, vote for questions, and reply with another explanation.
+- Jump from a discussion back to its source slide.
+- Start a contextual question directly from the lecture workspace.
 
 > [!NOTE]
-> The student list and community maps currently contain demonstration data. The application does not yet synchronize data between devices.
+> Community questions currently contain demonstration data and are stored in the browser. The application does not yet synchronize discussions between real users or devices.
 
 ## Tech Stack
 
 | Area | Technology |
 | --- | --- |
-| Interface | React 19, TypeScript |
+| Interface | React 19, TypeScript, React Flow |
 | 3D graphics | Three.js, React Three Fiber, Drei |
+| AI | OpenAI Responses API, Structured Outputs |
+| Graph layout | Custom deterministic radial constellation |
 | Styling | Tailwind CSS 4, CSS |
 | Build tool | Vite 7 |
 | Bundling | vite-plugin-singlefile |
@@ -74,13 +87,22 @@ npm install
 npm run dev
 ```
 
+Create `.env.local` before running the application:
+
+```env
+OPENAI_API_KEY=sk-your-key-here
+OPENAI_MODEL=gpt-5.6-sol
+```
+
+Never prefix the key with `VITE_`; the browser must not receive it. `npm run dev` starts Vite and the protected API server together.
+
 Open the address shown by Vite in your terminal. The default is [http://localhost:5173](http://localhost:5173).
 
 ### Production Build
 
 ```bash
 npm run build
-npm run preview
+npm start
 ```
 
 Running `npm run build` creates a static production bundle in `dist/`. The current configuration uses `vite-plugin-singlefile`, which embeds the JavaScript and CSS in `dist/index.html` for convenient deployment to static hosting services.
@@ -95,7 +117,7 @@ Running `npm run build` creates a static production bundle in `dist/`. The curre
 | Open a lesson | Select a planet or use the lesson dock at the bottom |
 | Show or hide orbits | Select the `◎` button |
 | Pause or resume motion | Select the `Ⅱ` or `▶` button |
-| Connect nodes | Select the source node → **Create Link** → select the target node |
+| Create a live map | Write in the notes panel and watch the map update automatically |
 | Save a map | Select **Save Map** in the toolbar |
 
 ## Project Structure
@@ -130,6 +152,9 @@ The application uses two groups of storage keys:
 ```text
 solar-note-map:<lesson-id>
 solar-note-reviews:<lesson-id>:<student-name>
+solar-slide-notes:<lesson-id>
+solar-slide-pins:<lesson-id>
+solar-community-questions:<lesson-id>
 ```
 
 Clearing the browser's site data or `localStorage` removes all saved maps and reviews. The current storage mechanism should not be treated as a long-term backup.
@@ -155,7 +180,7 @@ To add or edit a lesson, update the `LESSONS` array in `src/data/lessons.ts`. Ea
 
 ## Current Limitations
 
-- No backend, authentication, or cloud synchronization.
+- The included Node server has basic in-memory rate limiting but no user authentication or cloud synchronization.
 - Community content and the user profile contain sample data.
 - The `1 / 5` progress indicator in the header is currently static.
 - Performance depends on the device's WebGL and GPU capabilities.

@@ -1,98 +1,95 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Lesson } from '../data/lessons';
-
-type Importance = 'minor' | 'detail' | 'support' | 'important' | 'core';
-
-const IMPORTANCE_LEVELS: { value: Importance; label: string; description: string }[] = [
-  { value: 'minor', label: 'Mức 1 · Tham khảo', description: 'Thông tin mở rộng' },
-  { value: 'detail', label: 'Mức 2 · Bổ trợ', description: 'Ví dụ hoặc chi tiết phụ' },
-  { value: 'support', label: 'Mức 3 · Quan trọng', description: 'Ý cần ghi nhớ' },
-  { value: 'important', label: 'Mức 4 · Trọng yếu', description: 'Ý chính của một phần' },
-  { value: 'core', label: 'Mức 5 · Cốt lõi', description: 'Trọng tâm của bài học' },
-];
-
-interface KnowledgeNode {
-  id: string;
-  title: string;
-  note: string;
-  importance: Importance;
-  x: number;
-  y: number;
-}
-
-interface KnowledgeEdge {
-  from: string;
-  to: string;
-}
-
-interface KnowledgeMap {
-  nodes: KnowledgeNode[];
-  edges: KnowledgeEdge[];
-}
-
-interface ReviewComment {
-  id: string;
-  author: string;
-  content: string;
-  target: string;
-  replyTo?: string;
-  createdAt: string;
-}
+import { getLessonSlides, getPdfPageSlides } from '../data/slides';
+import { createRealtimeMap } from '../utils/smartMap';
+import type { KnowledgeMap, KnowledgeNode } from '../utils/smartMap';
+import { requestAiMap } from '../utils/aiMap';
+import { KnowledgeFlow } from './KnowledgeFlow';
+import { SlideLearningWorkspace } from './SlideLearningWorkspace';
+import { combineSlideNotes, updateSlideNote } from '../utils/slideNotes';
+import { CommunityQuestions } from './CommunityQuestions';
+import { PdfSlideWorkspace } from './PdfSlideWorkspace';
 
 const EMPTY_MAP: KnowledgeMap = { nodes: [], edges: [] };
-const COMMUNITY = [
-  { name: 'Minh Anh', nodes: 8, comment: 'Phân biệt ví dụ AI và automation rất rõ.' },
-  { name: 'Gia Huy', nodes: 6, comment: 'Sơ đồ gọn, có thể thêm phần dữ liệu đầu vào.' },
-  { name: 'Thảo Linh', nodes: 11, comment: 'Nhiều liên kết thực tế, dễ hình dung.' },
-];
-const COMMUNITY_PREVIEW_NODES = [
-  { title: 'Khái niệm chính', level: 5, x: 50, y: 48, note: 'AI là khả năng của máy tính thực hiện các nhiệm vụ thường cần trí thông minh con người.', example: 'Nhận diện hình ảnh, hiểu ngôn ngữ và hỗ trợ ra quyết định.' },
-  { title: 'Dữ liệu', level: 4, x: 23, y: 24, note: 'Dữ liệu là nguyên liệu giúp hệ thống AI học được các mẫu và quy luật.', example: 'Ảnh đã gắn nhãn được dùng để huấn luyện mô hình phân loại.' },
-  { title: 'Mô hình', level: 3, x: 78, y: 27, note: 'Mô hình là kết quả của quá trình học từ dữ liệu và được dùng để dự đoán.', example: 'Mô hình dự đoán một email có phải thư rác hay không.' },
-  { title: 'Ứng dụng', level: 2, x: 25, y: 76, note: 'AI được ứng dụng để tự động hóa hoặc hỗ trợ con người xử lý vấn đề.', example: 'Trợ lý học tập, chẩn đoán hình ảnh và hệ thống gợi ý.' },
-  { title: 'Rủi ro', level: 1, x: 75, y: 75, note: 'Kết quả AI có thể sai lệch nếu dữ liệu thiếu đại diện hoặc mục tiêu thiết kế chưa phù hợp.', example: 'Mô hình nhận diện hoạt động kém với nhóm dữ liệu ít xuất hiện.' },
-];
 
 export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: () => void }) {
   const [tab, setTab] = useState<'brief' | 'map' | 'community'>('brief');
   const [map, setMap] = useState<KnowledgeMap>(EMPTY_MAP);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [linkFrom, setLinkFrom] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-  const [zoom, setZoom] = useState(1);
-  const [reviewingStudent, setReviewingStudent] = useState<string | null>(null);
-  const [comments, setComments] = useState<ReviewComment[]>([]);
-  const [commentText, setCommentText] = useState('');
-  const [commentTarget, setCommentTarget] = useState('Toàn bộ sơ đồ');
-  const [replyTo, setReplyTo] = useState<string | null>(null);
-  const [selectedPreviewNode, setSelectedPreviewNode] = useState<string | null>(null);
-  const [hoveredPreviewNode, setHoveredPreviewNode] = useState<string | null>(null);
-  const boardRef = useRef<HTMLDivElement>(null);
+  const [thoughts, setThoughts] = useState('');
+  const [slideIndex, setSlideIndex] = useState(0);
+  const [slideNotes, setSlideNotes] = useState<Record<string, string>>({});
+  const [isThinking, setIsThinking] = useState(false);
+  const [mapSource, setMapSource] = useState<'local' | 'ai' | 'fallback'>('local');
+  const [analysisError, setAnalysisError] = useState('');
+  const [communitySlideId, setCommunitySlideId] = useState<string | undefined>();
+
+  const usesDay01Pdf = lesson.id === 'ai-foundations';
+  const slides = usesDay01Pdf ? getPdfPageSlides(42) : getLessonSlides(lesson.id, lesson.name, lesson.prompt);
 
   useEffect(() => {
     const stored = localStorage.getItem(`solar-note-map:${lesson.id}`);
-    setMap(stored ? JSON.parse(stored) : EMPTY_MAP);
+    const parsed = stored ? JSON.parse(stored) as KnowledgeMap : EMPTY_MAP;
+    const normalized = {
+      ...parsed,
+      nodes: parsed.nodes.map((node) => ({ ...node, status: node.status ?? 'confirmed' })),
+      edges: parsed.edges.map((edge) => ({ ...edge, label: edge.label ?? 'liên quan đến' })),
+    };
+    setMap(normalized);
+    const storedNotes = localStorage.getItem(`solar-slide-notes:${lesson.id}`);
+    let nextSlideNotes: Record<string, string> = {};
+    try {
+      nextSlideNotes = storedNotes ? JSON.parse(storedNotes) : {};
+    } catch {
+      localStorage.removeItem(`solar-slide-notes:${lesson.id}`);
+    }
+    setSlideNotes(nextSlideNotes);
+    setThoughts(combineSlideNotes(slides, nextSlideNotes) || normalized.sourceNote || '');
+    setSlideIndex(0);
     setSelectedId(null);
-    setLinkFrom(null);
     setTab('brief');
-    setZoom(1);
-    setReviewingStudent(null);
+    setCommunitySlideId(undefined);
   }, [lesson.id]);
 
   useEffect(() => {
-    if (!reviewingStudent) return;
-    const stored = localStorage.getItem(`solar-note-reviews:${lesson.id}:${reviewingStudent}`);
-    try {
-      setComments(stored ? JSON.parse(stored) : []);
-    } catch {
-      setComments([]);
+    const note = thoughts.trim();
+    const controller = new AbortController();
+    if (!note) {
+      setMap(EMPTY_MAP);
+      setIsThinking(false);
+      setMapSource('local');
+      setAnalysisError('');
+      return () => controller.abort();
     }
-    setCommentText('');
-    setCommentTarget('Toàn bộ sơ đồ');
-    setReplyTo(null);
-    setSelectedPreviewNode(null);
-    setHoveredPreviewNode(null);
-  }, [lesson.id, reviewingStudent]);
+
+    const localMap = createRealtimeMap(lesson.id, thoughts);
+    setMap((current) => ({ ...localMap, nodes: localMap.nodes.map((node) => {
+      const existing = current.nodes.find((item) => item.id === node.id);
+      return existing ? { ...node, x: existing.x, y: existing.y, status: existing.status } : node;
+    }) }));
+    setMapSource('local');
+    setIsThinking(true);
+    setAnalysisError('');
+    const timer = window.setTimeout(async () => {
+      try {
+        const result = await requestAiMap(thoughts, { name: lesson.name, prompt: lesson.prompt }, map, controller.signal);
+        setMap(result);
+        setSelectedId(null);
+        setMapSource('ai');
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setMapSource('fallback');
+        setAnalysisError(error instanceof Error ? error.message : 'AI tạm thời không khả dụng.');
+      } finally {
+        if (!controller.signal.aborted) setIsThinking(false);
+      }
+    }, 900);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [lesson.id, thoughts]);
 
   const selected = map.nodes.find((node) => node.id === selectedId);
 
@@ -103,6 +100,7 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
       title: `Ý chính ${index + 1}`,
       note: '',
       importance: index === 0 ? 'core' : 'support',
+      status: 'confirmed',
       x: 24 + (index * 17) % 58,
       y: 24 + (index * 23) % 54,
     };
@@ -124,39 +122,10 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
       edges: current.edges.filter((edge) => edge.from !== selectedId && edge.to !== selectedId),
     }));
     setSelectedId(null);
-    setLinkFrom(null);
   };
 
   const chooseNode = (id: string) => {
-    if (linkFrom && linkFrom !== id) {
-      const exists = map.edges.some((edge) => edge.from === linkFrom && edge.to === id);
-      if (!exists) setMap((current) => ({ ...current, edges: [...current.edges, { from: linkFrom, to: id }] }));
-      setLinkFrom(null);
-    }
-    setSelectedId(id);
-  };
-
-  const moveNode = (event: React.PointerEvent<HTMLButtonElement>, id: string) => {
-    event.currentTarget.setPointerCapture(event.pointerId);
-    const move = (pointerEvent: PointerEvent) => {
-      const bounds = boardRef.current?.getBoundingClientRect();
-      if (!bounds) return;
-      const rawX = ((pointerEvent.clientX - bounds.left) / bounds.width) * 100;
-      const rawY = ((pointerEvent.clientY - bounds.top) / bounds.height) * 100;
-      const minX = 50 + (4 - 50) / zoom;
-      const maxX = 50 + (96 - 50) / zoom;
-      const minY = 50 + (5 - 50) / zoom;
-      const maxY = 50 + (95 - 50) / zoom;
-      const x = Math.min(maxX, Math.max(minX, 50 + (rawX - 50) / zoom));
-      const y = Math.min(maxY, Math.max(minY, 50 + (rawY - 50) / zoom));
-      setMap((current) => ({ ...current, nodes: current.nodes.map((node) => node.id === id ? { ...node, x, y } : node) }));
-    };
-    const stop = () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', stop);
-    };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', stop);
+    setSelectedId(id || null);
   };
 
   const saveMap = () => {
@@ -168,25 +137,23 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
     window.setTimeout(() => setSaved(false), 1800);
   };
 
-  const submitComment = () => {
-    const content = commentText.trim();
-    if (!content || !reviewingStudent) return;
-    const next = [...comments, {
-      id: crypto.randomUUID(),
-      author: 'Anh Nguyen',
-      content,
-      target: commentTarget,
-      replyTo: replyTo ?? undefined,
-      createdAt: new Date().toISOString(),
-    }];
-    setComments(next);
-    localStorage.setItem(`solar-note-reviews:${lesson.id}:${reviewingStudent}`, JSON.stringify(next));
-    setCommentText('');
-    setReplyTo(null);
+  const resetSmartMap = () => {
+    setThoughts('');
+    setSlideNotes({});
+    localStorage.removeItem(`solar-slide-notes:${lesson.id}`);
+    setMap(EMPTY_MAP);
+    setSelectedId(null);
+  };
+
+  const changeSlideNote = (content: string) => {
+    const next = updateSlideNote(slideNotes, slides[slideIndex].id, content);
+    setSlideNotes(next);
+    setThoughts(combineSlideNotes(slides, next));
+    localStorage.setItem(`solar-slide-notes:${lesson.id}`, JSON.stringify(next));
   };
 
   return (
-    <aside className={`learning-console ${tab === 'map' ? 'map-open' : ''} ${tab === 'community' && reviewingStudent ? 'community-open' : ''}`} style={{ '--lesson-color': lesson.color } as React.CSSProperties}>
+    <aside className={`learning-console ${tab === 'brief' ? 'slide-open' : ''} ${tab === 'map' ? 'map-open' : ''} ${tab === 'community' ? 'community-open' : ''}`} style={{ '--lesson-color': lesson.color } as React.CSSProperties}>
       <header className="console-header">
         <div>
           <span className="eyebrow">{lesson.subtitle}</span>
@@ -196,130 +163,98 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
       </header>
 
       <nav className="console-tabs">
-        <button className={tab === 'brief' ? 'active' : ''} onClick={() => setTab('brief')}>Nhiệm vụ</button>
+        <button className={tab === 'brief' ? 'active' : ''} onClick={() => setTab('brief')}>Bài giảng</button>
         <button className={tab === 'map' ? 'active' : ''} onClick={() => setTab('map')}>Sơ đồ <span>{map.nodes.length}</span></button>
-        <button className={tab === 'community' ? 'active' : ''} onClick={() => setTab('community')}>Cộng đồng</button>
+        <button className={tab === 'community' ? 'active' : ''} onClick={() => { setCommunitySlideId(undefined); setTab('community'); }}>Cộng đồng</button>
       </nav>
 
       <div className="console-content">
         {tab === 'brief' && (
-          <section className="brief-view">
-            <div className="lesson-orb"><span>01</span></div>
-            <p className="lesson-description">{lesson.description}</p>
-            <div className="mission-card">
-              <span className="eyebrow">Câu hỏi dẫn đường</span>
-              <p>{lesson.prompt}</p>
-            </div>
-            <div className="steps">
-              <div><b>1</b><span>Chọn các ý quan trọng sau buổi học</span></div>
-              <div><b>2</b><span>Tạo hình cầu và điều chỉnh độ nổi bật</span></div>
-              <div><b>3</b><span>Nối các ý có quan hệ rồi chia sẻ</span></div>
-            </div>
-            <button className="primary-button" onClick={() => setTab('map')}>Bắt đầu dựng sơ đồ <span>→</span></button>
-          </section>
+          usesDay01Pdf ? <PdfSlideWorkspace
+            lessonId={lesson.id}
+            page={slideIndex + 1}
+            pageCount={slides.length}
+            note={slideNotes[slides[slideIndex].id] ?? ''}
+            map={map}
+            accent={lesson.color}
+            isThinking={isThinking}
+            mapSource={mapSource}
+            onPageChange={(page) => setSlideIndex(page - 1)}
+            onNoteChange={changeSlideNote}
+            onOpenMap={() => setTab('map')}
+            onAskCommunity={() => {
+              setCommunitySlideId(slides[slideIndex].id);
+              setTab('community');
+            }}
+          /> : <SlideLearningWorkspace
+            slides={slides}
+            index={slideIndex}
+            note={slideNotes[slides[slideIndex].id] ?? ''}
+            map={map}
+            accent={lesson.color}
+            isThinking={isThinking}
+            mapSource={mapSource}
+            onIndexChange={setSlideIndex}
+            onNoteChange={changeSlideNote}
+            onOpenMap={() => setTab('map')}
+            onAskCommunity={() => {
+              setCommunitySlideId(slides[slideIndex].id);
+              setTab('community');
+            }}
+          />
         )}
 
         {tab === 'map' && (
-          <section className="map-view">
-            <div className="map-toolbar">
-              <button onClick={addNode}>＋ Hạt kiến thức</button>
-              <button disabled={!selectedId} className={linkFrom ? 'linking' : ''} onClick={() => setLinkFrom(selectedId)}>{linkFrom ? 'Chọn hạt đích…' : '↗ Tạo liên kết'}</button>
-              <button onClick={saveMap}>{saved ? '✓ Đã lưu' : 'Lưu sơ đồ'}</button>
-            </div>
-            <div className="knowledge-board" ref={boardRef} onWheel={(event) => {
-              event.preventDefault();
-              setZoom((value) => Math.min(1.8, Math.max(0.45, value + (event.deltaY < 0 ? 0.1 : -0.1))));
-            }}>
-              <div className="zoom-controls">
-                <button onClick={() => setZoom((value) => Math.max(0.45, value - 0.1))} aria-label="Thu nhỏ">−</button>
-                <button className="zoom-value" onClick={() => setZoom(1)} title="Đặt lại 100%">{Math.round(zoom * 100)}%</button>
-                <button onClick={() => setZoom((value) => Math.min(1.8, value + 0.1))} aria-label="Phóng to">＋</button>
+          <section className="live-map-workspace">
+            <header className="live-map-header">
+              <div><span className="live-indicator"><i /> Sơ đồ trực tiếp</span><b>Ghi chú của bạn đang trở thành bản đồ kiến thức</b></div>
+              <div className="live-actions">
+                <button onClick={addNode}>＋ Thêm ý</button>
+                <button disabled={isThinking} onClick={saveMap}>{saved ? '✓ Đã lưu' : isThinking ? 'Đang đồng bộ…' : 'Lưu sơ đồ'}</button>
+                <button className="toolbar-more" onClick={resetSmartMap} title="Bắt đầu lại">↻</button>
               </div>
-              <div className="knowledge-stage" style={{ transform: `scale(${zoom})` }}>
-                {map.nodes.length === 0 && <button className="empty-map" onClick={addNode}><b>＋</b><span>Tạo hạt kiến thức đầu tiên</span><small>Mỗi hạt là một điều bạn hiểu sau buổi học</small></button>}
-                <svg className="edge-layer" viewBox="0 0 100 100" preserveAspectRatio="none">
-                  {map.edges.map((edge, index) => {
-                    const from = map.nodes.find((node) => node.id === edge.from);
-                    const to = map.nodes.find((node) => node.id === edge.to);
-                    return from && to ? <line key={index} x1={from.x} y1={from.y} x2={to.x} y2={to.y} /> : null;
-                  })}
-                </svg>
-                {map.nodes.map((node) => (
-                  <button key={node.id} className={`knowledge-node ${node.importance} ${selectedId === node.id ? 'selected' : ''} ${linkFrom === node.id ? 'link-source' : ''}`} style={{ left: `${node.x}%`, top: `${node.y}%` }} onClick={() => chooseNode(node.id)} onPointerDown={(event) => moveNode(event, node.id)}>
-                    <span>{node.title}</span>
-                  </button>
-                ))}
-              </div>
+            </header>
+
+            <aside className="live-note-panel">
+              <div className="note-panel-heading"><span className="ai-kicker"><i>✦</i> Ghi chú tổng hợp</span><small>{thoughts.trim() ? `${thoughts.trim().split(/\s+/).length} từ` : 'Chưa có nội dung'}</small></div>
+              <h3>Ghi chú từ các slide</h3>
+              <p>Nội dung này được tổng hợp tự động. Quay lại bài giảng để viết hoặc chỉnh sửa ghi chú theo từng slide.</p>
+              <div className="live-guide-question"><small>Câu hỏi dẫn đường</small><span>{lesson.prompt}</span></div>
+              <textarea readOnly value={thoughts} placeholder="Ghi chú từ các slide sẽ xuất hiện tại đây." />
+              <div className={`analysis-status ${isThinking ? 'thinking' : ''} ${mapSource === 'fallback' ? 'fallback' : ''}`} title={analysisError}><i>{isThinking ? '✦' : mapSource === 'fallback' ? '!' : '✓'}</i><span><b>{isThinking ? 'AI đang hiểu ghi chú…' : mapSource === 'ai' ? 'Đã đồng bộ bằng OpenAI' : mapSource === 'fallback' ? 'Đang dùng phân tích cục bộ' : thoughts.trim() ? 'Bản xem trước tức thì' : 'Sẵn sàng khi bạn bắt đầu viết'}</b><small>{analysisError || (map.nodes.length ? `${map.nodes.length} khái niệm · ${map.edges.length} mối quan hệ` : 'AI chỉ sử dụng nội dung trong ghi chú của bạn')}</small></span></div>
+            </aside>
+
+            <div className="live-canvas-area">
+              <div className="canvas-caption"><div><span>Mind map bài học</span><small>{map.nodes.length ? 'Các nhánh tự động hình thành từ ghi chú' : 'Các ý tưởng sẽ xuất hiện tại đây'}</small></div>{map.nodes.length > 0 && <button onClick={() => setSelectedId(null)}>Toàn cảnh</button>}</div>
+              <div className="knowledge-board">
+                {map.nodes.length > 0 && <KnowledgeFlow map={map} accent={lesson.color} selectedId={selectedId} onSelect={chooseNode} />}
+              {map.nodes.length === 0 && <div className="live-empty-state"><div className="orbit-loader"><i /><i /><span>✦</span></div><b>Sơ đồ sẽ lớn lên cùng ghi chú</b><p>Hãy viết một vài câu ở khung bên trái. Những khái niệm và mối quan hệ đầu tiên sẽ tự xuất hiện.</p></div>}
             </div>
             {selected && (
+              <aside className="live-node-editor">
               <div className="node-editor">
-                <div className="editor-heading"><span>Chỉnh hạt kiến thức</span><button onClick={removeNode}>Xóa</button></div>
+                <div className="editor-heading"><span>✦ Nhận diện từ ghi chú</span><button onClick={() => setSelectedId(null)}>×</button></div>
                 <input value={selected.title} onChange={(event) => updateNode({ title: event.target.value })} placeholder="Tên kiến thức" />
                 <textarea value={selected.note} onChange={(event) => updateNode({ note: event.target.value })} placeholder="Giải thích bằng lời của bạn…" />
-                <div className="importance-options">
-                  {IMPORTANCE_LEVELS.map((level) => (
-                    <button key={level.value} className={`${level.value} ${selected.importance === level.value ? 'active' : ''}`} onClick={() => updateNode({ importance: level.value })}>
-                      <i /><span>{level.label}</span><small>{level.description}</small>
-                    </button>
-                  ))}
-                </div>
+                <div className="node-editor-actions"><button onClick={() => updateNode({ status: 'confirmed' })}>✓ Xác nhận ý này</button><button onClick={removeNode}>Xóa khỏi sơ đồ</button></div>
               </div>
+              </aside>
             )}
+            </div>
           </section>
         )}
 
         {tab === 'community' && (
-          <section className="community-view">
-            {!reviewingStudent ? <>
-              <div className="community-intro"><span>12 sơ đồ đang bay quanh hành tinh</span><p>Xem cách mỗi học viên kết nối cùng một bài học theo góc nhìn riêng.</p></div>
-              {COMMUNITY.map((student, index) => (
-                <article
-                  className="student-map"
-                  key={student.name}
-                  role="button"
-                  tabIndex={0}
-                  onPointerDown={() => setReviewingStudent(student.name)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') setReviewingStudent(student.name);
-                  }}
-                >
-                  <div className="avatar">{student.name.slice(0, 1)}</div>
-                  <div><b>{student.name}</b><span>{student.nodes} hạt kiến thức · {index + 2} liên kết</span><p>“{student.comment}”</p></div>
-                  <button type="button" onPointerDown={(event) => { event.stopPropagation(); setReviewingStudent(student.name); }}>Xem →</button>
-                </article>
-              ))}
-            </> : (
-              <div className="review-workspace">
-                <div className="review-topline"><button onClick={() => setReviewingStudent(null)}>← Danh sách</button><div><b>Sơ đồ của {reviewingStudent}</b><span>{lesson.shortName}</span></div></div>
-                <div className="community-map-preview">
-                  <svg viewBox="0 0 100 100" preserveAspectRatio="none"><line x1="50" y1="48" x2="23" y2="24"/><line x1="50" y1="48" x2="78" y2="27"/><line x1="50" y1="48" x2="25" y2="76"/><line x1="50" y1="48" x2="75" y2="75"/></svg>
-                  {COMMUNITY_PREVIEW_NODES.map((node) => <button key={node.title} className={`preview-node level-${node.level} ${selectedPreviewNode === node.title ? 'active' : ''}`} style={{ left: `${node.x}%`, top: `${node.y}%` }} onPointerEnter={() => setHoveredPreviewNode(node.title)} onPointerLeave={() => setHoveredPreviewNode(null)} onFocus={() => setHoveredPreviewNode(node.title)} onBlur={() => setHoveredPreviewNode(null)} onClick={() => { setSelectedPreviewNode(node.title); setCommentTarget(node.title); }}><span>{node.title}</span></button>)}
-                  {hoveredPreviewNode && (() => {
-                    const node = COMMUNITY_PREVIEW_NODES.find((item) => item.title === hoveredPreviewNode)!;
-                    return <div className={`node-hover-card ${node.x > 60 ? 'place-left' : ''}`} style={{ left: `${node.x}%`, top: `${node.y}%` }}><small>Mức {node.level}</small><b>{node.title}</b><p>{node.note}</p><span>{node.example}</span><i>Nhấn để ghim và nhận xét</i></div>;
-                  })()}
-                </div>
-                <aside className="review-panel">
-                  {selectedPreviewNode && (() => {
-                    const node = COMMUNITY_PREVIEW_NODES.find((item) => item.title === selectedPreviewNode)!;
-                    return <section className="preview-node-detail"><div><span>Mức {node.level} · Nội dung node</span><button onClick={() => setSelectedPreviewNode(null)}>×</button></div><h3>{node.title}</h3><p>{node.note}</p><small>Ví dụ / ghi chú</small><blockquote>{node.example}</blockquote></section>;
-                  })()}
-                  <div className="review-heading"><b>Nhận xét</b><span>{comments.length}</span></div>
-                  <div className="comment-list">
-                    {comments.length === 0 && <p className="no-comments">Chưa có nhận xét. Hãy đặt một câu hỏi hoặc góp ý cụ thể.</p>}
-                    {comments.map((comment) => <article key={comment.id} className={comment.replyTo ? 'reply' : ''}><div><b>{comment.author}</b><small>{comment.target}</small></div><p>{comment.content}</p><button onClick={() => setReplyTo(comment.id)}>Phản hồi</button></article>)}
-                  </div>
-                  <div className="comment-composer">
-                    {replyTo && <div className="replying">Đang phản hồi một nhận xét <button onClick={() => setReplyTo(null)}>×</button></div>}
-                    <label>Nhận xét về</label>
-                    <select value={commentTarget} onChange={(event) => { setCommentTarget(event.target.value); setSelectedPreviewNode(event.target.value === 'Toàn bộ sơ đồ' ? null : event.target.value); }}><option>Toàn bộ sơ đồ</option>{COMMUNITY_PREVIEW_NODES.map((item) => <option key={item.title}>{item.title}</option>)}</select>
-                    <textarea value={commentText} onChange={(event) => setCommentText(event.target.value)} placeholder="Đặt câu hỏi hoặc đưa ra góp ý cụ thể…" />
-                    <button className="send-comment" disabled={!commentText.trim()} onClick={submitComment}>Gửi nhận xét →</button>
-                  </div>
-                </aside>
-              </div>
-            )}
-          </section>
+          <CommunityQuestions
+            lesson={lesson}
+            slides={slides}
+            initialSlideId={communitySlideId}
+            onOpenSlide={(slideId) => {
+              const index = slides.findIndex((slide) => slide.id === slideId);
+              if (index >= 0) setSlideIndex(index);
+              setTab('brief');
+            }}
+          />
         )}
       </div>
     </aside>
