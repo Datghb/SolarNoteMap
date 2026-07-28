@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
-import pdfUrl from '../../day01-llm-foundation.pdf?url';
 import type { KnowledgeMap } from '../utils/smartMap';
 import { addSlidePin, type SlidePin } from '../utils/slideNotes';
 import { askSlideAI } from '../utils/slideAi';
 import { KnowledgeFlow } from './KnowledgeFlow';
+import { SelectablePdfPage } from './SelectablePdfPage';
 
 type Understanding = 'understood' | 'question' | null;
 type InteractionMode = 'note' | 'ask' | null;
 type SlideAnchor = { x: number; y: number };
+type TextSelection = SlideAnchor & { text: string };
 
 export function PdfSlideWorkspace({
   lessonId,
@@ -38,6 +39,7 @@ export function PdfSlideWorkspace({
 }) {
   const [interactionMode, setInteractionMode] = useState<InteractionMode>(null);
   const [anchor, setAnchor] = useState<SlideAnchor | null>(null);
+  const [pendingSelection, setPendingSelection] = useState<TextSelection | null>(null);
   const [draftNote, setDraftNote] = useState('');
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
@@ -52,6 +54,12 @@ export function PdfSlideWorkspace({
     const stored = localStorage.getItem(`solar-slide-pins:${lessonId}`);
     try { setPins(stored ? JSON.parse(stored) : []); } catch { setPins([]); }
   }, [lessonId]);
+
+  useEffect(() => {
+    setPendingSelection(null);
+    setAnchor(null);
+    setInteractionMode(null);
+  }, [page]);
 
   const pagePins = pins.filter((pin) => pin.page === page);
   const chooseSlidePoint = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -98,9 +106,24 @@ export function PdfSlideWorkspace({
   };
   const selectMode = (mode: Exclude<InteractionMode, null>) => {
     setInteractionMode((current) => current === mode ? null : mode);
+    setPendingSelection(null);
     setAnchor(null);
     setAnswer('');
     setAiError('');
+  };
+  const askSelectedText = ({ text, x, y }: { text: string; x: number; y: number }) => {
+    setPendingSelection({ text, x, y });
+    setInteractionMode(null);
+    setAnchor(null);
+    setAnswer('');
+    setAiError('');
+  };
+  const openSelectedQuestion = () => {
+    if (!pendingSelection) return;
+    setInteractionMode('ask');
+    setAnchor({ x: pendingSelection.x, y: pendingSelection.y });
+    setQuestion(`Hãy giải thích đoạn: “${pendingSelection.text}”`);
+    setPendingSelection(null);
   };
 
   return (
@@ -108,15 +131,21 @@ export function PdfSlideWorkspace({
       <header className="pdf-toolbar">
         <div><span className="live-indicator"><i /> Day 01 · PDF</span><b>AI &amp; LLM Foundation</b></div>
         <div className="pdf-page-controls"><button disabled={page === 1} onClick={() => onPageChange(page - 1)}>←</button><span>Trang <b>{page}</b> / {pageCount}</span><button disabled={page === pageCount} onClick={() => onPageChange(page + 1)}>→</button></div>
-        <div className="pdf-view-actions"><button onClick={() => setFocusMode((value) => !value)}>{focusMode ? 'Thu nhỏ' : '⛶ Xem lớn'}</button><button className={interactionMode === 'note' ? 'pin-mode active' : 'pin-mode'} onClick={() => selectMode('note')}>✎ Note trên slide</button><button className={interactionMode === 'ask' ? 'pin-mode active ai-mode' : 'pin-mode'} onClick={() => selectMode('ask')}>✦ Hỏi AI</button></div>
+        <div className="pdf-view-actions"><button onClick={() => setFocusMode((value) => !value)}>{focusMode ? 'Thu nhỏ' : '⛶ Xem lớn'}</button><button className={interactionMode === 'note' ? 'pin-mode active' : 'pin-mode'} onClick={() => selectMode('note')}>✎ Note trên slide</button></div>
       </header>
 
-      <div className={`pdf-stage ${interactionMode ? 'pinning' : ''}`}>
-        <iframe key={page} title={`Day 01 - trang ${page}`} src={`${pdfUrl}#page=${page}&view=Fit&zoom=page-fit&toolbar=0&navpanes=0&scrollbar=0`} />
-        {interactionMode && <div className={`pdf-pin-layer ${interactionMode}`} onPointerDown={chooseSlidePoint} aria-label={interactionMode === 'ask' ? 'Bấm vào mục muốn hỏi AI' : 'Bấm vào vị trí muốn ghi chú'}>
+      <div className={`pdf-stage ${interactionMode === 'note' ? 'pinning' : ''}`}>
+        <SelectablePdfPage pageNumber={page} onTextSelected={askSelectedText} />
+        {interactionMode === 'note' && <div className="pdf-pin-layer note" onPointerDown={chooseSlidePoint} aria-label="Bấm vào vị trí muốn ghi chú">
           {pagePins.map((pin, index) => <button key={pin.id} style={{ left: `${pin.x}%`, top: `${pin.y}%` }} onPointerDown={(event) => event.stopPropagation()} onClick={() => removePin(pin.id)} title="Bấm để xóa ghim">{index + 1}</button>)}
-          {!anchor && <span>{interactionMode === 'ask' ? 'Bấm vào mục trên slide bạn muốn hỏi AI' : 'Bấm vào vị trí bạn muốn ghi chú'}</span>}
+          {!anchor && <span>Bấm vào vị trí bạn muốn ghi chú</span>}
         </div>}
+        {pendingSelection && <button
+          className="selection-ai-button"
+          style={{ left: `${Math.min(88, Math.max(12, pendingSelection.x))}%`, top: `${Math.min(82, Math.max(12, pendingSelection.y))}%` }}
+          onPointerDown={(event) => event.preventDefault()}
+          onClick={openSelectedQuestion}
+        >✦ Hỏi AI</button>}
         {!interactionMode && pagePins.map((pin, index) => <button className="pdf-pin passive" key={pin.id} style={{ left: `${pin.x}%`, top: `${pin.y}%` }} onClick={() => selectMode('note')}>{index + 1}</button>)}
         {anchor && <div className={`slide-context-composer ${interactionMode}`} style={{ left: `${Math.min(82, Math.max(18, anchor.x))}%`, top: `${Math.min(72, Math.max(18, anchor.y))}%` }} onPointerDown={(event) => event.stopPropagation()}>
           <header><span>{interactionMode === 'ask' ? '✦ Hỏi AI về mục này' : '✎ Ghi chú tại đây'}</span><button onClick={() => setAnchor(null)}>×</button></header>
