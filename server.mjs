@@ -2,6 +2,7 @@ import 'dotenv/config';
 import dotenv from 'dotenv';
 import express from 'express';
 import OpenAI from 'openai';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import path from 'node:path';
 import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -15,6 +16,9 @@ const provider = process.env.AI_PROVIDER === 'groq' ? 'groq' : 'openai';
 const model = process.env.AI_MODEL || process.env.OPENAI_MODEL || (provider === 'groq' ? 'qwen/qwen3.6-27b' : 'gpt-5.6-sol');
 const apiKey = provider === 'groq' ? process.env.GROQ_API_KEY : process.env.OPENAI_API_KEY;
 const client = apiKey ? new OpenAI({ apiKey, ...(provider === 'groq' ? { baseURL: 'https://api.groq.com/openai/v1' } : {}) }) : null;
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabasePublishableKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const supabaseAuth = supabaseUrl && supabasePublishableKey ? createSupabaseClient(supabaseUrl, supabasePublishableKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }) : null;
 const requests = new Map();
 const rootDirectory = path.dirname(fileURLToPath(import.meta.url));
 const pdfPath = path.join(rootDirectory, 'day01-llm-foundation.pdf');
@@ -196,6 +200,15 @@ app.use('/api', (request, response, next) => {
   requests.set(key, [...recent, now]);
   next();
 });
+app.use('/api', async (request, response, next) => {
+  if (!supabaseAuth) return response.status(503).json({ error: 'Máy chủ chưa được cấu hình Supabase.' });
+  const token = request.headers.authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+  if (!token) return response.status(401).json({ error: 'Bạn cần đăng nhập để sử dụng tính năng này.' });
+  const { data, error } = await supabaseAuth.auth.getUser(token);
+  if (error || !data.user) return response.status(401).json({ error: 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn.' });
+  request.authUser = data.user;
+  next();
+});
 
 const graphSchema = {
   type: 'object', additionalProperties: false, required: ['nodes', 'edges'],
@@ -309,6 +322,7 @@ app.post('/api/slide-question', async (request, response) => {
   const question = typeof request.body?.question === 'string' ? request.body.question.trim() : '';
   const note = typeof request.body?.note === 'string' ? request.body.note.trim().slice(0, 4_000) : '';
   const image = typeof request.body?.image === 'string' ? request.body.image : '';
+  const useBundledPdfContext = request.body?.useBundledPdfContext === true;
   if (!Number.isInteger(page) || page < 1 || page > 100) return response.status(400).json({ error: 'Trang slide không hợp lệ.' });
   if (!question || question.length > 1_000) return response.status(400).json({ error: 'Câu hỏi phải có từ 1 đến 1.000 ký tự.' });
   if (image && (!/^data:image\/(?:jpeg|png);base64,[a-zA-Z0-9+/=]+$/.test(image) || image.length > 750_000)) {
@@ -317,7 +331,7 @@ app.post('/api/slide-question', async (request, response) => {
   if (!client) return response.status(503).json({ error: `Máy chủ chưa được cấu hình ${provider === 'groq' ? 'GROQ_API_KEY' : 'OPENAI_API_KEY'}.` });
 
   try {
-    const slideContext = await getCachedSlideSummary(page);
+    const slideContext = useBundledPdfContext ? await getCachedSlideSummary(page) : { summary: '(Không có văn bản slide trên máy chủ; chỉ dùng vùng ảnh và ghi chú người học.)', source: 'user-context' };
     const tutorPrompt = 'Bạn là trợ giảng AI cho học sinh Việt Nam. Trả lời ngắn gọn, dễ hiểu, bám sát nội dung slide được cung cấp. Nếu slide không đủ dữ kiện, nói rõ điều đó; không bịa thông tin. Ưu tiên ví dụ đơn giản và kết thúc bằng một câu kiểm tra hiểu bài khi phù hợp.';
     const questionContext = `Trang slide: ${page}\n\nBản tóm tắt đã lưu của slide:\n${slideContext.summary}\n\nGhi chú của học sinh:\n${note || '(chưa có)'}\n\nCâu hỏi:\n${question}`;
     if (provider === 'groq') {

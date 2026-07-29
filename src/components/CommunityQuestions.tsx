@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Lesson } from '../data/lessons';
 import type { LessonSlide } from '../data/slides';
 import { addAnswer, createQuestion, toggleQuestionVote, type CommunityQuestion } from '../utils/communityQuestions';
+import { recordStudentActivity } from '../utils/courseStore';
 
 function sampleQuestions(lessonId: string, slides: LessonSlide[]): CommunityQuestion[] {
   const first = slides[0];
@@ -48,12 +49,15 @@ export function CommunityQuestions({ lesson, slides, initialSlideId, onOpenSlide
     save([createQuestion(lesson.id, composerSlide, questionText, 'Anh Nguyen'), ...questions]);
     setQuestionText('');
     setFilter(composerSlide);
+    recordStudentActivity({ lessonId: lesson.id, slideId: composerSlide, type: 'question_posted' });
   };
   const submitAnswer = (questionId: string) => {
     const content = answerText[questionId]?.trim();
     if (!content) return;
     save(addAnswer(questions, questionId, content, 'Anh Nguyen'));
     setAnswerText((current) => ({ ...current, [questionId]: '' }));
+    const question = questions.find((item) => item.id === questionId);
+    recordStudentActivity({ lessonId: lesson.id, slideId: question?.slideId, type: 'answer_posted' });
   };
 
   return (

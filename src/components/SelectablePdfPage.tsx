@@ -5,24 +5,27 @@ import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 import 'pdfjs-dist/legacy/web/pdf_viewer.css';
 
 GlobalWorkerOptions.workerSrc = workerUrl;
-const slidePdfUrl = new URL('../../day01-llm-foundation.pdf', import.meta.url).href;
+export const builtInSlidePdfUrl = new URL('../../day01-llm-foundation.pdf', import.meta.url).href;
 
-let documentPromise: Promise<PDFDocumentProxy> | null = null;
-function loadSlides() {
-  documentPromise ??= fetch(slidePdfUrl)
+const documentPromises = new Map<string, Promise<PDFDocumentProxy>>();
+function loadSlides(pdfUrl: string) {
+  const cached = documentPromises.get(pdfUrl);
+  if (cached) return cached;
+  const promise = fetch(pdfUrl)
     .then((response) => {
       if (!response.ok) throw new Error(`Không tải được PDF (${response.status}).`);
       return response.arrayBuffer();
     })
     .then((buffer) => getDocument({ data: new Uint8Array(buffer) }).promise)
     .catch((error) => {
-      documentPromise = null;
+      documentPromises.delete(pdfUrl);
       throw error;
     });
-  return documentPromise;
+  documentPromises.set(pdfUrl, promise);
+  return promise;
 }
 
-export function SelectablePdfPage({ pageNumber }: { pageNumber: number }) {
+export function SelectablePdfPage({ pageNumber, pdfUrl, onDocumentLoad }: { pageNumber: number; pdfUrl: string; onDocumentLoad?: (pageCount: number) => void }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
@@ -42,7 +45,8 @@ export function SelectablePdfPage({ pageNumber }: { pageNumber: number }) {
 
     const render = async (currentGeneration: number) => {
       try {
-        const document = await loadSlides();
+        const document = await loadSlides(pdfUrl);
+        onDocumentLoad?.(document.numPages);
         const page = await document.getPage(pageNumber);
         if (cancelled || currentGeneration !== generation) return;
         const base = page.getViewport({ scale: 1 });
@@ -57,7 +61,7 @@ export function SelectablePdfPage({ pageNumber }: { pageNumber: number }) {
         const context = canvas.getContext('2d');
         if (!context) throw new Error('Không thể khởi tạo trình hiển thị slide.');
         renderTask = page.render({ canvasContext: context, viewport, transform: pixelRatio === 1 ? undefined : [pixelRatio, 0, 0, pixelRatio, 0, 0] });
-        textLayer = new TextLayerBuilder({ pdfPage: page, onAppend: (layer: HTMLDivElement) => textHost.append(layer) });
+        textLayer = new TextLayerBuilder({ pdfPage: page, onAppend: ((layer: HTMLDivElement) => textHost.append(layer)) as never });
         await Promise.all([renderTask.promise, textLayer.render(viewport)]);
         if (!cancelled && currentGeneration === generation) setError('');
       } catch (renderError) {
@@ -92,7 +96,7 @@ export function SelectablePdfPage({ pageNumber }: { pageNumber: number }) {
       renderTask?.cancel();
       textLayer?.cancel();
     };
-  }, [pageNumber, retryToken]);
+  }, [pageNumber, pdfUrl, onDocumentLoad, retryToken]);
 
   return <div ref={hostRef} className="selectable-pdf-page">
     <div className="pdf-page-surface"><canvas ref={canvasRef} /><div ref={textRef} className="pdf-text-host" /></div>

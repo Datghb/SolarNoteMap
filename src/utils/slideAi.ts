@@ -3,6 +3,7 @@ export interface SlideQuestionInput {
   question: string;
   note?: string;
   image?: string;
+  useBundledPdfContext?: boolean;
 }
 
 export interface SlideAnswer {
@@ -17,11 +18,12 @@ export async function askSlideAI(input: SlideQuestionInput): Promise<SlideAnswer
 
   const response = await fetch('/api/slide-question', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ page: input.page, question, note: input.note?.slice(0, 4_000) ?? '', image: input.image ?? '' }),
+    headers: { 'Content-Type': 'application/json', ...await getSupabaseAuthHeaders() },
+    body: JSON.stringify({ page: input.page, question, note: input.note?.slice(0, 4_000) ?? '', image: input.image ?? '', useBundledPdfContext: input.useBundledPdfContext === true }),
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(typeof payload.error === 'string' ? payload.error : 'AI chưa thể trả lời lúc này.');
   if (typeof payload.answer !== 'string' || !payload.answer.trim()) throw new Error('AI trả về câu trả lời không hợp lệ.');
   return { answer: payload.answer.trim(), model: typeof payload.model === 'string' ? payload.model : undefined };
 }
+import { getSupabaseAuthHeaders } from '../lib/supabase';

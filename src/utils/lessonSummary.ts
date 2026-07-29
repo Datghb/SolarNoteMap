@@ -2,8 +2,8 @@ export type SummaryChatRole = 'user' | 'assistant';
 export interface SummaryChatMessage { role: SummaryChatRole; content: string }
 export interface LessonSummaryResult { summary: string; source: 'cache' | 'generated' }
 
-export function fetchLessonSummary(lessonId: string): Promise<LessonSummaryResult> {
-  return fetch(`/api/lesson-summary?lessonId=${encodeURIComponent(lessonId)}`)
+export async function fetchLessonSummary(lessonId: string): Promise<LessonSummaryResult> {
+  return fetch(`/api/lesson-summary?lessonId=${encodeURIComponent(lessonId)}`, { headers: await getSupabaseAuthHeaders() })
     .then(async (response) => {
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(typeof payload.error === 'string' ? payload.error : 'Không thể tạo bản tóm tắt.');
@@ -18,7 +18,7 @@ export async function askLessonSummaryAI(lessonId: string, questionValue: string
   const safeHistory = history.slice(-8).map((message) => ({ role: message.role, content: message.content.slice(0, 2_000) }));
   const response = await fetch('/api/lesson-summary-chat', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...await getSupabaseAuthHeaders() },
     body: JSON.stringify({ lessonId, question, history: safeHistory }),
     signal,
   });
@@ -27,3 +27,4 @@ export async function askLessonSummaryAI(lessonId: string, questionValue: string
   if (typeof payload.answer !== 'string' || !payload.answer.trim()) throw new Error('AI trả về câu trả lời không hợp lệ.');
   return payload.answer.trim();
 }
+import { getSupabaseAuthHeaders } from '../lib/supabase';

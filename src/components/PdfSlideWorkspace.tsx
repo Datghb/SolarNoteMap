@@ -12,6 +12,7 @@ type SlideRegion = { x: number; y: number; width: number; height: number };
 export function PdfSlideWorkspace({
   page,
   pageCount,
+  pdfUrl,
   note,
   map,
   accent,
@@ -21,9 +22,12 @@ export function PdfSlideWorkspace({
   onNoteChange,
   onOpenMap,
   onAskCommunity,
+  onDocumentLoad,
+  useBundledPdfContext,
 }: {
   page: number;
   pageCount: number;
+  pdfUrl: string;
   note: string;
   map: KnowledgeMap;
   accent: string;
@@ -33,6 +37,8 @@ export function PdfSlideWorkspace({
   onNoteChange: (note: string) => void;
   onOpenMap: () => void;
   onAskCommunity: () => void;
+  onDocumentLoad?: (pageCount: number) => void;
+  useBundledPdfContext: boolean;
 }) {
   const [interactionMode, setInteractionMode] = useState<InteractionMode>(null);
   const [anchor, setAnchor] = useState<SlideAnchor | null>(null);
@@ -70,7 +76,7 @@ export function PdfSlideWorkspace({
     setAiError('');
     setAnswer('');
     try {
-      const result = await askSlideAI({ page, question, note, image: regionImage });
+      const result = await askSlideAI({ page, question, note, image: regionImage, useBundledPdfContext });
       setAnswer(result.answer);
     } catch (error) {
       setAiError(error instanceof Error ? error.message : 'AI chưa thể trả lời lúc này.');
@@ -204,7 +210,7 @@ export function PdfSlideWorkspace({
       </header>
 
       <div className="pdf-stage" onWheel={handleSlideWheel}>
-        <SelectablePdfPage pageNumber={page} />
+        <SelectablePdfPage pageNumber={page} pdfUrl={pdfUrl} onDocumentLoad={onDocumentLoad} />
         {interactionMode === 'region' && <div className="region-select-layer region" onPointerDown={beginRegion} onPointerMove={updateRegion} onPointerUp={finishRegion}>
           {!regionDraft && !pendingRegion && <span>Kéo một khung quanh nội dung muốn hỏi AI</span>}
           {regionDraft && <i className="slide-region-box draft" style={{ left: `${regionDraft.x}%`, top: `${regionDraft.y}%`, width: `${regionDraft.width}%`, height: `${regionDraft.height}%` }} />}

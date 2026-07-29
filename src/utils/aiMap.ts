@@ -1,4 +1,5 @@
 import type { Importance, KnowledgeMap } from './smartMap';
+import { getSupabaseAuthHeaders } from '../lib/supabase';
 
 const IMPORTANCE = new Set<Importance>(['minor', 'detail', 'support', 'important', 'core']);
 
@@ -77,7 +78,7 @@ export async function requestAiMap(
 ) {
   const response = await fetch('/api/knowledge-map', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...await getSupabaseAuthHeaders() },
     body: JSON.stringify({ note, lesson }),
     signal,
   });

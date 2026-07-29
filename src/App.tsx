@@ -5,19 +5,56 @@ import * as THREE from 'three';
 import { SolarSystem } from './components/SolarSystem';
 import { Comet, LuminousStarBand, MilkyWayGalaxy, Nebula, SpaceDust, ShootingStars, StarCluster } from './components/SpaceObjects';
 import { LearningConsole } from './components/LearningConsole';
-import { LESSONS } from './data/lessons';
+import { TeacherDashboard } from './components/TeacherDashboard';
+import { recordStudentActivity, setActiveCloudClass, type StudentActivity, type TeacherLesson } from './utils/courseStore';
+import { AuthScreen } from './components/AuthScreen';
+import { ClassroomOnboarding } from './components/ClassroomOnboarding';
+import { useAuth } from './hooks/useAuth';
+import { createCloudLesson, loadCloudActivities, loadCloudLessons, loadMyClasses, setCloudLessonPublished } from './utils/cloudClassroom';
 
 export function App() {
+  const auth = useAuth();
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
   const [showOrbits, setShowOrbits] = useState(true);
   const [speedMultiplier, setSpeedMultiplier] = useState(0.16);
   const [savedMaps, setSavedMaps] = useState<Record<string, number>>({});
-  const selectedLesson = LESSONS.find((lesson) => lesson.id === selectedLessonId) ?? null;
+  const [teacherMode, setTeacherMode] = useState(false);
+  const [customLessons, setCustomLessons] = useState<TeacherLesson[]>([]);
+  const [activities, setActivities] = useState<StudentActivity[]>([]);
+  const [activeClassId, setActiveClassId] = useState<string | null>(null);
+  const [cloudLoading, setCloudLoading] = useState(true);
+  const lessons = customLessons.filter((lesson) => lesson.published);
+  const selectedLesson = lessons.find((lesson) => lesson.id === selectedLessonId) ?? null;
+
+  useEffect(() => {
+    if (!auth.user) { setCloudLoading(false); return; }
+    let active = true;
+    setCloudLoading(true);
+    loadMyClasses().then((rows) => {
+      if (!active) return;
+      const preferred = localStorage.getItem('solar-active-class');
+      setActiveClassId(rows.some((row) => row.id === preferred) ? preferred : rows[0]?.id ?? null);
+    }).finally(() => { if (active) setCloudLoading(false); });
+    return () => { active = false; };
+  }, [auth.user?.id]);
+
+  useEffect(() => {
+    setActiveCloudClass(activeClassId);
+    if (!activeClassId) { setCustomLessons([]); setActivities([]); return; }
+    localStorage.setItem('solar-active-class', activeClassId);
+    let active = true;
+    Promise.all([loadCloudLessons(activeClassId), loadCloudActivities(activeClassId)]).then(([lessonRows, activityRows]) => {
+      if (!active) return;
+      setCustomLessons(lessonRows as TeacherLesson[]);
+      setActivities(activityRows);
+    });
+    return () => { active = false; };
+  }, [activeClassId]);
 
   useEffect(() => {
     const readSavedMaps = () => {
       const next: Record<string, number> = {};
-      LESSONS.forEach((lesson) => {
+      lessons.forEach((lesson) => {
         const stored = localStorage.getItem(`solar-note-map:${lesson.id}`);
         if (!stored) return;
         try {
@@ -33,12 +70,38 @@ export function App() {
     readSavedMaps();
     window.addEventListener('solar-note-map:saved', readSavedMaps);
     return () => window.removeEventListener('solar-note-map:saved', readSavedMaps);
-  }, []);
+  }, [customLessons]);
 
   const selectByPlanetName = (shortName: string) => {
-    const lesson = LESSONS.find((item) => item.shortName === shortName);
-    if (lesson) setSelectedLessonId(lesson.id);
+    const lesson = lessons.find((item) => item.shortName === shortName);
+    if (lesson) {
+      setSelectedLessonId(lesson.id);
+      recordStudentActivity({ lessonId: lesson.id, type: 'lesson_opened' });
+    }
   };
+
+  const openLesson = (lessonId: string) => {
+    setSelectedLessonId(lessonId);
+    recordStudentActivity({ lessonId, type: 'lesson_opened' });
+  };
+
+  const createLesson = async (lesson: TeacherLesson, pdf?: File) => {
+    if (!activeClassId || !auth.user) throw new Error('Chưa chọn lớp học.');
+    await createCloudLesson(activeClassId, auth.user.id, lesson, pdf);
+    setCustomLessons(await loadCloudLessons(activeClassId) as TeacherLesson[]);
+  };
+
+  const toggleLessonPublish = async (lessonId: string) => {
+    if (!activeClassId) return;
+    const lesson = customLessons.find((item) => item.id === lessonId);
+    await setCloudLessonPublished(lessonId, !lesson?.published);
+    setCustomLessons(await loadCloudLessons(activeClassId) as TeacherLesson[]);
+  };
+
+  if (!auth.configured || (!auth.loading && !auth.user)) return <AuthScreen />;
+  if (auth.loading || cloudLoading || !auth.profile) return <main className="auth-screen"><div className="auth-message">Đang tải tài khoản và lớp học…</div></main>;
+  if (!activeClassId) return <ClassroomOnboarding profile={auth.profile} onReady={setActiveClassId} onSignOut={() => void auth.signOut()} onRedeemTeacher={auth.redeemTeacherInvite} />;
+  if (teacherMode && auth.profile.role === 'teacher') return <TeacherDashboard lessons={customLessons} customLessons={customLessons} activities={activities} onCreateLesson={createLesson} onTogglePublish={toggleLessonPublish} onClose={() => setTeacherMode(false)} />;
 
   return (
     <main className="app-shell">
@@ -80,7 +143,7 @@ export function App() {
       <header className="top-bar">
         <button className="brand" onClick={() => setSelectedLessonId(null)}><img className="brand-mark" src="/share-icon.svg" alt="" /><span>Solar Note Map<small>AI Learning Universe</small></span></button>
         <div className="course-progress"><span>Hành trình AI căn bản</span><div><i style={{ width: '20%' }} /></div><b>1 / 5</b></div>
-        <button className="profile-button"><span>AN</span><div>Anh Nguyen<small>Nhà thám hiểm</small></div><i>⌄</i></button>
+        <button className="profile-button" onClick={() => auth.profile?.role === 'teacher' ? setTeacherMode(true) : void auth.signOut()} title={auth.profile?.role === 'teacher' ? 'Mở trang giáo viên' : 'Đăng xuất'}><span>{auth.profile?.display_name.charAt(0).toUpperCase()}</span><div>{auth.profile?.display_name}<small>{auth.profile?.role === 'teacher' ? 'Trang giáo viên' : 'Học sinh · Đăng xuất'}</small></div><i>→</i></button>
       </header>
 
       <section className="hero-copy">
@@ -90,8 +153,8 @@ export function App() {
       </section>
 
       <nav className="lesson-dock" aria-label="Danh sách bài học">
-        {LESSONS.map((lesson, index) => (
-          <button key={lesson.id} className={selectedLessonId === lesson.id ? 'active' : ''} onClick={() => setSelectedLessonId(lesson.id)} style={{ '--planet-color': lesson.color } as React.CSSProperties}>
+        {lessons.map((lesson, index) => (
+          <button key={lesson.id} className={selectedLessonId === lesson.id ? 'active' : ''} onClick={() => openLesson(lesson.id)} style={{ '--planet-color': lesson.color } as React.CSSProperties}>
             <span className="dock-number">0{index + 1}</span><i /><div><small>{index === 0 ? 'SẴN SÀNG' : 'BUỔI HỌC'}</small><b>{lesson.shortName}</b></div>
           </button>
         ))}

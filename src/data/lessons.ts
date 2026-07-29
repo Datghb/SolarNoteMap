@@ -7,6 +7,12 @@ export interface Lesson {
   prompt: string;
   color: string;
   colors: string[];
+  published?: boolean;
+  pdfName?: string;
+  pdfPath?: string;
+  pdfUrl?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export const LESSONS: Lesson[] = [
