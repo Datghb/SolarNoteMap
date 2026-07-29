@@ -18,7 +18,16 @@
    where id = (select id from auth.users where email = 'teacher@example.com');
    ```
 
-6. The teacher can create a class and choose a private join code (at least 8 characters). Students register normally, then enter that code.
+6. Users enter the personal learning space directly. Built-in lessons, teacher-created lessons, notes, maps, and activity are stored locally on the current device.
+
+## Google sign-in
+
+1. In Google Cloud, create an OAuth 2.0 Web client.
+2. Add `https://YOUR_PROJECT_REF.supabase.co/auth/v1/callback` as an authorized redirect URI.
+3. In Supabase Dashboard, open **Authentication → Providers → Google**, enable Google, then add the Google client ID and client secret.
+4. In **Authentication → URL Configuration**, add `http://localhost:5173` and the production application URL to Redirect URLs.
+
+The application sends users back to the current origin after Google authentication, so every origin used for testing or deployment must be allowlisted.
 
 ## Bootstrapping the first administrator
 
@@ -30,27 +39,10 @@ set role = 'admin'
 where id = (select id from auth.users where email = 'admin@example.com');
 ```
 
-Sign out and back in. Admins open the account dashboard automatically and can switch non-admin accounts between student and teacher roles. Admin accounts cannot demote themselves or other admins from the dashboard. A teacher who still owns a class cannot be demoted until class ownership is transferred or the class is removed.
-
-## Creating another teacher invite
-
-Choose a random secret of at least 24 characters and insert only its SHA-256 hash. Send the original secret to the invited teacher through a private channel.
-
-```sql
-insert into public.teacher_invites (token_hash, created_by, expires_at)
-select
-  encode(extensions.digest('REPLACE_WITH_A_LONG_RANDOM_SECRET', 'sha256'), 'hex'),
-  id,
-  now() + interval '7 days'
-from public.profiles
-where id = auth.uid() and role = 'teacher';
-```
-
-When running this statement directly in SQL Editor, `auth.uid()` may be null. Replace it with the teacher profile UUID in that case.
+Sign out and back in. Admins open the account dashboard automatically and can switch non-admin accounts between student and teacher roles. Admin accounts cannot demote themselves or other admins from the dashboard.
 
 ## Security notes
 
 - Never expose a Supabase secret/service-role key in a `VITE_` variable.
-- The `lesson-pdfs` bucket is private and restricted to PDFs up to 50 MB.
 - All application tables have Row Level Security enabled.
-- Teachers can see activity only for classes they own. Students can access only their own learning records and published lessons in joined classes.
+- Google OAuth secrets belong only in Google Cloud and the Supabase provider configuration, never in client environment variables.

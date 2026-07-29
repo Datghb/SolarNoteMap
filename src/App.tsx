@@ -78,7 +78,8 @@ export function App() {
   };
 
   if (!auth.configured || (!auth.loading && !auth.user)) return <AuthScreen />;
-  if (auth.loading || !auth.profile) return <main className="auth-screen"><div className="auth-message">Đang tải tài khoản…</div></main>;
+  if (auth.loading) return <main className="auth-screen"><div className="auth-message">Đang tải tài khoản…</div></main>;
+  if (!auth.profile) return <main className="auth-screen"><section className="auth-card"><div className="auth-message error" role="alert">{auth.error || 'Không thể tải hồ sơ tài khoản.'}</div><button className="auth-primary" onClick={() => void auth.signOut()}>Đăng xuất và thử lại</button></section></main>;
   if (auth.profile.role === 'admin') return <AdminDashboard currentUserId={auth.profile.id} onSignOut={() => void auth.signOut()} />;
   if (teacherMode && auth.profile.role === 'teacher') return <TeacherDashboard lessons={teacherLessons} customLessons={customLessons} activities={activities} onCreateLesson={createLesson} onTogglePublish={toggleLessonPublish} onClose={() => setTeacherMode(false)} />;
 
