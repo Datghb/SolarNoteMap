@@ -1,17 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { KnowledgeMap } from '../utils/smartMap';
-import { addSlidePin, type SlidePin } from '../utils/slideNotes';
 import { askSlideAI } from '../utils/slideAi';
 import { KnowledgeFlow } from './KnowledgeFlow';
 import { SelectablePdfPage } from './SelectablePdfPage';
 
 type Understanding = 'understood' | 'question' | null;
-type InteractionMode = 'note' | 'ask' | null;
+type InteractionMode = 'region' | 'ask' | null;
 type SlideAnchor = { x: number; y: number };
-type TextSelection = SlideAnchor & { text: string };
+type SlideRegion = { x: number; y: number; width: number; height: number };
 
 export function PdfSlideWorkspace({
-  lessonId,
   page,
   pageCount,
   note,
@@ -24,7 +22,6 @@ export function PdfSlideWorkspace({
   onOpenMap,
   onAskCommunity,
 }: {
-  lessonId: string;
   page: number;
   pageCount: number;
   note: string;
@@ -39,60 +36,40 @@ export function PdfSlideWorkspace({
 }) {
   const [interactionMode, setInteractionMode] = useState<InteractionMode>(null);
   const [anchor, setAnchor] = useState<SlideAnchor | null>(null);
-  const [pendingSelection, setPendingSelection] = useState<TextSelection | null>(null);
-  const [draftNote, setDraftNote] = useState('');
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
   const [aiError, setAiError] = useState('');
   const [asking, setAsking] = useState(false);
+  const [regionDraft, setRegionDraft] = useState<SlideRegion | null>(null);
+  const [pendingRegion, setPendingRegion] = useState<SlideRegion | null>(null);
+  const [regionImage, setRegionImage] = useState('');
+  const regionStart = useRef<SlideAnchor | null>(null);
+  const composerDrag = useRef<{ pointerId: number; offsetX: number; offsetY: number } | null>(null);
+  const wheelLocked = useRef(false);
+  const wheelAccumulator = useRef(0);
+  const wheelTimer = useRef<number | null>(null);
   const [focusMode, setFocusMode] = useState(false);
-  const [pins, setPins] = useState<SlidePin[]>([]);
   const [understanding, setUnderstanding] = useState<Record<number, Understanding>>({});
   const status = understanding[page] ?? null;
-
   useEffect(() => {
-    const stored = localStorage.getItem(`solar-slide-pins:${lessonId}`);
-    try { setPins(stored ? JSON.parse(stored) : []); } catch { setPins([]); }
-  }, [lessonId]);
-
-  useEffect(() => {
-    setPendingSelection(null);
     setAnchor(null);
     setInteractionMode(null);
+    setRegionDraft(null);
+    setPendingRegion(null);
+    setRegionImage('');
   }, [page]);
 
-  const pagePins = pins.filter((pin) => pin.page === page);
-  const chooseSlidePoint = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!interactionMode) return;
-    const bounds = event.currentTarget.getBoundingClientRect();
-    setAnchor({
-      x: ((event.clientX - bounds.left) / bounds.width) * 100,
-      y: ((event.clientY - bounds.top) / bounds.height) * 100,
-    });
-    setAnswer('');
-    setAiError('');
-  };
-  const saveAnchoredNote = () => {
-    if (!anchor || !draftNote.trim()) return;
-    const next = addSlidePin(pins, { page, ...anchor });
-    setPins(next);
-    localStorage.setItem(`solar-slide-pins:${lessonId}`, JSON.stringify(next));
-    onNoteChange(`${note}${note.trim() ? '\n' : ''}• ${draftNote.trim()}`);
-    setDraftNote('');
-    setAnchor(null);
-  };
-  const removePin = (id: string) => {
-    const next = pins.filter((pin) => pin.id !== id);
-    setPins(next);
-    localStorage.setItem(`solar-slide-pins:${lessonId}`, JSON.stringify(next));
-  };
+  useEffect(() => () => {
+    if (wheelTimer.current !== null) window.clearTimeout(wheelTimer.current);
+  }, []);
+
   const submitQuestion = async () => {
     if (!question.trim() || asking) return;
     setAsking(true);
     setAiError('');
     setAnswer('');
     try {
-      const result = await askSlideAI({ page, question, note });
+      const result = await askSlideAI({ page, question, note, image: regionImage });
       setAnswer(result.answer);
     } catch (error) {
       setAiError(error instanceof Error ? error.message : 'AI chưa thể trả lời lúc này.');
@@ -100,70 +77,151 @@ export function PdfSlideWorkspace({
       setAsking(false);
     }
   };
-  const saveAnswerToNote = () => {
-    if (!answer) return;
-    onNoteChange(`${note}${note.trim() ? '\n\n' : ''}Câu hỏi: ${question.trim()}\nAI giải thích: ${answer}`);
-  };
   const selectMode = (mode: Exclude<InteractionMode, null>) => {
     setInteractionMode((current) => current === mode ? null : mode);
-    setPendingSelection(null);
+    setPendingRegion(null);
+    setRegionImage('');
     setAnchor(null);
     setAnswer('');
     setAiError('');
   };
-  const askSelectedText = ({ text, x, y }: { text: string; x: number; y: number }) => {
-    setPendingSelection({ text, x, y });
-    setInteractionMode(null);
-    setAnchor(null);
-    setAnswer('');
-    setAiError('');
+  const pointInStage = (event: React.PointerEvent<HTMLDivElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    return {
+      x: Math.min(100, Math.max(0, ((event.clientX - bounds.left) / bounds.width) * 100)),
+      y: Math.min(100, Math.max(0, ((event.clientY - bounds.top) / bounds.height) * 100)),
+    };
   };
-  const openSelectedQuestion = () => {
-    if (!pendingSelection) return;
+  const beginRegion = (event: React.PointerEvent<HTMLDivElement>) => {
+    const start = pointInStage(event);
+    regionStart.current = start;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setPendingRegion(null);
+    setRegionDraft({ ...start, width: 0, height: 0 });
+  };
+  const updateRegion = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!regionStart.current) return;
+    const point = pointInStage(event);
+    setRegionDraft({
+      x: Math.min(regionStart.current.x, point.x),
+      y: Math.min(regionStart.current.y, point.y),
+      width: Math.abs(point.x - regionStart.current.x),
+      height: Math.abs(point.y - regionStart.current.y),
+    });
+  };
+  const captureRegionImage = (region: SlideRegion, stage: HTMLDivElement) => {
+    const source = stage.parentElement?.querySelector<HTMLCanvasElement>('.pdf-page-surface canvas');
+    if (!source) return '';
+    const stageBounds = stage.getBoundingClientRect();
+    const canvasBounds = source.getBoundingClientRect();
+    const left = stageBounds.left + stageBounds.width * region.x / 100;
+    const top = stageBounds.top + stageBounds.height * region.y / 100;
+    const right = left + stageBounds.width * region.width / 100;
+    const bottom = top + stageBounds.height * region.height / 100;
+    const clippedLeft = Math.max(left, canvasBounds.left);
+    const clippedTop = Math.max(top, canvasBounds.top);
+    const clippedRight = Math.min(right, canvasBounds.right);
+    const clippedBottom = Math.min(bottom, canvasBounds.bottom);
+    if (clippedRight <= clippedLeft || clippedBottom <= clippedTop) return '';
+    const scaleX = source.width / canvasBounds.width;
+    const scaleY = source.height / canvasBounds.height;
+    const sx = (clippedLeft - canvasBounds.left) * scaleX;
+    const sy = (clippedTop - canvasBounds.top) * scaleY;
+    const sw = (clippedRight - clippedLeft) * scaleX;
+    const sh = (clippedBottom - clippedTop) * scaleY;
+    const ratio = Math.min(1, 1000 / Math.max(sw, sh));
+    const output = document.createElement('canvas');
+    output.width = Math.max(1, Math.round(sw * ratio));
+    output.height = Math.max(1, Math.round(sh * ratio));
+    output.getContext('2d')?.drawImage(source, sx, sy, sw, sh, 0, 0, output.width, output.height);
+    return output.toDataURL('image/jpeg', 0.78);
+  };
+  const finishRegion = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!regionDraft || regionDraft.width < 2 || regionDraft.height < 2) {
+      setRegionDraft(null);
+      regionStart.current = null;
+      return;
+    }
+    setPendingRegion(regionDraft);
+    setRegionImage(captureRegionImage(regionDraft, event.currentTarget));
+    setRegionDraft(null);
+    regionStart.current = null;
+  };
+  const openRegionQuestion = () => {
+    if (!pendingRegion) return;
     setInteractionMode('ask');
-    setAnchor({ x: pendingSelection.x, y: pendingSelection.y });
-    setQuestion(`Hãy giải thích đoạn: “${pendingSelection.text}”`);
-    setPendingSelection(null);
+    setAnchor({ x: pendingRegion.x + pendingRegion.width / 2 < 50 ? 53 : 5, y: Math.min(48, Math.max(8, pendingRegion.y)) });
+    setQuestion('Hãy giải thích nội dung trong vùng slide mình đã chọn.');
   };
-
+  const beginComposerDrag = (event: React.PointerEvent<HTMLElement>) => {
+    if ((event.target as HTMLElement).closest('button')) return;
+    const composer = event.currentTarget.parentElement;
+    if (!composer) return;
+    const bounds = composer.getBoundingClientRect();
+    composerDrag.current = { pointerId: event.pointerId, offsetX: event.clientX - bounds.left, offsetY: event.clientY - bounds.top };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  };
+  const moveComposer = (event: React.PointerEvent<HTMLElement>) => {
+    if (!composerDrag.current || composerDrag.current.pointerId !== event.pointerId) return;
+    const composer = event.currentTarget.parentElement;
+    const stage = composer?.closest<HTMLElement>('.pdf-stage');
+    if (!composer || !stage) return;
+    const stageBounds = stage.getBoundingClientRect();
+    const composerBounds = composer.getBoundingClientRect();
+    const maxLeft = Math.max(8, stageBounds.width - composerBounds.width - 8);
+    const maxTop = Math.max(8, stageBounds.height - composerBounds.height - 8);
+    const left = Math.min(maxLeft, Math.max(8, event.clientX - stageBounds.left - composerDrag.current.offsetX));
+    const top = Math.min(maxTop, Math.max(8, event.clientY - stageBounds.top - composerDrag.current.offsetY));
+    setAnchor({ x: left / stageBounds.width * 100, y: top / stageBounds.height * 100 });
+  };
+  const endComposerDrag = (event: React.PointerEvent<HTMLElement>) => {
+    if (composerDrag.current?.pointerId !== event.pointerId) return;
+    composerDrag.current = null;
+    event.currentTarget.releasePointerCapture(event.pointerId);
+  };
+  const handleSlideWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    if ((event.target as HTMLElement).closest('.slide-context-composer')) return;
+    if (wheelLocked.current) return;
+    wheelAccumulator.current += event.deltaY;
+    if (Math.abs(wheelAccumulator.current) < 55) return;
+    const direction = wheelAccumulator.current > 0 ? 1 : -1;
+    const nextPage = Math.min(pageCount, Math.max(1, page + direction));
+    wheelAccumulator.current = 0;
+    if (nextPage === page) return;
+    event.preventDefault();
+    wheelLocked.current = true;
+    onPageChange(nextPage);
+    wheelTimer.current = window.setTimeout(() => { wheelLocked.current = false; }, 650);
+  };
   return (
     <section className={`pdf-learning-workspace ${focusMode ? 'focus-mode' : ''}`}>
       <header className="pdf-toolbar">
         <div><span className="live-indicator"><i /> Day 01 · PDF</span><b>AI &amp; LLM Foundation</b></div>
         <div className="pdf-page-controls"><button disabled={page === 1} onClick={() => onPageChange(page - 1)}>←</button><span>Trang <b>{page}</b> / {pageCount}</span><button disabled={page === pageCount} onClick={() => onPageChange(page + 1)}>→</button></div>
-        <div className="pdf-view-actions"><button onClick={() => setFocusMode((value) => !value)}>{focusMode ? 'Thu nhỏ' : '⛶ Xem lớn'}</button><button className={interactionMode === 'note' ? 'pin-mode active' : 'pin-mode'} onClick={() => selectMode('note')}>✎ Note trên slide</button></div>
+        <div className="pdf-view-actions"><button onClick={() => setFocusMode((value) => !value)}>{focusMode ? 'Thu nhỏ' : '⛶ Xem lớn'}</button><button className={interactionMode === 'region' ? 'pin-mode active ai-mode' : 'pin-mode'} onClick={() => selectMode('region')}>▱ Chọn vùng hỏi AI</button></div>
       </header>
 
-      <div className={`pdf-stage ${interactionMode === 'note' ? 'pinning' : ''}`}>
-        <SelectablePdfPage pageNumber={page} onTextSelected={askSelectedText} />
-        {interactionMode === 'note' && <div className="pdf-pin-layer note" onPointerDown={chooseSlidePoint} aria-label="Bấm vào vị trí muốn ghi chú">
-          {pagePins.map((pin, index) => <button key={pin.id} style={{ left: `${pin.x}%`, top: `${pin.y}%` }} onPointerDown={(event) => event.stopPropagation()} onClick={() => removePin(pin.id)} title="Bấm để xóa ghim">{index + 1}</button>)}
-          {!anchor && <span>Bấm vào vị trí bạn muốn ghi chú</span>}
+      <div className="pdf-stage" onWheel={handleSlideWheel}>
+        <SelectablePdfPage pageNumber={page} />
+        {interactionMode === 'region' && <div className="region-select-layer region" onPointerDown={beginRegion} onPointerMove={updateRegion} onPointerUp={finishRegion}>
+          {!regionDraft && !pendingRegion && <span>Kéo một khung quanh nội dung muốn hỏi AI</span>}
+          {regionDraft && <i className="slide-region-box draft" style={{ left: `${regionDraft.x}%`, top: `${regionDraft.y}%`, width: `${regionDraft.width}%`, height: `${regionDraft.height}%` }} />}
         </div>}
-        {pendingSelection && <button
-          className="selection-ai-button"
-          style={{ left: `${Math.min(88, Math.max(12, pendingSelection.x))}%`, top: `${Math.min(82, Math.max(12, pendingSelection.y))}%` }}
-          onPointerDown={(event) => event.preventDefault()}
-          onClick={openSelectedQuestion}
-        >✦ Hỏi AI</button>}
-        {!interactionMode && pagePins.map((pin, index) => <button className="pdf-pin passive" key={pin.id} style={{ left: `${pin.x}%`, top: `${pin.y}%` }} onClick={() => selectMode('note')}>{index + 1}</button>)}
-        {anchor && <div className={`slide-context-composer ${interactionMode}`} style={{ left: `${Math.min(82, Math.max(18, anchor.x))}%`, top: `${Math.min(72, Math.max(18, anchor.y))}%` }} onPointerDown={(event) => event.stopPropagation()}>
-          <header><span>{interactionMode === 'ask' ? '✦ Hỏi AI về mục này' : '✎ Ghi chú tại đây'}</span><button onClick={() => setAnchor(null)}>×</button></header>
-          {interactionMode === 'note' ? <>
-            <textarea autoFocus value={draftNote} onChange={(event) => setDraftNote(event.target.value)} placeholder="Viết điều bạn hiểu hoặc cần nhớ…" />
-            <button className="context-primary" disabled={!draftNote.trim()} onClick={saveAnchoredNote}>Lưu vào ghi chú</button>
-          </> : <>
+        {pendingRegion && <><i className="slide-region-box" style={{ left: `${pendingRegion.x}%`, top: `${pendingRegion.y}%`, width: `${pendingRegion.width}%`, height: `${pendingRegion.height}%` }} /><button className="region-ai-button" style={{ left: `${Math.min(88, pendingRegion.x + pendingRegion.width / 2)}%`, top: `${Math.min(88, pendingRegion.y + pendingRegion.height)}%` }} onClick={openRegionQuestion}>✦ Hỏi AI về vùng này</button></>}
+        {!interactionMode && <div className="slide-wheel-hint">Cuộn để đổi trang</div>}
+        {anchor && <div className={`slide-context-composer ${interactionMode}`} style={{ left: `${anchor.x}%`, top: `${anchor.y}%` }} onPointerDown={(event) => event.stopPropagation()}>
+          <header className="composer-drag-handle" onPointerDown={beginComposerDrag} onPointerMove={moveComposer} onPointerUp={endComposerDrag} onPointerCancel={endComposerDrag}><span>✦ Hỏi AI về mục này <small>kéo để di chuyển</small></span><button onPointerDown={(event) => event.stopPropagation()} onClick={() => setAnchor(null)}>×</button></header>
             <textarea autoFocus value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Ví dụ: Khái niệm này nghĩa là gì?" onKeyDown={(event) => { if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) submitQuestion(); }} />
             <button className="context-primary" disabled={!question.trim() || asking} onClick={submitQuestion}>{asking ? 'AI đang đọc slide…' : 'Gửi câu hỏi'}</button>
             {aiError && <p className="slide-ai-error">{aiError}</p>}
-            {answer && <div className="slide-ai-answer"><b>AI giải thích</b><p>{answer}</p><button onClick={saveAnswerToNote}>＋ Lưu vào ghi chú</button></div>}
-          </>}
+            {answer && <div className="slide-ai-answer"><b>AI giải thích</b><p>{answer}</p></div>}
         </div>}
       </div>
 
       <aside className="pdf-sidecar">
         <div className="inline-note-card pdf-note-card">
-          <div><span><i>✎</i> Ghi chú trang {page}</span><small>{pagePins.length} ghim</small></div>
+          <div><span><i>✎</i> Ghi chú trang {page}</span><small>{note.trim() ? `${note.trim().split(/\s+/).length} từ` : 'Chưa có ghi chú'}</small></div>
           <textarea value={note} onChange={(event) => onNoteChange(event.target.value)} placeholder="Ghi lại điều bạn hiểu, một ví dụ hoặc phần còn thắc mắc ở trang này…" />
           <div className="pdf-understanding"><button className={status === 'understood' ? 'active' : ''} onClick={() => setUnderstanding((current) => ({ ...current, [page]: status === 'understood' ? null : 'understood' }))}>✓ Đã hiểu</button><button className={status === 'question' ? 'active question' : ''} onClick={() => setUnderstanding((current) => ({ ...current, [page]: status === 'question' ? null : 'question' }))}>? Chưa rõ</button><button onClick={onAskCommunity}>Hỏi cộng đồng →</button></div>
           <div className="inline-ai-status"><i>{isThinking ? '✦' : mapSource === 'fallback' ? '!' : '✓'}</i><span>{isThinking ? 'AI đang cập nhật sơ đồ…' : mapSource === 'ai' ? 'Đã đồng bộ vào sơ đồ' : 'Sơ đồ cập nhật từ ghi chú'}</span></div>

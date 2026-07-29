@@ -22,7 +22,7 @@ function loadSlides() {
   return documentPromise;
 }
 
-export function SelectablePdfPage({ pageNumber, onTextSelected }: { pageNumber: number; onTextSelected: (selection: { text: string; x: number; y: number }) => void }) {
+export function SelectablePdfPage({ pageNumber }: { pageNumber: number }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
@@ -94,24 +94,7 @@ export function SelectablePdfPage({ pageNumber, onTextSelected }: { pageNumber: 
     };
   }, [pageNumber, retryToken]);
 
-  const captureSelection = () => {
-    requestAnimationFrame(() => {
-      const selection = window.getSelection();
-      const host = hostRef.current;
-      if (!selection || !host || selection.isCollapsed || !selection.rangeCount) return;
-      const text = selection.toString().replace(/\s+/g, ' ').trim().slice(0, 1_000);
-      if (!text || !textRef.current?.contains(selection.anchorNode)) return;
-      const rangeBounds = selection.getRangeAt(0).getBoundingClientRect();
-      const hostBounds = host.getBoundingClientRect();
-      onTextSelected({
-        text,
-        x: ((rangeBounds.left + rangeBounds.width / 2 - hostBounds.left) / hostBounds.width) * 100,
-        y: ((rangeBounds.bottom - hostBounds.top) / hostBounds.height) * 100,
-      });
-    });
-  };
-
-  return <div ref={hostRef} className="selectable-pdf-page" onMouseUp={captureSelection} onTouchEnd={captureSelection}>
+  return <div ref={hostRef} className="selectable-pdf-page">
     <div className="pdf-page-surface"><canvas ref={canvasRef} /><div ref={textRef} className="pdf-text-host" /></div>
     {error && <div className="pdf-render-error"><b>Không thể hiển thị nội dung slide</b><small>{error}</small><button onClick={() => setRetryToken((value) => value + 1)}>Thử lại</button></div>}
   </div>;

@@ -2,6 +2,7 @@ export interface SlideQuestionInput {
   page: number;
   question: string;
   note?: string;
+  image?: string;
 }
 
 export interface SlideAnswer {
@@ -17,7 +18,7 @@ export async function askSlideAI(input: SlideQuestionInput): Promise<SlideAnswer
   const response = await fetch('/api/slide-question', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ page: input.page, question, note: input.note?.slice(0, 4_000) ?? '' }),
+    body: JSON.stringify({ page: input.page, question, note: input.note?.slice(0, 4_000) ?? '', image: input.image ?? '' }),
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(typeof payload.error === 'string' ? payload.error : 'AI chưa thể trả lời lúc này.');

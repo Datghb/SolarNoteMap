@@ -171,7 +171,6 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
       <div className="console-content">
         {tab === 'brief' && (
           usesDay01Pdf ? <PdfSlideWorkspace
-            lessonId={lesson.id}
             page={slideIndex + 1}
             pageCount={slides.length}
             note={slideNotes[slides[slideIndex].id] ?? ''}
