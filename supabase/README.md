@@ -20,6 +20,18 @@
 
 6. The teacher can create a class and choose a private join code (at least 8 characters). Students register normally, then enter that code.
 
+## Bootstrapping the first administrator
+
+After applying `20260729180000_admin_accounts.sql`, register the administrator normally, then run this once in SQL Editor:
+
+```sql
+update public.profiles
+set role = 'admin'
+where id = (select id from auth.users where email = 'admin@example.com');
+```
+
+Sign out and back in. Admins open the account dashboard automatically and can switch non-admin accounts between student and teacher roles. Admin accounts cannot demote themselves or other admins from the dashboard. A teacher who still owns a class cannot be demoted until class ownership is transferred or the class is removed.
+
 ## Creating another teacher invite
 
 Choose a random secret of at least 24 characters and insert only its SHA-256 hash. Send the original secret to the invited teacher through a private channel.
