@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { askSlideAI } from './slideAi';
 
+vi.mock('../lib/supabase', () => ({
+  getSupabaseAuthHeaders: vi.fn().mockResolvedValue({ Authorization: 'Bearer test-access-token' }),
+}));
+
 afterEach(() => vi.restoreAllMocks());
 
 describe('askSlideAI', () => {
@@ -8,6 +12,10 @@ describe('askSlideAI', () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ answer: 'Đây là câu trả lời.', model: 'test' }), { status: 200 }));
     await expect(askSlideAI({ page: 2, question: '  Mục này nghĩa là gì? ', note: 'Ghi chú' })).resolves.toEqual({ answer: 'Đây là câu trả lời.', model: 'test' });
     expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ page: 2, question: 'Mục này nghĩa là gì?', note: 'Ghi chú', image: '', useBundledPdfContext: false });
+    expect(fetchMock.mock.calls[0][1]?.headers).toEqual({
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer test-access-token',
+    });
   });
 
   it('rejects empty questions before calling the server', async () => {
