@@ -1,6 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <path d="M20.5 27.2 43 14.1M20.5 36.8 43 49.9" fill="none" stroke="#000" stroke-width="8" stroke-linecap="round"/>
-  <circle cx="16" cy="32" r="10" fill="#000"/>
-  <circle cx="48" cy="11" r="10" fill="#000"/>
-  <circle cx="48" cy="53" r="10" fill="#000"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <clipPath id="rounded-corners">
+      <rect width="512" height="512" rx="144"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#rounded-corners)">
+    <rect width="512" height="512" fill="#f4f8f8"/>
+    <path d="M256 42C199 42 166 84 171 131C176 177 226 202 226 256C226 310 176 335 171 381C166 428 199 470 256 470C313 470 346 428 341 381C336 335 286 310 286 256C286 202 336 177 341 131C346 84 313 42 256 42Z" fill="#1b1c1f"/>
+  </g>
 </svg>

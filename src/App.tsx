@@ -78,7 +78,7 @@ export function App() {
       </div>
 
       <header className="top-bar">
-        <button className="brand" onClick={() => setSelectedLessonId(null)}><span className="brand-mark">S</span><span>Solar Note Map<small>AI Learning Universe</small></span></button>
+        <button className="brand" onClick={() => setSelectedLessonId(null)}><img className="brand-mark" src="/share-icon.svg" alt="" /><span>Solar Note Map<small>AI Learning Universe</small></span></button>
         <div className="course-progress"><span>Hành trình AI căn bản</span><div><i style={{ width: '20%' }} /></div><b>1 / 5</b></div>
         <button className="profile-button"><span>AN</span><div>Anh Nguyen<small>Nhà thám hiểm</small></div><i>⌄</i></button>
       </header>
