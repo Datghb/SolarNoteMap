@@ -29,6 +29,11 @@ export function App() {
 
   useEffect(() => {
     if (!auth.user) { setCloudLoading(false); return; }
+    if (auth.profile?.role === 'admin') {
+      setActiveClassId(null);
+      setCloudLoading(false);
+      return;
+    }
     let active = true;
     setCloudLoading(true);
     loadMyClasses().then((rows) => {
@@ -37,7 +42,7 @@ export function App() {
       setActiveClassId(rows.some((row) => row.id === preferred) ? preferred : rows[0]?.id ?? null);
     }).finally(() => { if (active) setCloudLoading(false); });
     return () => { active = false; };
-  }, [auth.user?.id]);
+  }, [auth.profile?.role, auth.user?.id]);
 
   useEffect(() => {
     setActiveCloudClass(activeClassId);
@@ -100,8 +105,9 @@ export function App() {
   };
 
   if (!auth.configured || (!auth.loading && !auth.user)) return <AuthScreen />;
-  if (auth.loading || cloudLoading || !auth.profile) return <main className="auth-screen"><div className="auth-message">Đang tải tài khoản và lớp học…</div></main>;
+  if (auth.loading || !auth.profile) return <main className="auth-screen"><div className="auth-message">Đang tải tài khoản…</div></main>;
   if (auth.profile.role === 'admin') return <AdminDashboard currentUserId={auth.profile.id} onSignOut={() => void auth.signOut()} />;
+  if (cloudLoading) return <main className="auth-screen"><div className="auth-message">Đang tải lớp học…</div></main>;
   if (!activeClassId) return <ClassroomOnboarding profile={auth.profile} onReady={setActiveClassId} onSignOut={() => void auth.signOut()} onRedeemTeacher={auth.redeemTeacherInvite} />;
   if (teacherMode && auth.profile.role === 'teacher') return <TeacherDashboard lessons={customLessons} customLessons={customLessons} activities={activities} onCreateLesson={createLesson} onTogglePublish={toggleLessonPublish} onClose={() => setTeacherMode(false)} />;
 
