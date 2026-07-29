@@ -6,18 +6,21 @@ import type { KnowledgeMap, KnowledgeNode } from '../utils/smartMap';
 import { requestAiMap } from '../utils/aiMap';
 import { KnowledgeFlow } from './KnowledgeFlow';
 import { SlideLearningWorkspace } from './SlideLearningWorkspace';
-import { combineSlideNotes, updateSlideNote } from '../utils/slideNotes';
+import { combineSlideNotes, restoreSlideThoughts, updateSlideNote } from '../utils/slideNotes';
 import { CommunityQuestions } from './CommunityQuestions';
 import { PdfSlideWorkspace } from './PdfSlideWorkspace';
+import { LessonSummary } from './LessonSummary';
+import { fetchLessonSummary } from '../utils/lessonSummary';
 
 const EMPTY_MAP: KnowledgeMap = { nodes: [], edges: [] };
 
 export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: () => void }) {
-  const [tab, setTab] = useState<'brief' | 'map' | 'community'>('brief');
+  const [tab, setTab] = useState<'brief' | 'summary' | 'map' | 'community'>('brief');
   const [map, setMap] = useState<KnowledgeMap>(EMPTY_MAP);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [thoughts, setThoughts] = useState('');
+  const [thoughtsLessonId, setThoughtsLessonId] = useState<string | null>(null);
   const [slideIndex, setSlideIndex] = useState(0);
   const [slideNotes, setSlideNotes] = useState<Record<string, string>>({});
   const [isThinking, setIsThinking] = useState(false);
@@ -29,6 +32,10 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
   const slides = usesDay01Pdf ? getPdfPageSlides(42) : getLessonSlides(lesson.id, lesson.name, lesson.prompt);
 
   useEffect(() => {
+    if (usesDay01Pdf) fetchLessonSummary(lesson.id).catch(() => undefined);
+  }, [lesson.id, usesDay01Pdf]);
+
+  useEffect(() => {
     const stored = localStorage.getItem(`solar-note-map:${lesson.id}`);
     const parsed = stored ? JSON.parse(stored) as KnowledgeMap : EMPTY_MAP;
     const normalized = {
@@ -36,7 +43,6 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
       nodes: parsed.nodes.map((node) => ({ ...node, status: node.status ?? 'confirmed' })),
       edges: parsed.edges.map((edge) => ({ ...edge, label: edge.label ?? 'liên quan đến' })),
     };
-    setMap(normalized);
     const storedNotes = localStorage.getItem(`solar-slide-notes:${lesson.id}`);
     let nextSlideNotes: Record<string, string> = {};
     try {
@@ -44,8 +50,13 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
     } catch {
       localStorage.removeItem(`solar-slide-notes:${lesson.id}`);
     }
+    const restoredThoughts = restoreSlideThoughts(slides, nextSlideNotes, normalized.sourceNote);
     setSlideNotes(nextSlideNotes);
-    setThoughts(combineSlideNotes(slides, nextSlideNotes) || normalized.sourceNote || '');
+    // Only real slide notes may trigger map generation. A saved map's sourceNote
+    // can be stale/demo data and must not recreate a map for an empty notebook.
+    setMap(restoredThoughts ? normalized : EMPTY_MAP);
+    setThoughts(restoredThoughts);
+    setThoughtsLessonId(lesson.id);
     setSlideIndex(0);
     setSelectedId(null);
     setTab('brief');
@@ -53,6 +64,7 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
   }, [lesson.id]);
 
   useEffect(() => {
+    if (thoughtsLessonId !== lesson.id) return;
     const note = thoughts.trim();
     const controller = new AbortController();
     if (!note) {
@@ -89,7 +101,7 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [lesson.id, thoughts]);
+  }, [lesson.id, thoughts, thoughtsLessonId]);
 
   const selected = map.nodes.find((node) => node.id === selectedId);
 
@@ -141,6 +153,10 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
     setThoughts('');
     setSlideNotes({});
     localStorage.removeItem(`solar-slide-notes:${lesson.id}`);
+    localStorage.removeItem(`solar-note-map:${lesson.id}`);
+    window.dispatchEvent(new CustomEvent('solar-note-map:saved', {
+      detail: { lessonId: lesson.id, nodeCount: 0 },
+    }));
     setMap(EMPTY_MAP);
     setSelectedId(null);
   };
@@ -149,11 +165,12 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
     const next = updateSlideNote(slideNotes, slides[slideIndex].id, content);
     setSlideNotes(next);
     setThoughts(combineSlideNotes(slides, next));
+    setThoughtsLessonId(lesson.id);
     localStorage.setItem(`solar-slide-notes:${lesson.id}`, JSON.stringify(next));
   };
 
   return (
-    <aside className={`learning-console ${tab === 'brief' ? 'slide-open' : ''} ${tab === 'map' ? 'map-open' : ''} ${tab === 'community' ? 'community-open' : ''}`} style={{ '--lesson-color': lesson.color } as React.CSSProperties}>
+    <aside className={`learning-console ${tab === 'brief' ? 'slide-open' : ''} ${tab === 'summary' ? 'summary-open' : ''} ${tab === 'map' ? 'map-open' : ''} ${tab === 'community' ? 'community-open' : ''}`} style={{ '--lesson-color': lesson.color } as React.CSSProperties}>
       <header className="console-header">
         <div>
           <span className="eyebrow">{lesson.subtitle}</span>
@@ -162,8 +179,9 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
         <button className="icon-button" onClick={onClose} aria-label="Đóng">×</button>
       </header>
 
-      <nav className="console-tabs">
+      <nav className="console-tabs" style={{ gridTemplateColumns: `repeat(${usesDay01Pdf ? 4 : 3}, 1fr)` }}>
         <button className={tab === 'brief' ? 'active' : ''} onClick={() => setTab('brief')}>Bài giảng</button>
+        {usesDay01Pdf && <button className={tab === 'summary' ? 'active' : ''} onClick={() => setTab('summary')}>Tóm tắt</button>}
         <button className={tab === 'map' ? 'active' : ''} onClick={() => setTab('map')}>Sơ đồ <span>{map.nodes.length}</span></button>
         <button className={tab === 'community' ? 'active' : ''} onClick={() => { setCommunitySlideId(undefined); setTab('community'); }}>Cộng đồng</button>
       </nav>
@@ -242,6 +260,8 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
             </div>
           </section>
         )}
+
+        {tab === 'summary' && <LessonSummary lesson={lesson} />}
 
         {tab === 'community' && (
           <CommunityQuestions

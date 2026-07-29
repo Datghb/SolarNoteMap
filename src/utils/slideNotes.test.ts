@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addSlidePin, combineSlideNotes, updateSlideNote } from './slideNotes';
+import { addSlidePin, combineSlideNotes, restoreSlideThoughts, updateSlideNote } from './slideNotes';
 
 describe('slide notes', () => {
   it('updates notes immutably', () => {
@@ -18,6 +18,16 @@ describe('slide notes', () => {
     );
 
     expect(result).toBe('[Slide: Dữ liệu]\nMô hình học từ dữ liệu.');
+  });
+
+  it('does not restore a mind map from a saved map when slide notes are empty', () => {
+    const result = restoreSlideThoughts(
+      [{ id: 'intro', title: 'Khởi động' }],
+      {},
+      '[Slide: Khởi động]\nNội dung demo còn sót lại.',
+    );
+
+    expect(result).toBe('');
   });
 
   it('adds a normalized interaction pin without mutating previous pins', () => {

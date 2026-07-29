@@ -30,3 +30,11 @@ export function combineSlideNotes(slides: SlideSummary[], notes: Record<string, 
     .map(({ slide, note }) => `[Slide: ${slide.title}]\n${note}`)
     .join('\n\n');
 }
+
+export function restoreSlideThoughts(
+  slides: SlideSummary[],
+  notes: Record<string, string>,
+  _savedMapSourceNote?: string,
+) {
+  return combineSlideNotes(slides, notes);
+}

@@ -51,6 +51,7 @@ export function PdfSlideWorkspace({
   const [focusMode, setFocusMode] = useState(false);
   const [understanding, setUnderstanding] = useState<Record<number, Understanding>>({});
   const status = understanding[page] ?? null;
+  const hasMapContent = map.nodes.length > 0;
   useEffect(() => {
     setAnchor(null);
     setInteractionMode(null);
@@ -224,7 +225,7 @@ export function PdfSlideWorkspace({
           <div><span><i>✎</i> Ghi chú trang {page}</span><small>{note.trim() ? `${note.trim().split(/\s+/).length} từ` : 'Chưa có ghi chú'}</small></div>
           <textarea value={note} onChange={(event) => onNoteChange(event.target.value)} placeholder="Ghi lại điều bạn hiểu, một ví dụ hoặc phần còn thắc mắc ở trang này…" />
           <div className="pdf-understanding"><button className={status === 'understood' ? 'active' : ''} onClick={() => setUnderstanding((current) => ({ ...current, [page]: status === 'understood' ? null : 'understood' }))}>✓ Đã hiểu</button><button className={status === 'question' ? 'active question' : ''} onClick={() => setUnderstanding((current) => ({ ...current, [page]: status === 'question' ? null : 'question' }))}>? Chưa rõ</button><button onClick={onAskCommunity}>Hỏi cộng đồng →</button></div>
-          <div className="inline-ai-status"><i>{isThinking ? '✦' : mapSource === 'fallback' ? '!' : '✓'}</i><span>{isThinking ? 'AI đang cập nhật sơ đồ…' : mapSource === 'ai' ? 'Đã đồng bộ vào sơ đồ' : 'Sơ đồ cập nhật từ ghi chú'}</span></div>
+          <div className="inline-ai-status"><i>{isThinking ? '✦' : mapSource === 'fallback' ? '!' : hasMapContent ? '✓' : '·'}</i><span>{isThinking ? 'AI đang cập nhật sơ đồ…' : mapSource === 'ai' && hasMapContent ? 'Đã đồng bộ vào sơ đồ' : hasMapContent ? 'Sơ đồ cập nhật từ ghi chú' : 'Sơ đồ chờ ghi chú đầu tiên'}</span></div>
         </div>
         <div className="inline-map-card pdf-mini-map"><header><div><span>Mind map đang hình thành</span><small>{map.nodes.length} ý · {map.edges.length} liên kết</small></div><button onClick={onOpenMap}>Mở rộng ↗</button></header><div className="mini-flow">{map.nodes.length ? <KnowledgeFlow compact map={map} accent={accent} onSelect={onOpenMap} /> : <div className="mini-map-empty"><i>✦</i><span>Ghi chú để tạo nhánh đầu tiên</span></div>}</div></div>
       </aside>
