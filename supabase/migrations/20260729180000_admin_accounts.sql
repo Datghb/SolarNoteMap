@@ -55,7 +55,7 @@ begin
   return query
   select
     p.id,
-    coalesce(u.email, ''),
+    coalesce(u.email, '')::text,
     p.display_name,
     p.role::text,
     p.created_at,
