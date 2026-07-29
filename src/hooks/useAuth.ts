@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { requireSupabase, supabase, supabaseConfigError } from '../lib/supabase';
 
-export type UserRole = 'student' | 'teacher';
+export type UserRole = 'student' | 'teacher' | 'admin';
 
 export interface UserProfile {
   id: string;
