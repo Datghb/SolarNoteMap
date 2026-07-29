@@ -10,13 +10,10 @@
 .auth-card label { display:grid; gap:7px; color:#aeb4c7; font-size:11px; font-weight:600; }
 .auth-card input { width:100%; min-height:45px; padding:11px 13px; border:1px solid #2b3046; border-radius:10px; outline:none; background:#0d101e; color:#f4f6ff; }
 .auth-card input:focus { border-color:#7987f4; box-shadow:0 0 0 3px #7180ff1c; }
-.auth-primary,.auth-invite button { min-height:45px; border:1px solid #8390ff99; border-radius:10px; background:linear-gradient(135deg,#6675ed,#424ba0); color:#fff; font-weight:700; cursor:pointer; }
-.auth-primary:disabled,.auth-invite button:disabled { opacity:.45; cursor:not-allowed; }
+.auth-primary { min-height:45px; border:1px solid #8390ff99; border-radius:10px; background:linear-gradient(135deg,#6675ed,#424ba0); color:#fff; font-weight:700; cursor:pointer; }
+.auth-primary:disabled { opacity:.45; cursor:not-allowed; }
 .auth-switch { width:100%; margin-top:18px; border:0; background:none; color:#9ca6f7; font-size:12px; cursor:pointer; }
 .auth-message { margin-top:15px; padding:10px 12px; border-radius:9px; font-size:11px; line-height:1.5; }
 .auth-message.error { border:1px solid #ef718155; background:#43172480; color:#ffafba; }
 .auth-message.success { border:1px solid #61d6a555; background:#123b3080; color:#91edca; }
-.auth-invite { display:grid; grid-template-columns:1fr 96px; align-items:end; gap:9px; margin-top:22px; padding-top:20px; border-top:1px solid #ffffff12; }
-.auth-invite button { min-height:45px; }
 @media (max-width:520px) { .auth-card { padding:30px 22px; }.auth-card h1 { font-size:26px; } }
-.classroom-onboarding { min-height:100vh; display:grid; place-items:center; padding:24px; overflow:auto; background:radial-gradient(circle at 50% 20%,#171c48,#050711 48%,#020208); }.classroom-onboarding > section { width:min(500px,100%); padding:38px; border:1px solid #303750; border-radius:20px; background:#090c17ed; box-shadow:0 28px 90px #000b; }.classroom-onboarding h1 { margin:10px 0 8px; font:650 28px 'Space Grotesk'; }.classroom-onboarding > section > p { margin:0 0 22px; color:#8991a5; font-size:12px; line-height:1.6; }.classroom-onboarding label { display:grid; gap:6px; margin-top:13px; color:#aeb4c7; font-size:10px; font-weight:700; }.classroom-onboarding input,.classroom-onboarding textarea { width:100%; padding:11px 12px; border:1px solid #30364a; border-radius:9px; outline:0; background:#101421; color:#f2f4fa; }.classroom-onboarding textarea { min-height:80px; resize:vertical; }.classroom-onboarding .auth-primary { width:100%; margin-top:18px; }

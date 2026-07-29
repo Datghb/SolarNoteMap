@@ -1,12 +1,7 @@
 import type { Lesson } from '../data/lessons';
-import { recordCloudActivity, saveCloudMap, saveCloudNote } from './cloudClassroom';
 
 export const TEACHER_LESSONS_KEY = 'solar-lessons:v1';
 export const ACTIVITY_KEY = 'solar-activity:v1';
-let activeCloudClassId: string | null = null;
-
-export function setActiveCloudClass(classId: string | null) { activeCloudClassId = classId; }
-
 export type ActivityType = 'lesson_opened' | 'slide_viewed' | 'note_updated' | 'map_saved' | 'question_posted' | 'answer_posted' | 'understanding_updated';
 
 export interface StudentActivity {
@@ -105,21 +100,12 @@ export function recordStudentActivity(activity: Omit<StudentActivity, 'id' | 'st
   const next = appendActivity(loadActivities(), {
     ...activity,
     id: crypto.randomUUID(),
-    studentId: 'anh-nguyen',
-    studentName: 'Anh Nguyen',
+    studentId: 'local-learner',
+    studentName: 'Người học trên thiết bị',
     occurredAt: new Date().toISOString(),
   });
   localStorage.setItem(ACTIVITY_KEY, JSON.stringify(next));
   window.dispatchEvent(new CustomEvent('solar-activity:changed'));
-  if (activeCloudClassId) void recordCloudActivity(activeCloudClassId, activity.lessonId, activity.type, activity.metadata).catch(() => undefined);
-}
-
-export function persistCloudNote(lessonId: string, slideNumber: number, content: string) {
-  if (activeCloudClassId) void saveCloudNote(lessonId, slideNumber, content).catch(() => undefined);
-}
-
-export function persistCloudMap(lessonId: string, title: string, graph: unknown) {
-  if (activeCloudClassId) void saveCloudMap(lessonId, title, graph).catch(() => undefined);
 }
 
 export function summarizeClassroom(activities: StudentActivity[]) {

@@ -11,9 +11,8 @@ import { CommunityQuestions } from './CommunityQuestions';
 import { PdfSlideWorkspace } from './PdfSlideWorkspace';
 import { LessonSummary } from './LessonSummary';
 import { fetchLessonSummary } from '../utils/lessonSummary';
-import { persistCloudMap, persistCloudNote, recordStudentActivity } from '../utils/courseStore';
+import { recordStudentActivity } from '../utils/courseStore';
 import { builtInSlidePdfUrl } from './SelectablePdfPage';
-import { loadCloudLearningState } from '../utils/cloudClassroom';
 
 const EMPTY_MAP: KnowledgeMap = { nodes: [], edges: [] };
 
@@ -74,20 +73,6 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
     setSelectedId(null);
     setTab('brief');
     setCommunitySlideId(undefined);
-    let active = true;
-    loadCloudLearningState(lesson.id).then((cloud) => {
-      if (!active) return;
-      const cloudNotes = Object.fromEntries(cloud.notes.flatMap((note) => {
-        const slide = slides[note.slide_number - 1];
-        return slide ? [[slide.id, note.content]] : [];
-      }));
-      if (Object.keys(cloudNotes).length) {
-        setSlideNotes(cloudNotes);
-        setThoughts(combineSlideNotes(slides, cloudNotes));
-      }
-      if (Object.keys(cloudNotes).length && cloud.map && typeof cloud.map === 'object') setMap(cloud.map as KnowledgeMap);
-    }).catch((error) => console.error('Không tải được dữ liệu học từ Supabase:', error));
-    return () => { active = false; };
   }, [lesson.id]);
 
   useEffect(() => {
@@ -173,7 +158,6 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
       detail: { lessonId: lesson.id, nodeCount: map.nodes.length },
     }));
     setSaved(true);
-    persistCloudMap(lesson.id, lesson.name, map);
     recordStudentActivity({ lessonId: lesson.id, type: 'map_saved', metadata: { nodeCount: map.nodes.length } });
     window.setTimeout(() => setSaved(false), 1800);
   };
@@ -196,7 +180,6 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
     setThoughts(combineSlideNotes(slides, next));
     setThoughtsLessonId(lesson.id);
     localStorage.setItem(`solar-slide-notes:${lesson.id}`, JSON.stringify(next));
-    persistCloudNote(lesson.id, slideIndex + 1, content);
     if (noteActivityTimer.current !== null) window.clearTimeout(noteActivityTimer.current);
     noteActivityTimer.current = window.setTimeout(() => {
       recordStudentActivity({ lessonId: lesson.id, slideId: slides[slideIndex].id, type: 'note_updated', metadata: { wordCount: content.trim() ? content.trim().split(/\s+/).length : 0 } });

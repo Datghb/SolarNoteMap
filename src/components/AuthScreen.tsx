@@ -12,7 +12,6 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [inviteCode, setInviteCode] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
 
   const submit = async (event: FormEvent) => {
@@ -29,17 +28,6 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
       }
     } catch {
       // The hook exposes a localized, renderable error.
-    }
-  };
-
-  const redeemInvite = async () => {
-    setNotice(null);
-    try {
-      await auth.redeemTeacherInvite(inviteCode);
-      setInviteCode('');
-      setNotice('Đã kích hoạt quyền giáo viên.');
-    } catch {
-      // The hook exposes the error.
     }
   };
 
@@ -67,12 +55,6 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
           {mode === 'login' ? 'Chưa có tài khoản? Đăng ký' : 'Đã có tài khoản? Đăng nhập'}
         </button>
 
-        {auth.user && (
-          <div className="auth-invite">
-            <label>Mã mời giáo viên<input value={inviteCode} onChange={(event) => setInviteCode(event.target.value)} placeholder="Nhập mã mời" /></label>
-            <button type="button" onClick={redeemInvite} disabled={!inviteCode.trim()}>Kích hoạt</button>
-          </div>
-        )}
       </section>
     </main>
   );

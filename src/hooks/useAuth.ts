@@ -48,18 +48,6 @@ export function useAuth() {
     return data as UserProfile | null;
   }, []);
 
-  const refreshProfile = useCallback(async () => {
-    if (!state.user) return null;
-    try {
-      const profile = await fetchProfile(state.user);
-      setState((current) => ({ ...current, profile, error: null }));
-      return profile;
-    } catch (error) {
-      setState((current) => ({ ...current, error: errorMessage(error) }));
-      return null;
-    }
-  }, [fetchProfile, state.user]);
-
   useEffect(() => {
     if (!supabase) return;
     let active = true;
@@ -118,21 +106,6 @@ export function useAuth() {
     }
   }, []);
 
-  const redeemTeacherInvite = useCallback(async (inviteCode: string) => {
-    const code = inviteCode.trim();
-    if (!code) throw new Error('Vui lòng nhập mã mời giáo viên.');
-    try {
-      const { data, error } = await requireSupabase().rpc('redeem_teacher_invite', { invite_token: code });
-      if (error) throw error;
-      await refreshProfile();
-      setState((current) => ({ ...current, error: null }));
-      return data;
-    } catch (error) {
-      setState((current) => ({ ...current, error: errorMessage(error) }));
-      throw error;
-    }
-  }, [refreshProfile]);
-
   const signOut = useCallback(async () => {
     try {
       const { error } = await requireSupabase().auth.signOut();
@@ -144,5 +117,5 @@ export function useAuth() {
     }
   }, []);
 
-  return { ...state, signIn, signUp, signOut, redeemTeacherInvite, refreshProfile };
+  return { ...state, signIn, signUp, signOut };
 }

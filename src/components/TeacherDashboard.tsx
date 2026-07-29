@@ -11,7 +11,7 @@ export function TeacherDashboard({ lessons, customLessons, activities, onCreateL
   lessons: Lesson[];
   customLessons: TeacherLesson[];
   activities: StudentActivity[];
-  onCreateLesson: (lesson: TeacherLesson, pdf?: File) => void | Promise<void>;
+  onCreateLesson: (lesson: TeacherLesson) => void | Promise<void>;
   onTogglePublish: (lessonId: string) => void | Promise<void>;
   onClose: () => void;
 }) {
@@ -19,7 +19,6 @@ export function TeacherDashboard({ lessons, customLessons, activities, onCreateL
   const [showCreator, setShowCreator] = useState(false);
   const [form, setForm] = useState<TeacherLessonInput>({ name: '', shortName: '', description: '', prompt: '' });
   const [formError, setFormError] = useState('');
-  const [pdfFile, setPdfFile] = useState<File>();
   const [savingLesson, setSavingLesson] = useState(false);
   const metrics = summarizeClassroom(activities);
   const students = useMemo(() => [...new Set(activities.map((activity) => activity.studentId))].map((studentId) => {
@@ -30,9 +29,8 @@ export function TeacherDashboard({ lessons, customLessons, activities, onCreateL
   const submitLesson = async () => {
     setSavingLesson(true);
     try {
-      await onCreateLesson(createTeacherLesson(form), pdfFile);
+      await onCreateLesson(createTeacherLesson(form));
       setForm({ name: '', shortName: '', description: '', prompt: '' });
-      setPdfFile(undefined);
       setFormError('');
       setShowCreator(false);
       setView('lessons');
@@ -50,9 +48,9 @@ export function TeacherDashboard({ lessons, customLessons, activities, onCreateL
 
     <section className="teacher-shell">
       <aside className="teacher-sidebar">
-        <span className="teacher-kicker">LỚP AI CĂN BẢN</span><h1>Theo dõi hành trình học tập.</h1><p>Quản lý bài giảng và quan sát những tín hiệu học tập quan trọng theo thời gian.</p>
+        <span className="teacher-kicker">KHÔNG GIAN CÁ NHÂN</span><h1>Xây dựng hành trình học tập.</h1><p>Quản lý bài giảng và nội dung học tập được lưu trên thiết bị này.</p>
         <button className="teacher-create" onClick={() => setShowCreator(true)}>＋ Thêm bài giảng</button>
-        <div className="teacher-storage-note"><i>i</i><span><b>Chế độ thử nghiệm cục bộ</b>Chưa có đăng nhập giáo viên hoặc dữ liệu nhiều thiết bị.</span></div>
+        <div className="teacher-storage-note"><i>i</i><span><b>Dữ liệu cục bộ</b>Bài giảng và hoạt động được lưu trên thiết bị hiện tại.</span></div>
       </aside>
 
       <div className="teacher-main">
@@ -76,7 +74,7 @@ export function TeacherDashboard({ lessons, customLessons, activities, onCreateL
       </div>
     </section>
 
-    {showCreator && <div className="lesson-creator-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowCreator(false); }}><section className="lesson-creator"><header><div><span>＋ BÀI GIẢNG MỚI</span><h2>Thêm nội dung cho lớp</h2></div><button onClick={() => setShowCreator(false)}>×</button></header><label>Tên bài giảng<input maxLength={120} value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="Ví dụ: Prompt Engineering căn bản" /></label><label>Tên ngắn<input maxLength={48} value={form.shortName} onChange={(event) => setForm((current) => ({ ...current, shortName: event.target.value }))} placeholder="Prompt Engineering" /></label><label>Mô tả<textarea maxLength={500} value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} placeholder="Học sinh sẽ học được gì?" /></label><label>Câu hỏi dẫn đường<input maxLength={300} value={form.prompt} onChange={(event) => setForm((current) => ({ ...current, prompt: event.target.value }))} placeholder="Câu hỏi trọng tâm của bài học" /></label><label className="lesson-file">Tài liệu PDF<input type="file" accept="application/pdf" onChange={(event) => { const file = event.target.files?.[0]; setPdfFile(file); setForm((current) => ({ ...current, pdfName: file?.name })); }} /><span>{form.pdfName || 'Chọn tệp PDF từ máy'}</span></label>{formError && <p className="creator-error">{formError}</p>}<footer><button onClick={() => setShowCreator(false)}>Hủy</button><button className="primary" disabled={savingLesson} onClick={submitLesson}>{savingLesson ? 'Đang tải lên…' : 'Lưu bản nháp'}</button></footer></section></div>}
+    {showCreator && <div className="lesson-creator-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowCreator(false); }}><section className="lesson-creator"><header><div><span>＋ BÀI GIẢNG MỚI</span><h2>Thêm nội dung học tập</h2></div><button onClick={() => setShowCreator(false)}>×</button></header><label>Tên bài giảng<input maxLength={120} value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="Ví dụ: Prompt Engineering căn bản" /></label><label>Tên ngắn<input maxLength={48} value={form.shortName} onChange={(event) => setForm((current) => ({ ...current, shortName: event.target.value }))} placeholder="Prompt Engineering" /></label><label>Mô tả<textarea maxLength={500} value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} placeholder="Người học sẽ học được gì?" /></label><label>Câu hỏi dẫn đường<input maxLength={300} value={form.prompt} onChange={(event) => setForm((current) => ({ ...current, prompt: event.target.value }))} placeholder="Câu hỏi trọng tâm của bài học" /></label>{formError && <p className="creator-error">{formError}</p>}<footer><button onClick={() => setShowCreator(false)}>Hủy</button><button className="primary" disabled={savingLesson} onClick={submitLesson}>{savingLesson ? 'Đang lưu…' : 'Lưu bản nháp'}</button></footer></section></div>}
   </main>;
 }
 
