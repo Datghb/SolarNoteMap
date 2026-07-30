@@ -3,7 +3,7 @@ import { appendActivity, buildCloudActivityMetadata, createTeacherLesson, summar
 
 describe('teacher course store', () => {
   it('creates a normalized lesson without mutating the form input', () => {
-    const input = { name: '  Prompt Engineering ', shortName: ' Prompt ', description: 'Kỹ thuật viết prompt', prompt: 'Prompt tốt cần gì?', pdfName: 'lesson.pdf' };
+    const input = { name: '  Prompt Engineering ', shortName: ' Prompt ', description: 'Kỹ thuật viết prompt', pdfName: 'lesson.pdf' };
     const lesson = createTeacherLesson(input, 'lesson-id', '2026-07-29T00:00:00.000Z');
     expect(input.name).toContain('  ');
     expect(lesson).toMatchObject({ id: 'lesson-id', name: 'Prompt Engineering', shortName: 'Prompt', published: false, pdfName: 'lesson.pdf' });

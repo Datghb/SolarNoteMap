@@ -88,7 +88,6 @@ export function TeacherDashboard({
     name: "",
     shortName: "",
     description: "",
-    prompt: "",
   });
   const [formError, setFormError] = useState("");
   const [pdfFile, setPdfFile] = useState<File>();
@@ -132,7 +131,7 @@ export function TeacherDashboard({
     setSavingLesson(true);
     try {
       await onCreateLesson(createTeacherLesson(form), pdfFile);
-      setForm({ name: "", shortName: "", description: "", prompt: "" });
+      setForm({ name: "", shortName: "", description: "" });
       setPdfFile(undefined);
       setFormError("");
       setShowCreator(false);
@@ -842,20 +841,6 @@ export function TeacherDashboard({
                   }))
                 }
                 placeholder="Học sinh sẽ học được gì?"
-              />
-            </label>
-            <label>
-              Câu hỏi dẫn đường
-              <input
-                maxLength={300}
-                value={form.prompt}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    prompt: event.target.value,
-                  }))
-                }
-                placeholder="Câu hỏi trọng tâm của bài học"
               />
             </label>
             <label className="lesson-file">

@@ -31,7 +31,6 @@ export interface TeacherLessonInput {
   name: string;
   shortName: string;
   description: string;
-  prompt: string;
   pdfName?: string;
 }
 
@@ -61,7 +60,6 @@ export function createTeacherLesson(input: TeacherLessonInput, id: string = cryp
     shortName,
     subtitle: 'Bài giảng do giáo viên tạo',
     description: limited(input.description, 500, 'Mô tả'),
-    prompt: limited(input.prompt, 300, 'Câu hỏi dẫn đường') || `Những kiến thức quan trọng nhất trong “${name}” là gì?`,
     color: '#8ea1ff',
     colors: ['#d8deff', '#7289ff', '#314387'],
     published: false,
@@ -76,7 +74,7 @@ export function loadTeacherLessons() {
     if (!value || typeof value !== 'object') return false;
     const lesson = value as Partial<TeacherLesson>;
     return typeof lesson.id === 'string' && typeof lesson.name === 'string' && typeof lesson.shortName === 'string' &&
-      typeof lesson.description === 'string' && typeof lesson.prompt === 'string' && typeof lesson.color === 'string' &&
+      typeof lesson.description === 'string' && typeof lesson.color === 'string' &&
       Array.isArray(lesson.colors) && typeof lesson.published === 'boolean' && typeof lesson.createdAt === 'string';
   });
 }

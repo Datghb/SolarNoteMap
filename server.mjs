@@ -281,14 +281,14 @@ app.post('/api/knowledge-map', async (request, response) => {
   const note = typeof request.body?.note === 'string' ? request.body.note.trim() : '';
   const lesson = request.body?.lesson;
   if (!note || note.length > 12_000) return response.status(400).json({ error: 'Ghi chú phải có từ 1 đến 12.000 ký tự.' });
-  if (!lesson || typeof lesson.name !== 'string' || typeof lesson.prompt !== 'string') {
+  if (!lesson || typeof lesson.name !== 'string') {
     return response.status(400).json({ error: 'Thông tin bài học không hợp lệ.' });
   }
   if (!client) return response.status(503).json({ error: `Máy chủ chưa được cấu hình ${provider === 'groq' ? 'GROQ_API_KEY' : 'OPENAI_API_KEY'}.` });
 
   try {
     const developerPrompt = 'Chuyển ghi chú học tập tiếng Việt thành bản đồ kiến thức. Chỉ dùng ý có trong ghi chú; không bổ sung kiến thức như thể học sinh đã viết. Trả về duy nhất JSON object có nodes và edges. Mỗi node gồm id, title, description, importance (minor|detail|support|important|core). Mỗi edge gồm source, target, relation. Tạo ID ngắn, ổn định; chọn đúng một core khi có ít nhất hai node; tối đa 12 node và 20 edge.';
-    const userPrompt = `Bài học: ${lesson.name}\nCâu hỏi dẫn đường: ${lesson.prompt}\n\nGhi chú của học sinh:\n${note}`;
+    const userPrompt = `Bài học: ${lesson.name}\n\nGhi chú của học sinh:\n${note}`;
     if (provider === 'groq') {
       const result = await client.chat.completions.create({
         model,

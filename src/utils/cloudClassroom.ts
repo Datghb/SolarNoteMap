@@ -149,7 +149,7 @@ async function mapLessonRows(client: ReturnType<typeof requireSupabase>, rows: R
     if (signed.error) throw signed.error;
     return {
     id: row.id, name: row.title, shortName: row.short_name, subtitle: isClassLessonReleased(row.published_at) ? 'Bài giảng đang mở' : row.published_at ? 'Bài giảng đã lên lịch' : 'Bài giảng đang khóa',
-    description: row.description, prompt: row.prompt, color: '#8ea1ff',
+    description: row.description, color: '#8ea1ff',
     colors: ['#d8deff', '#7289ff', '#314387'], published: isClassLessonReleased(row.published_at), availableAt: row.published_at ?? undefined, pdfName: row.pdf_path?.split('/').pop(),
     pdfPath: row.pdf_path ?? undefined, pdfUrl: signed.data?.signedUrl,
     createdAt: row.created_at, updatedAt: row.updated_at,
@@ -165,7 +165,7 @@ function safeSlug(value: string) {
 export async function createCloudLesson(courseId: string, userId: string, input: TeacherLessonInput, pdf?: File) {
   const client = requireSupabase();
   const id = safeSlug(input.name);
-  const lessonDraft = { id, course_id: courseId, created_by: userId, title: input.name.trim(), short_name: input.shortName.trim(), description: input.description.trim(), prompt: input.prompt.trim(), pdf_path: null };
+  const lessonDraft = { id, course_id: courseId, created_by: userId, title: input.name.trim(), short_name: input.shortName.trim(), description: input.description.trim(), prompt: '', pdf_path: null };
   let { data, error } = await client.from('lessons').insert(lessonDraft).select().single();
   if (error && courseSchemaIsMissing(error)) {
     const legacy = await client.from('lessons').insert({ ...lessonDraft, course_id: undefined, class_id: courseId }).select().single();

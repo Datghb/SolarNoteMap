@@ -43,7 +43,7 @@ export function LearningConsole({ lesson, classId, onClose }: { lesson: Lesson; 
   const usesDay01Pdf = lesson.id === 'ai-foundations' || Boolean(lesson.pdfUrl);
   const [pdfPageCount, setPdfPageCount] = useState(42);
   const [pdfLoadedLessonId, setPdfLoadedLessonId] = useState<string | null>(null);
-  const slides = usesDay01Pdf ? getPdfPageSlides(pdfPageCount) : getLessonSlides(lesson.id, lesson.name, lesson.prompt);
+  const slides = usesDay01Pdf ? getPdfPageSlides(pdfPageCount) : getLessonSlides(lesson.id, lesson.name);
 
   useEffect(() => {
     if (usesDay01Pdf) fetchLessonSummary(lesson.id).catch(() => undefined);
@@ -141,7 +141,7 @@ export function LearningConsole({ lesson, classId, onClose }: { lesson: Lesson; 
     setAnalysisError('');
     const timer = window.setTimeout(async () => {
       try {
-        const result = await requestAiMap(thoughts, { name: lesson.name, prompt: lesson.prompt }, map, controller.signal);
+        const result = await requestAiMap(thoughts, { name: lesson.name }, map, controller.signal);
         setMap(result);
         setSelectedId(null);
         setMapSource('ai');
@@ -324,7 +324,6 @@ export function LearningConsole({ lesson, classId, onClose }: { lesson: Lesson; 
               <div className="note-panel-heading"><span className="ai-kicker"><i>✦</i> Ghi chú tổng hợp</span><small>{thoughts.trim() ? `${thoughts.trim().split(/\s+/).length} từ` : 'Chưa có nội dung'}</small></div>
               <h3>Ghi chú từ các slide</h3>
               <p>Nội dung này được tổng hợp tự động. Quay lại bài giảng để viết hoặc chỉnh sửa ghi chú theo từng slide.</p>
-              <div className="live-guide-question"><small>Câu hỏi dẫn đường</small><span>{lesson.prompt}</span></div>
               <textarea readOnly value={thoughts} placeholder="Ghi chú từ các slide sẽ xuất hiện tại đây." />
               <div className={`analysis-status ${isThinking ? 'thinking' : ''} ${mapSource === 'fallback' ? 'fallback' : ''}`} title={analysisError}><i>{isThinking ? '✦' : mapSource === 'fallback' ? '!' : '✓'}</i><span><b>{isThinking ? 'AI đang hiểu ghi chú…' : mapSource === 'ai' ? 'Đã đồng bộ bằng OpenAI' : mapSource === 'fallback' ? 'Đang dùng phân tích cục bộ' : thoughts.trim() ? 'Bản xem trước tức thì' : 'Sẵn sàng khi bạn bắt đầu viết'}</b><small>{analysisError || (map.nodes.length ? `${map.nodes.length} khái niệm · ${map.edges.length} mối quan hệ` : 'AI chỉ sử dụng nội dung trong ghi chú của bạn')}</small></span></div>
             </aside>
