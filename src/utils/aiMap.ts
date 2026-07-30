@@ -72,7 +72,7 @@ export function normalizeAiMap(value: unknown, sourceNote: string, previous: Kno
 
 export async function requestAiMap(
   note: string,
-  lesson: { name: string; prompt: string },
+  lesson: { name: string },
   previous: KnowledgeMap,
   signal: AbortSignal,
 ) {

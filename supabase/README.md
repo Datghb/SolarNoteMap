@@ -1,7 +1,7 @@
 # Supabase setup
 
 1. Create a Supabase project.
-2. Open **SQL Editor** and run `migrations/20260729103000_initial_auth_classroom.sql`.
+2. Open **SQL Editor** and run every migration in timestamp order through `20260730130000_lesson_pdf_drafts.sql`.
 3. Copy the Project URL and Publishable key into `.env.local`:
 
    ```env
@@ -18,7 +18,9 @@
    where id = (select id from auth.users where email = 'teacher@example.com');
    ```
 
-6. The teacher can create a class and choose a private join code (at least 8 characters). Students register normally, then enter that code.
+6. Teachers create a shared course program, add reusable PDF lessons, then create one or more classes. Each class receives a server-generated private join code and its own lesson release schedule.
+7. Students enter a class code once, can switch between joined classes, and only see lessons released for the selected class. Notes, maps, questions and activity are isolated by class.
+8. Admins can inspect accounts, programs, and classes without receiving access to students' private notes or maps.
 
 ## Bootstrapping the first administrator
 
@@ -30,27 +32,12 @@ set role = 'admin'
 where id = (select id from auth.users where email = 'admin@example.com');
 ```
 
-Sign out and back in. Admins open the account dashboard automatically and can switch non-admin accounts between student and teacher roles. Admin accounts cannot demote themselves or other admins from the dashboard. A teacher who still owns a class cannot be demoted until class ownership is transferred or the class is removed.
-
-## Creating another teacher invite
-
-Choose a random secret of at least 24 characters and insert only its SHA-256 hash. Send the original secret to the invited teacher through a private channel.
-
-```sql
-insert into public.teacher_invites (token_hash, created_by, expires_at)
-select
-  encode(extensions.digest('REPLACE_WITH_A_LONG_RANDOM_SECRET', 'sha256'), 'hex'),
-  id,
-  now() + interval '7 days'
-from public.profiles
-where id = auth.uid() and role = 'teacher';
-```
-
-When running this statement directly in SQL Editor, `auth.uid()` may be null. Replace it with the teacher profile UUID in that case.
+Sign out and back in. Admins open the account dashboard automatically and can switch non-admin accounts between student and teacher roles. Admin accounts cannot demote themselves or other admins from the dashboard.
 
 ## Security notes
 
 - Never expose a Supabase secret/service-role key in a `VITE_` variable.
-- The `lesson-pdfs` bucket is private and restricted to PDFs up to 50 MB.
 - All application tables have Row Level Security enabled.
-- Teachers can see activity only for classes they own. Students can access only their own learning records and published lessons in joined classes.
+- Join codes are stored as hashes; the original code should be shared privately.
+- Failed join attempts are rate-limited per account.
+- Lesson PDFs remain private and are delivered through expiring signed URLs.

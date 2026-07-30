@@ -9,6 +9,8 @@ export interface UserProfile {
   display_name: string;
   avatar_url: string | null;
   role: UserRole;
+  blocked_at?: string | null;
+  block_reason?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -48,18 +50,6 @@ export function useAuth() {
     return data as UserProfile | null;
   }, []);
 
-  const refreshProfile = useCallback(async () => {
-    if (!state.user) return null;
-    try {
-      const profile = await fetchProfile(state.user);
-      setState((current) => ({ ...current, profile, error: null }));
-      return profile;
-    } catch (error) {
-      setState((current) => ({ ...current, error: errorMessage(error) }));
-      return null;
-    }
-  }, [fetchProfile, state.user]);
-
   useEffect(() => {
     if (!supabase) return;
     let active = true;
@@ -88,6 +78,23 @@ export function useAuth() {
       listener.subscription.unsubscribe();
     };
   }, [fetchProfile]);
+
+  useEffect(() => {
+    if (!state.user) return;
+    let active = true;
+    const refreshAccess = () => {
+      void fetchProfile(state.user!).then((profile) => {
+        if (active) setState((current) => ({ ...current, profile }));
+      }).catch(() => undefined);
+    };
+    const timer = window.setInterval(refreshAccess, 30_000);
+    window.addEventListener('focus', refreshAccess);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refreshAccess);
+    };
+  }, [fetchProfile, state.user]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     setState((current) => ({ ...current, loading: true, error: null }));
@@ -118,21 +125,6 @@ export function useAuth() {
     }
   }, []);
 
-  const redeemTeacherInvite = useCallback(async (inviteCode: string) => {
-    const code = inviteCode.trim();
-    if (!code) throw new Error('Vui lòng nhập mã mời giáo viên.');
-    try {
-      const { data, error } = await requireSupabase().rpc('redeem_teacher_invite', { invite_token: code });
-      if (error) throw error;
-      await refreshProfile();
-      setState((current) => ({ ...current, error: null }));
-      return data;
-    } catch (error) {
-      setState((current) => ({ ...current, error: errorMessage(error) }));
-      throw error;
-    }
-  }, [refreshProfile]);
-
   const signOut = useCallback(async () => {
     try {
       const { error } = await requireSupabase().auth.signOut();
@@ -144,5 +136,5 @@ export function useAuth() {
     }
   }, []);
 
-  return { ...state, signIn, signUp, signOut, redeemTeacherInvite, refreshProfile };
+  return { ...state, signIn, signUp, signOut };
 }

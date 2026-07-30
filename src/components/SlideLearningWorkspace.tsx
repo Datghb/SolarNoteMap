@@ -17,6 +17,7 @@ export function SlideLearningWorkspace({
   onNoteChange,
   onOpenMap,
   onAskCommunity,
+  onUnderstandingChange,
 }: {
   slides: LessonSlide[];
   index: number;
@@ -29,11 +30,17 @@ export function SlideLearningWorkspace({
   onNoteChange: (note: string) => void;
   onOpenMap: () => void;
   onAskCommunity: () => void;
+  onUnderstandingChange: (status: 'understood' | 'question' | 'unmarked') => void;
 }) {
   const slide = slides[index];
   const [selectedPoint, setSelectedPoint] = useState<string | null>(null);
   const [understanding, setUnderstanding] = useState<Record<string, Understanding>>({});
   const status = understanding[slide.id] ?? null;
+  const changeUnderstanding = (next: Exclude<Understanding, null>) => {
+    const value = status === next ? null : next;
+    setUnderstanding((current) => ({ ...current, [slide.id]: value }));
+    onUnderstandingChange(value ?? 'unmarked');
+  };
 
   const changeSlide = (next: number) => {
     setSelectedPoint(null);
@@ -64,8 +71,8 @@ export function SlideLearningWorkspace({
         <div className="slide-question"><small>Câu hỏi dành cho bạn</small><p>{slide.question}</p></div>
         <div className="understanding-actions">
           <span>Slide này với bạn thế nào?</span>
-          <button className={status === 'understood' ? 'active understood' : ''} onClick={() => setUnderstanding((current) => ({ ...current, [slide.id]: status === 'understood' ? null : 'understood' }))}>✓ Đã hiểu</button>
-          <button className={status === 'question' ? 'active question' : ''} onClick={() => setUnderstanding((current) => ({ ...current, [slide.id]: status === 'question' ? null : 'question' }))}>? Chưa rõ</button>
+          <button className={status === 'understood' ? 'active understood' : ''} onClick={() => changeUnderstanding('understood')}>✓ Đã hiểu</button>
+          <button className={status === 'question' ? 'active question' : ''} onClick={() => changeUnderstanding('question')}>? Chưa rõ</button>
           <button onClick={onAskCommunity}>Hỏi cộng đồng →</button>
         </div>
       </div>

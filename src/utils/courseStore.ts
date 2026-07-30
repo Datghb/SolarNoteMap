@@ -17,7 +17,7 @@ export interface StudentActivity {
   type: ActivityType;
   occurredAt: string;
   slideId?: string;
-  metadata?: { wordCount?: number; nodeCount?: number; status?: string };
+  metadata?: { wordCount?: number; nodeCount?: number; status?: string; slideId?: string };
 }
 
 export interface TeacherLesson extends Lesson {
@@ -29,9 +29,8 @@ export interface TeacherLesson extends Lesson {
 
 export interface TeacherLessonInput {
   name: string;
-  shortName: string;
+  shortName?: string;
   description: string;
-  prompt: string;
   pdfName?: string;
 }
 
@@ -53,15 +52,16 @@ function limited(value: string, max: number, label: string) {
 
 export function createTeacherLesson(input: TeacherLessonInput, id: string = crypto.randomUUID(), now = new Date().toISOString()): TeacherLesson {
   const name = limited(input.name, 120, 'Tên bài giảng');
-  const shortName = limited(input.shortName, 48, 'Tên ngắn');
-  if (!name || !shortName) throw new Error('Tên bài giảng và tên ngắn không được để trống.');
+  const shortName = input.shortName
+    ? limited(input.shortName, 48, 'Tên ngắn')
+    : name;
+  if (!name) throw new Error('Tên bài giảng không được để trống.');
   return {
     id,
     name,
     shortName,
     subtitle: 'Bài giảng do giáo viên tạo',
     description: limited(input.description, 500, 'Mô tả'),
-    prompt: limited(input.prompt, 300, 'Câu hỏi dẫn đường') || `Những kiến thức quan trọng nhất trong “${name}” là gì?`,
     color: '#8ea1ff',
     colors: ['#d8deff', '#7289ff', '#314387'],
     published: false,
@@ -76,7 +76,7 @@ export function loadTeacherLessons() {
     if (!value || typeof value !== 'object') return false;
     const lesson = value as Partial<TeacherLesson>;
     return typeof lesson.id === 'string' && typeof lesson.name === 'string' && typeof lesson.shortName === 'string' &&
-      typeof lesson.description === 'string' && typeof lesson.prompt === 'string' && typeof lesson.color === 'string' &&
+      typeof lesson.description === 'string' && typeof lesson.color === 'string' &&
       Array.isArray(lesson.colors) && typeof lesson.published === 'boolean' && typeof lesson.createdAt === 'string';
   });
 }
@@ -101,6 +101,10 @@ export function appendActivity(current: StudentActivity[], activity: StudentActi
   return [activity, ...current].slice(0, 1000);
 }
 
+export function buildCloudActivityMetadata(slideId: string | undefined, metadata: StudentActivity['metadata'] = {}) {
+  return slideId ? { ...metadata, slideId } : { ...metadata };
+}
+
 export function recordStudentActivity(activity: Omit<StudentActivity, 'id' | 'studentId' | 'studentName' | 'occurredAt'>) {
   const next = appendActivity(loadActivities(), {
     ...activity,
@@ -111,15 +115,15 @@ export function recordStudentActivity(activity: Omit<StudentActivity, 'id' | 'st
   });
   localStorage.setItem(ACTIVITY_KEY, JSON.stringify(next));
   window.dispatchEvent(new CustomEvent('solar-activity:changed'));
-  if (activeCloudClassId) void recordCloudActivity(activeCloudClassId, activity.lessonId, activity.type, activity.metadata).catch(() => undefined);
+  if (activeCloudClassId) void recordCloudActivity(activeCloudClassId, activity.lessonId, activity.type, buildCloudActivityMetadata(activity.slideId, activity.metadata)).catch(() => undefined);
 }
 
-export function persistCloudNote(lessonId: string, slideNumber: number, content: string) {
-  if (activeCloudClassId) void saveCloudNote(lessonId, slideNumber, content).catch(() => undefined);
+export async function persistCloudNote(lessonId: string, slideNumber: number, content: string) {
+  if (activeCloudClassId) await saveCloudNote(activeCloudClassId, lessonId, slideNumber, content);
 }
 
-export function persistCloudMap(lessonId: string, title: string, graph: unknown) {
-  if (activeCloudClassId) void saveCloudMap(lessonId, title, graph).catch(() => undefined);
+export async function persistCloudMap(lessonId: string, title: string, graph: unknown) {
+  if (activeCloudClassId) await saveCloudMap(activeCloudClassId, lessonId, title, graph);
 }
 
 export function summarizeClassroom(activities: StudentActivity[]) {

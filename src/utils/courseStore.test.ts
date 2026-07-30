@@ -1,12 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { appendActivity, createTeacherLesson, summarizeClassroom, type StudentActivity } from './courseStore';
+import { appendActivity, buildCloudActivityMetadata, createTeacherLesson, summarizeClassroom, type StudentActivity } from './courseStore';
 
 describe('teacher course store', () => {
   it('creates a normalized lesson without mutating the form input', () => {
-    const input = { name: '  Prompt Engineering ', shortName: ' Prompt ', description: 'Kỹ thuật viết prompt', prompt: 'Prompt tốt cần gì?', pdfName: 'lesson.pdf' };
+    const input = { name: '  Prompt Engineering ', shortName: ' Prompt ', description: 'Kỹ thuật viết prompt', pdfName: 'lesson.pdf' };
     const lesson = createTeacherLesson(input, 'lesson-id', '2026-07-29T00:00:00.000Z');
     expect(input.name).toContain('  ');
     expect(lesson).toMatchObject({ id: 'lesson-id', name: 'Prompt Engineering', shortName: 'Prompt', published: false, pdfName: 'lesson.pdf' });
+  });
+
+  it('uses the lesson name when no short name is provided', () => {
+    const lesson = createTeacherLesson(
+      { name: 'Agentic AI cho doanh nghiệp', description: '' },
+      'lesson-id',
+      '2026-07-29T00:00:00.000Z',
+    );
+
+    expect(lesson.shortName).toBe('Agentic AI cho doanh nghiệp');
   });
 
   it('prepends activity immutably and caps the history', () => {
@@ -24,5 +34,11 @@ describe('teacher course store', () => {
       { id: '3', studentId: 'b', studentName: 'Bình', lessonId: 'l1', type: 'question_posted', occurredAt: '3' },
     ];
     expect(summarizeClassroom(activities)).toEqual({ activeStudents: 2, notes: 1, maps: 0, questions: 1, totalEvents: 3 });
+  });
+
+  it('preserves the viewed slide id in cloud activity metadata', () => {
+    const metadata = { status: 'reviewing' };
+    expect(buildCloudActivityMetadata('slide-7', metadata)).toEqual({ status: 'reviewing', slideId: 'slide-7' });
+    expect(metadata).toEqual({ status: 'reviewing' });
   });
 });

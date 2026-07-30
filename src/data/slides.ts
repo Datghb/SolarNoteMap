@@ -43,13 +43,13 @@ const SLIDE_CONTENT: Record<string, LessonSlide[]> = {
   ],
 };
 
-export function getLessonSlides(lessonId: string, lessonName: string, prompt: string): LessonSlide[] {
+export function getLessonSlides(lessonId: string, lessonName: string): LessonSlide[] {
   return SLIDE_CONTENT[lessonId] ?? [
     { id: `${lessonId}-overview`, eyebrow: 'Khởi động', title: lessonName, statement: `Bắt đầu bằng việc xác định những khái niệm quan trọng nhất trong “${lessonName}”.`, points: [
       { id: 'concept', label: 'Khái niệm', description: 'Ghi lại định nghĩa bằng lời của bạn.' },
       { id: 'connection', label: 'Mối liên hệ', description: 'Tìm điều liên kết các ý với nhau.' },
       { id: 'example', label: 'Ví dụ', description: 'Dùng một tình huống thực tế để kiểm chứng.' },
-    ], question: prompt },
+    ], question: 'Bạn đã hiểu những ý chính nào và còn muốn tìm hiểu thêm điều gì?' },
     { id: `${lessonId}-mechanism`, eyebrow: 'Khám phá', title: 'Từ khái niệm đến cơ chế', statement: 'Một khái niệm chỉ thực sự rõ khi bạn giải thích được đầu vào, quá trình và kết quả của nó.', points: [
       { id: 'input', label: 'Đầu vào', description: 'Điều gì cung cấp thông tin cho hệ thống?' },
       { id: 'process', label: 'Quá trình', description: 'Thông tin được biến đổi như thế nào?' },

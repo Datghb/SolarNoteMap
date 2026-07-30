@@ -16,6 +16,12 @@ describe('lesson summary API', () => {
     });
   });
 
+  it('passes the uploaded PDF URL when summarizing a custom lesson', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ summary: 'Tóm tắt', source: 'generated' }), { status: 200 }));
+    await fetchLessonSummary('custom-lesson', 'https://school.supabase.co/storage/v1/object/sign/lesson.pdf?token=signed');
+    expect(String(fetchMock.mock.calls[0][0])).toContain('pdfUrl=https%3A%2F%2Fschool.supabase.co');
+  });
+
   it('sends a bounded chat history with the question', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ answer: 'Câu trả lời' }), { status: 200 }));
     await askLessonSummaryAI('ai-foundations', ' Giải thích LLM ', [{ role: 'assistant', content: 'Chào bạn' }]);
