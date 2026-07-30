@@ -119,11 +119,11 @@ export function recordStudentActivity(activity: Omit<StudentActivity, 'id' | 'st
 }
 
 export async function persistCloudNote(lessonId: string, slideNumber: number, content: string) {
-  if (activeCloudClassId) await saveCloudNote(lessonId, slideNumber, content);
+  if (activeCloudClassId) await saveCloudNote(activeCloudClassId, lessonId, slideNumber, content);
 }
 
 export async function persistCloudMap(lessonId: string, title: string, graph: unknown) {
-  if (activeCloudClassId) await saveCloudMap(lessonId, title, graph);
+  if (activeCloudClassId) await saveCloudMap(activeCloudClassId, lessonId, title, graph);
 }
 
 export function summarizeClassroom(activities: StudentActivity[]) {

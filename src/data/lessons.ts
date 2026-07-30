@@ -11,6 +11,7 @@ export interface Lesson {
   pdfName?: string;
   pdfPath?: string;
   pdfUrl?: string;
+  availableAt?: string;
   createdAt?: string;
   updatedAt?: string;
 }

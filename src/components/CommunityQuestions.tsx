@@ -15,13 +15,14 @@ function sampleQuestions(lessonId: string, slides: LessonSlide[]): CommunityQues
   ];
 }
 
-export function CommunityQuestions({ lesson, slides, initialSlideId, onOpenSlide }: {
+export function CommunityQuestions({ lesson, classId, slides, initialSlideId, onOpenSlide }: {
   lesson: Lesson;
+  classId: string;
   slides: LessonSlide[];
   initialSlideId?: string;
   onOpenSlide: (slideId: string) => void;
 }) {
-  const storageKey = `solar-community-questions:${lesson.id}`;
+  const storageKey = `solar-community-questions:${classId}:${lesson.id}`;
   const [questions, setQuestions] = useState<CommunityQuestion[]>([]);
   const [filter, setFilter] = useState(initialSlideId ?? 'all');
   const [composerSlide, setComposerSlide] = useState(initialSlideId ?? slides[0].id);
@@ -37,7 +38,7 @@ export function CommunityQuestions({ lesson, slides, initialSlideId, onOpenSlide
     }
     setFilter(initialSlideId ?? 'all');
     setComposerSlide(initialSlideId ?? slides[0].id);
-  }, [lesson.id, initialSlideId]);
+  }, [lesson.id, classId, initialSlideId]);
 
   const save = (next: CommunityQuestion[]) => {
     setQuestions(next);

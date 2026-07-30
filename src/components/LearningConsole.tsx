@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useMemo, useEffect, useRef, useState } from 'react';
 import type { Lesson } from '../data/lessons';
 import { getLessonSlides, getPdfPageSlides } from '../data/slides';
 import { createRealtimeMap } from '../utils/smartMap';
@@ -17,7 +17,7 @@ import { loadCloudLearningState } from '../utils/cloudClassroom';
 
 const EMPTY_MAP: KnowledgeMap = { nodes: [], edges: [] };
 
-export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: () => void }) {
+export function LearningConsole({ lesson, classId, onClose }: { lesson: Lesson; classId: string; onClose: () => void }) {
   const [tab, setTab] = useState<'brief' | 'summary' | 'map' | 'community'>('brief');
   const [map, setMap] = useState<KnowledgeMap>(EMPTY_MAP);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -37,6 +37,8 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
   const skipNextMapGeneration = useRef(false);
   const learningStateDirty = useRef(false);
   const learningStateLessonId = useRef<string | null>(null);
+  const mapStorageKey = useMemo(() => `solar-note-map:${classId}:${lesson.id}`, [classId, lesson.id]);
+  const notesStorageKey = useMemo(() => `solar-slide-notes:${classId}:${lesson.id}`, [classId, lesson.id]);
 
   const usesDay01Pdf = lesson.id === 'ai-foundations' || Boolean(lesson.pdfUrl);
   const [pdfPageCount, setPdfPageCount] = useState(42);
@@ -71,19 +73,19 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
       learningStateLessonId.current = lesson.id;
       learningStateDirty.current = false;
     }
-    const stored = localStorage.getItem(`solar-note-map:${lesson.id}`);
+    const stored = localStorage.getItem(mapStorageKey);
     const parsed = stored ? JSON.parse(stored) as KnowledgeMap : EMPTY_MAP;
     const normalized = {
       ...parsed,
       nodes: parsed.nodes.map((node) => ({ ...node, status: node.status ?? 'confirmed' })),
       edges: parsed.edges.map((edge) => ({ ...edge, label: edge.label ?? 'liên quan đến' })),
     };
-    const storedNotes = localStorage.getItem(`solar-slide-notes:${lesson.id}`);
+    const storedNotes = localStorage.getItem(notesStorageKey);
     let nextSlideNotes: Record<string, string> = {};
     try {
       nextSlideNotes = storedNotes ? JSON.parse(storedNotes) : {};
     } catch {
-      localStorage.removeItem(`solar-slide-notes:${lesson.id}`);
+      localStorage.removeItem(notesStorageKey);
     }
     const restoredThoughts = restoreSlideThoughts(slides, nextSlideNotes, normalized.sourceNote);
     setSlideNotes(nextSlideNotes);
@@ -97,7 +99,7 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
     setTab('brief');
     setCommunitySlideId(undefined);
     let active = true;
-    loadCloudLearningState(lesson.id).then((cloud) => {
+    loadCloudLearningState(classId, lesson.id).then((cloud) => {
       if (!active || learningStateDirty.current) return;
       const cloudNotes = Object.fromEntries(cloud.notes.flatMap((note) => {
         const slide = slides[note.slide_number - 1];
@@ -111,7 +113,7 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
       if (cloud.map && typeof cloud.map === 'object') setMap(cloud.map as KnowledgeMap);
     }).catch((error) => console.error('Không tải được dữ liệu học từ Supabase:', error));
     return () => { active = false; };
-  }, [lesson.id, lesson.pdfUrl, pdfLoadedLessonId, pdfPageCount]);
+  }, [classId, lesson.id, lesson.pdfUrl, pdfLoadedLessonId, pdfPageCount, mapStorageKey, notesStorageKey]);
 
   useEffect(() => {
     if (thoughtsLessonId !== lesson.id) return;
@@ -198,9 +200,9 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
   };
 
   const saveMap = async () => {
-    localStorage.setItem(`solar-note-map:${lesson.id}`, JSON.stringify(map));
+    localStorage.setItem(mapStorageKey, JSON.stringify(map));
     window.dispatchEvent(new CustomEvent('solar-note-map:saved', {
-      detail: { lessonId: lesson.id, nodeCount: map.nodes.length },
+      detail: { classId, lessonId: lesson.id, nodeCount: map.nodes.length },
     }));
     try {
       await persistCloudMap(lesson.id, lesson.name, map);
@@ -216,10 +218,10 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
     learningStateDirty.current = true;
     setThoughts('');
     setSlideNotes({});
-    localStorage.removeItem(`solar-slide-notes:${lesson.id}`);
-    localStorage.removeItem(`solar-note-map:${lesson.id}`);
+    localStorage.removeItem(notesStorageKey);
+    localStorage.removeItem(mapStorageKey);
     window.dispatchEvent(new CustomEvent('solar-note-map:saved', {
-      detail: { lessonId: lesson.id, nodeCount: 0 },
+      detail: { classId, lessonId: lesson.id, nodeCount: 0 },
     }));
     setMap(EMPTY_MAP);
     setSelectedId(null);
@@ -231,7 +233,7 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
     setSlideNotes(next);
     setThoughts(combineSlideNotes(slides, next));
     setThoughtsLessonId(lesson.id);
-    localStorage.setItem(`solar-slide-notes:${lesson.id}`, JSON.stringify(next));
+    localStorage.setItem(notesStorageKey, JSON.stringify(next));
     if (cloudNoteTimer.current !== null) window.clearTimeout(cloudNoteTimer.current);
     const savedSlideNumber = slideIndex + 1;
     const pending = { lessonId: lesson.id, slideNumber: savedSlideNumber, content };
@@ -352,6 +354,7 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
         {tab === 'community' && (
           <CommunityQuestions
             lesson={lesson}
+            classId={classId}
             slides={slides}
             initialSlideId={communitySlideId}
             onOpenSlide={(slideId) => {

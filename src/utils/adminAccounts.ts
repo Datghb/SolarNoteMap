@@ -11,6 +11,9 @@ export interface AdminAccount {
   class_count: number;
 }
 
+export interface AdminCourse { id: string; name: string; description: string; owner_id: string; created_at: string }
+export interface AdminClassroom { id: string; name: string; course_id: string; teacher_id: string; created_at: string }
+
 export async function loadAdminAccounts(): Promise<AdminAccount[]> {
   const { data, error } = await requireSupabase().rpc('admin_list_accounts');
   if (error) throw error;
@@ -25,4 +28,16 @@ export async function updateAccountRole(userId: string, role: ManagedAccountRole
     target_role: role,
   });
   if (error) throw error;
+}
+
+export async function loadAdminCourses(): Promise<AdminCourse[]> {
+  const { data, error } = await requireSupabase().from('courses').select('id,name,description,owner_id,created_at').is('archived_at', null).order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as AdminCourse[];
+}
+
+export async function loadAdminClasses(): Promise<AdminClassroom[]> {
+  const { data, error } = await requireSupabase().from('classes').select('id,name,course_id,teacher_id,created_at').is('archived_at', null).order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as AdminClassroom[];
 }

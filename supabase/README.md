@@ -1,7 +1,7 @@
 # Supabase setup
 
 1. Create a Supabase project.
-2. Open **SQL Editor** and run the migrations in timestamp order, including `20260730090000_add_slide_activity_kinds.sql`.
+2. Open **SQL Editor** and run every migration in timestamp order through `20260730100000_course_programs.sql`.
 3. Copy the Project URL and Publishable key into `.env.local`:
 
    ```env
@@ -18,8 +18,9 @@
    where id = (select id from auth.users where email = 'teacher@example.com');
    ```
 
-6. Teachers create a class and receive a server-generated 24-character private join code, upload PDF slide lessons, and publish them when ready. Students enter the code once to join and only see published lessons.
-7. Student interactions—including lesson opens, individual slide views, notes, maps, questions, and understanding updates—are stored by class for the teacher dashboard.
+6. Teachers create a shared course program, add reusable PDF lessons, then create one or more classes. Each class receives a server-generated private join code and its own lesson release schedule.
+7. Students enter a class code once, can switch between joined classes, and only see lessons released for the selected class. Notes, maps, questions and activity are isolated by class.
+8. Admins can inspect accounts, programs, and classes without receiving access to students' private notes or maps.
 
 ## Bootstrapping the first administrator
 
