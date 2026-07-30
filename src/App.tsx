@@ -127,7 +127,7 @@ export function App() {
   if (cloudLoading) return <main className="auth-screen"><div className="auth-message">Đang tải lớp học…</div></main>;
   if (cloudError) return <main className="auth-screen"><section className="auth-card"><div className="auth-message error" role="alert">{cloudError}</div><button className="auth-primary" onClick={() => window.location.reload()}>Thử tải lại</button><button className="auth-switch" onClick={() => void auth.signOut()}>Đăng xuất</button></section></main>;
   if (!activeClassId && auth.profile.role === 'student') return <ClassroomOnboarding profile={auth.profile} onReady={setActiveClassId} onSignOut={() => void auth.signOut()} />;
-  if (auth.profile.role === 'teacher' && (!activeClassId || teacherMode)) return <TeacherDashboard hasActiveClass={Boolean(activeClassId)} lessons={customLessons} customLessons={customLessons} activities={activities} onCreateClass={createClass} onCreateLesson={createLesson} onTogglePublish={toggleLessonPublish} onRefreshActivities={refreshActivities} onClose={() => setTeacherMode(false)} onSignOut={() => void auth.signOut()} />;
+  if (auth.profile.role === 'teacher' && teacherMode) return <TeacherDashboard hasActiveClass={Boolean(activeClassId)} lessons={customLessons} customLessons={customLessons} activities={activities} onCreateClass={createClass} onCreateLesson={createLesson} onTogglePublish={toggleLessonPublish} onRefreshActivities={refreshActivities} onClose={() => setTeacherMode(false)} onSignOut={() => void auth.signOut()} />;
 
   return (
     <main className="app-shell">
@@ -169,13 +169,14 @@ export function App() {
       <header className="top-bar">
         <button className="brand" onClick={() => setSelectedLessonId(null)}><img className="brand-mark" src="/share-icon.svg" alt="" /><span>Solar Note Map<small>AI Learning Universe</small></span></button>
         <div className="course-progress"><span>Hành trình AI căn bản</span><div><i style={{ width: '20%' }} /></div><b>1 / 5</b></div>
-        <button className="profile-button" onClick={() => auth.profile?.role === 'teacher' ? setTeacherMode(true) : void auth.signOut()} title={auth.profile?.role === 'teacher' ? 'Mở trang giáo viên' : 'Đăng xuất'}><span>{auth.profile?.display_name.charAt(0).toUpperCase()}</span><div>{auth.profile?.display_name}<small>{auth.profile?.role === 'teacher' ? 'Trang giáo viên' : 'Học sinh · Đăng xuất'}</small></div><i>→</i></button>
+        <div className="account-actions">{auth.profile.role === 'teacher' && <button className="class-management-button" onClick={() => setTeacherMode(true)}>{activeClassId ? 'Quản lý lớp' : '＋ Tạo lớp'}</button>}<button className="profile-button" onClick={() => auth.profile?.role === 'teacher' ? setTeacherMode(true) : void auth.signOut()} title={auth.profile?.role === 'teacher' ? 'Mở trang giáo viên' : 'Đăng xuất'}><span>{auth.profile?.display_name.charAt(0).toUpperCase()}</span><div>{auth.profile?.display_name}<small>{auth.profile?.role === 'teacher' ? 'Giáo viên' : 'Học sinh · Đăng xuất'}</small></div><i>→</i></button></div>
       </header>
 
       <section className="hero-copy">
-        <span className="eyebrow">MISSION CONTROL · KHÓA 01</span>
+        <span className="eyebrow">MISSION CONTROL · {auth.profile.role === 'teacher' ? 'KHÔNG GIAN GIÁO VIÊN' : 'KHÓA 01'}</span>
         <h1>Vũ trụ kiến thức<br/><em>của riêng bạn.</em></h1>
-        <p>Chọn một hành tinh để bắt đầu bài học.<br/>Mỗi sơ đồ bạn tạo sẽ trở thành một vệ tinh tri thức.</p>
+        <p>{auth.profile.role === 'teacher' && !activeClassId ? 'Tạo lớp khi bạn sẵn sàng, sau đó đăng bài giảng và mời học sinh tham gia.' : 'Chọn một hành tinh để bắt đầu bài học. Mỗi sơ đồ bạn tạo sẽ trở thành một vệ tinh tri thức.'}</p>
+        {auth.profile.role === 'teacher' && !activeClassId && <button className="hero-class-button" onClick={() => setTeacherMode(true)}>＋ Tạo lớp học đầu tiên</button>}
       </section>
 
       <nav className="lesson-dock" aria-label="Danh sách bài học">

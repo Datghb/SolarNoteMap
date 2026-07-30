@@ -20,6 +20,10 @@ body { margin: 0; overflow: hidden; }
 .course-progress i { display: block; height: 100%; background: #9aa6ff; box-shadow: 0 0 8px #8190ff; }
 .course-progress b { color: #d9dded; font-weight: 500; }
 .profile-button { justify-self: end; gap: 10px; text-align: left; }
+.account-actions { justify-self:end; display:flex; align-items:center; gap:16px; }
+.class-management-button, .hero-class-button { border:1px solid #7587ff66; border-radius:12px; background:#536dff22; color:#dce3ff; padding:11px 16px; font-weight:700; cursor:pointer; }
+.class-management-button:hover, .hero-class-button:hover { background:#536dff3d; border-color:#8fa0ff; }
+.hero-class-button { margin-top:20px; pointer-events:auto; }
 .profile-button > span { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; background: linear-gradient(135deg, #8798ff, #394170); font-size: 11px; font-weight: 700; }
 .profile-button div { font-size: 12px; }.profile-button i { color: #6d7286; font-style: normal; }
 
