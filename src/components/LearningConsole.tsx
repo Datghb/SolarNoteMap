@@ -11,8 +11,9 @@ import { CommunityQuestions } from './CommunityQuestions';
 import { PdfSlideWorkspace } from './PdfSlideWorkspace';
 import { LessonSummary } from './LessonSummary';
 import { fetchLessonSummary } from '../utils/lessonSummary';
-import { recordStudentActivity } from '../utils/courseStore';
+import { persistCloudMap, persistCloudNote, recordStudentActivity } from '../utils/courseStore';
 import { builtInSlidePdfUrl } from './SelectablePdfPage';
+import { loadCloudLearningState } from '../utils/cloudClassroom';
 
 const EMPTY_MAP: KnowledgeMap = { nodes: [], edges: [] };
 
@@ -30,9 +31,16 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
   const [analysisError, setAnalysisError] = useState('');
   const [communitySlideId, setCommunitySlideId] = useState<string | undefined>();
   const noteActivityTimer = useRef<number | null>(null);
+  const cloudNoteTimer = useRef<number | null>(null);
+  const cloudNoteSaveChain = useRef(Promise.resolve());
+  const pendingCloudNote = useRef<{ lessonId: string; slideNumber: number; content: string } | null>(null);
+  const skipNextMapGeneration = useRef(false);
+  const learningStateDirty = useRef(false);
+  const learningStateLessonId = useRef<string | null>(null);
 
   const usesDay01Pdf = lesson.id === 'ai-foundations' || Boolean(lesson.pdfUrl);
   const [pdfPageCount, setPdfPageCount] = useState(42);
+  const [pdfLoadedLessonId, setPdfLoadedLessonId] = useState<string | null>(null);
   const slides = usesDay01Pdf ? getPdfPageSlides(pdfPageCount) : getLessonSlides(lesson.id, lesson.name, lesson.prompt);
 
   useEffect(() => {
@@ -45,9 +53,24 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
 
   useEffect(() => () => {
     if (noteActivityTimer.current !== null) window.clearTimeout(noteActivityTimer.current);
+    if (cloudNoteTimer.current !== null) window.clearTimeout(cloudNoteTimer.current);
+    const pending = pendingCloudNote.current;
+    if (pending) {
+      cloudNoteSaveChain.current = cloudNoteSaveChain.current
+        .catch(() => undefined)
+        .then(() => persistCloudNote(pending.lessonId, pending.slideNumber, pending.content))
+        .catch((error) => console.error('Không lưu được ghi chú lên Supabase:', error));
+      pendingCloudNote.current = null;
+    }
   }, []);
 
   useEffect(() => {
+    if (lesson.pdfUrl && pdfLoadedLessonId !== lesson.id) return;
+    if (learningStateLessonId.current === lesson.id && learningStateDirty.current) return;
+    if (learningStateLessonId.current !== lesson.id) {
+      learningStateLessonId.current = lesson.id;
+      learningStateDirty.current = false;
+    }
     const stored = localStorage.getItem(`solar-note-map:${lesson.id}`);
     const parsed = stored ? JSON.parse(stored) as KnowledgeMap : EMPTY_MAP;
     const normalized = {
@@ -73,10 +96,29 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
     setSelectedId(null);
     setTab('brief');
     setCommunitySlideId(undefined);
-  }, [lesson.id]);
+    let active = true;
+    loadCloudLearningState(lesson.id).then((cloud) => {
+      if (!active || learningStateDirty.current) return;
+      const cloudNotes = Object.fromEntries(cloud.notes.flatMap((note) => {
+        const slide = slides[note.slide_number - 1];
+        return slide ? [[slide.id, note.content]] : [];
+      }));
+      if (Object.keys(cloudNotes).length) {
+        setSlideNotes(cloudNotes);
+        if (cloud.map && typeof cloud.map === 'object') skipNextMapGeneration.current = true;
+        setThoughts(combineSlideNotes(slides, cloudNotes));
+      }
+      if (cloud.map && typeof cloud.map === 'object') setMap(cloud.map as KnowledgeMap);
+    }).catch((error) => console.error('Không tải được dữ liệu học từ Supabase:', error));
+    return () => { active = false; };
+  }, [lesson.id, lesson.pdfUrl, pdfLoadedLessonId, pdfPageCount]);
 
   useEffect(() => {
     if (thoughtsLessonId !== lesson.id) return;
+    if (skipNextMapGeneration.current) {
+      skipNextMapGeneration.current = false;
+      return;
+    }
     const note = thoughts.trim();
     const controller = new AbortController();
     if (!note) {
@@ -118,6 +160,7 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
   const selected = map.nodes.find((node) => node.id === selectedId);
 
   const addNode = () => {
+    learningStateDirty.current = true;
     const index = map.nodes.length;
     const node: KnowledgeNode = {
       id: crypto.randomUUID(),
@@ -133,6 +176,7 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
   };
 
   const updateNode = (patch: Partial<KnowledgeNode>) => {
+    learningStateDirty.current = true;
     setMap((current) => ({
       ...current,
       nodes: current.nodes.map((node) => node.id === selectedId ? { ...node, ...patch } : node),
@@ -141,6 +185,7 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
 
   const removeNode = () => {
     if (!selectedId) return;
+    learningStateDirty.current = true;
     setMap((current) => ({
       nodes: current.nodes.filter((node) => node.id !== selectedId),
       edges: current.edges.filter((edge) => edge.from !== selectedId && edge.to !== selectedId),
@@ -152,17 +197,23 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
     setSelectedId(id || null);
   };
 
-  const saveMap = () => {
+  const saveMap = async () => {
     localStorage.setItem(`solar-note-map:${lesson.id}`, JSON.stringify(map));
     window.dispatchEvent(new CustomEvent('solar-note-map:saved', {
       detail: { lessonId: lesson.id, nodeCount: map.nodes.length },
     }));
-    setSaved(true);
-    recordStudentActivity({ lessonId: lesson.id, type: 'map_saved', metadata: { nodeCount: map.nodes.length } });
+    try {
+      await persistCloudMap(lesson.id, lesson.name, map);
+      recordStudentActivity({ lessonId: lesson.id, type: 'map_saved', metadata: { nodeCount: map.nodes.length } });
+      setSaved(true);
+    } catch (error) {
+      setAnalysisError(error instanceof Error ? error.message : 'Không thể đồng bộ sơ đồ lên lớp học.');
+    }
     window.setTimeout(() => setSaved(false), 1800);
   };
 
   const resetSmartMap = () => {
+    learningStateDirty.current = true;
     setThoughts('');
     setSlideNotes({});
     localStorage.removeItem(`solar-slide-notes:${lesson.id}`);
@@ -175,11 +226,24 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
   };
 
   const changeSlideNote = (content: string) => {
+    learningStateDirty.current = true;
     const next = updateSlideNote(slideNotes, slides[slideIndex].id, content);
     setSlideNotes(next);
     setThoughts(combineSlideNotes(slides, next));
     setThoughtsLessonId(lesson.id);
     localStorage.setItem(`solar-slide-notes:${lesson.id}`, JSON.stringify(next));
+    if (cloudNoteTimer.current !== null) window.clearTimeout(cloudNoteTimer.current);
+    const savedSlideNumber = slideIndex + 1;
+    const pending = { lessonId: lesson.id, slideNumber: savedSlideNumber, content };
+    pendingCloudNote.current = pending;
+    cloudNoteTimer.current = window.setTimeout(() => {
+      if (pendingCloudNote.current !== pending) return;
+      pendingCloudNote.current = null;
+      cloudNoteSaveChain.current = cloudNoteSaveChain.current
+        .catch(() => undefined)
+        .then(() => persistCloudNote(lesson.id, savedSlideNumber, content))
+        .catch((error) => console.error('Không lưu được ghi chú lên Supabase:', error));
+    }, 600);
     if (noteActivityTimer.current !== null) window.clearTimeout(noteActivityTimer.current);
     noteActivityTimer.current = window.setTimeout(() => {
       recordStudentActivity({ lessonId: lesson.id, slideId: slides[slideIndex].id, type: 'note_updated', metadata: { wordCount: content.trim() ? content.trim().split(/\s+/).length : 0 } });
@@ -209,7 +273,7 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
             page={slideIndex + 1}
             pageCount={slides.length}
             pdfUrl={lesson.pdfUrl ?? builtInSlidePdfUrl}
-            onDocumentLoad={setPdfPageCount}
+            onDocumentLoad={(pageCount) => { setPdfPageCount(pageCount); setPdfLoadedLessonId(lesson.id); }}
             useBundledPdfContext={lesson.id === 'ai-foundations'}
             note={slideNotes[slides[slideIndex].id] ?? ''}
             map={map}
@@ -223,6 +287,7 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
               setCommunitySlideId(slides[slideIndex].id);
               setTab('community');
             }}
+            onUnderstandingChange={(status) => recordStudentActivity({ lessonId: lesson.id, slideId: slides[slideIndex].id, type: 'understanding_updated', metadata: { status } })}
           /> : <SlideLearningWorkspace
             slides={slides}
             index={slideIndex}
@@ -238,6 +303,7 @@ export function LearningConsole({ lesson, onClose }: { lesson: Lesson; onClose: 
               setCommunitySlideId(slides[slideIndex].id);
               setTab('community');
             }}
+            onUnderstandingChange={(status) => recordStudentActivity({ lessonId: lesson.id, slideId: slides[slideIndex].id, type: 'understanding_updated', metadata: { status } })}
           />
         )}
 

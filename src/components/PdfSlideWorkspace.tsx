@@ -22,6 +22,7 @@ export function PdfSlideWorkspace({
   onNoteChange,
   onOpenMap,
   onAskCommunity,
+  onUnderstandingChange,
   onDocumentLoad,
   useBundledPdfContext,
 }: {
@@ -37,6 +38,7 @@ export function PdfSlideWorkspace({
   onNoteChange: (note: string) => void;
   onOpenMap: () => void;
   onAskCommunity: () => void;
+  onUnderstandingChange: (status: 'understood' | 'question' | 'unmarked') => void;
   onDocumentLoad?: (pageCount: number) => void;
   useBundledPdfContext: boolean;
 }) {
@@ -57,6 +59,11 @@ export function PdfSlideWorkspace({
   const [focusMode, setFocusMode] = useState(false);
   const [understanding, setUnderstanding] = useState<Record<number, Understanding>>({});
   const status = understanding[page] ?? null;
+  const changeUnderstanding = (next: Exclude<Understanding, null>) => {
+    const value = status === next ? null : next;
+    setUnderstanding((current) => ({ ...current, [page]: value }));
+    onUnderstandingChange(value ?? 'unmarked');
+  };
   const hasMapContent = map.nodes.length > 0;
   useEffect(() => {
     setAnchor(null);
@@ -230,7 +237,7 @@ export function PdfSlideWorkspace({
         <div className="inline-note-card pdf-note-card">
           <div><span><i>✎</i> Ghi chú trang {page}</span><small>{note.trim() ? `${note.trim().split(/\s+/).length} từ` : 'Chưa có ghi chú'}</small></div>
           <textarea value={note} onChange={(event) => onNoteChange(event.target.value)} placeholder="Ghi lại điều bạn hiểu, một ví dụ hoặc phần còn thắc mắc ở trang này…" />
-          <div className="pdf-understanding"><button className={status === 'understood' ? 'active' : ''} onClick={() => setUnderstanding((current) => ({ ...current, [page]: status === 'understood' ? null : 'understood' }))}>✓ Đã hiểu</button><button className={status === 'question' ? 'active question' : ''} onClick={() => setUnderstanding((current) => ({ ...current, [page]: status === 'question' ? null : 'question' }))}>? Chưa rõ</button><button onClick={onAskCommunity}>Hỏi cộng đồng →</button></div>
+          <div className="pdf-understanding"><button className={status === 'understood' ? 'active' : ''} onClick={() => changeUnderstanding('understood')}>✓ Đã hiểu</button><button className={status === 'question' ? 'active question' : ''} onClick={() => changeUnderstanding('question')}>? Chưa rõ</button><button onClick={onAskCommunity}>Hỏi cộng đồng →</button></div>
           <div className="inline-ai-status"><i>{isThinking ? '✦' : mapSource === 'fallback' ? '!' : hasMapContent ? '✓' : '·'}</i><span>{isThinking ? 'AI đang cập nhật sơ đồ…' : mapSource === 'ai' && hasMapContent ? 'Đã đồng bộ vào sơ đồ' : hasMapContent ? 'Sơ đồ cập nhật từ ghi chú' : 'Sơ đồ chờ ghi chú đầu tiên'}</span></div>
         </div>
         <div className="inline-map-card pdf-mini-map"><header><div><span>Mind map đang hình thành</span><small>{map.nodes.length} ý · {map.edges.length} liên kết</small></div><button onClick={onOpenMap}>Mở rộng ↗</button></header><div className="mini-flow">{map.nodes.length ? <KnowledgeFlow compact map={map} accent={accent} onSelect={onOpenMap} /> : <div className="mini-map-empty"><i>✦</i><span>Ghi chú để tạo nhánh đầu tiên</span></div>}</div></div>

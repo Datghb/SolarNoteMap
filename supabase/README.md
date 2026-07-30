@@ -1,7 +1,7 @@
 # Supabase setup
 
 1. Create a Supabase project.
-2. Open **SQL Editor** and run `migrations/20260729103000_initial_auth_classroom.sql`.
+2. Open **SQL Editor** and run the migrations in timestamp order, including `20260730090000_add_slide_activity_kinds.sql`.
 3. Copy the Project URL and Publishable key into `.env.local`:
 
    ```env
@@ -18,7 +18,8 @@
    where id = (select id from auth.users where email = 'teacher@example.com');
    ```
 
-6. Users enter the personal learning space directly. Built-in lessons, teacher-created lessons, notes, maps, and activity are stored locally on the current device.
+6. Teachers create a class and receive a server-generated 24-character private join code, upload PDF slide lessons, and publish them when ready. Students enter the code once to join and only see published lessons.
+7. Student interactions—including lesson opens, individual slide views, notes, maps, questions, and understanding updates—are stored by class for the teacher dashboard.
 
 ## Bootstrapping the first administrator
 
@@ -36,3 +37,6 @@ Sign out and back in. Admins open the account dashboard automatically and can sw
 
 - Never expose a Supabase secret/service-role key in a `VITE_` variable.
 - All application tables have Row Level Security enabled.
+- Join codes are stored as hashes; the original code should be shared privately.
+- Failed join attempts are rate-limited per account.
+- Lesson PDFs remain private and are delivered through expiring signed URLs.

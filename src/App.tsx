@@ -6,11 +6,12 @@ import { SolarSystem } from './components/SolarSystem';
 import { Comet, LuminousStarBand, MilkyWayGalaxy, Nebula, SpaceDust, ShootingStars, StarCluster } from './components/SpaceObjects';
 import { LearningConsole } from './components/LearningConsole';
 import { TeacherDashboard } from './components/TeacherDashboard';
-import { loadActivities, loadTeacherLessons, recordStudentActivity, saveTeacherLessons, type StudentActivity, type TeacherLesson } from './utils/courseStore';
+import { recordStudentActivity, setActiveCloudClass, type StudentActivity, type TeacherLesson } from './utils/courseStore';
 import { AuthScreen } from './components/AuthScreen';
+import { ClassroomOnboarding } from './components/ClassroomOnboarding';
 import { AdminDashboard } from './components/AdminDashboard';
 import { useAuth } from './hooks/useAuth';
-import { LESSONS } from './data/lessons';
+import { createCloudLesson, loadCloudActivities, loadCloudLessons, loadMyClasses, setCloudLessonPublished } from './utils/cloudClassroom';
 
 export function App() {
   const auth = useAuth();
@@ -19,17 +20,46 @@ export function App() {
   const [speedMultiplier, setSpeedMultiplier] = useState(0.16);
   const [savedMaps, setSavedMaps] = useState<Record<string, number>>({});
   const [teacherMode, setTeacherMode] = useState(false);
-  const [customLessons, setCustomLessons] = useState<TeacherLesson[]>(loadTeacherLessons);
-  const [activities, setActivities] = useState<StudentActivity[]>(loadActivities);
-  const lessons = [...LESSONS, ...customLessons.filter((lesson) => lesson.published)];
-  const teacherLessons = [...LESSONS, ...customLessons];
+  const [customLessons, setCustomLessons] = useState<TeacherLesson[]>([]);
+  const [activities, setActivities] = useState<StudentActivity[]>([]);
+  const [activeClassId, setActiveClassId] = useState<string | null>(null);
+  const [cloudLoading, setCloudLoading] = useState(true);
+  const [cloudError, setCloudError] = useState('');
+  const lessons = customLessons.filter((lesson) => lesson.published);
   const selectedLesson = lessons.find((lesson) => lesson.id === selectedLessonId) ?? null;
 
   useEffect(() => {
-    const refreshActivities = () => setActivities(loadActivities());
-    window.addEventListener('solar-activity:changed', refreshActivities);
-    return () => window.removeEventListener('solar-activity:changed', refreshActivities);
-  }, []);
+    if (!auth.user) { setCloudLoading(false); return; }
+    if (auth.profile?.role === 'admin') {
+      setActiveClassId(null);
+      setCloudLoading(false);
+      return;
+    }
+    let active = true;
+    setCloudLoading(true);
+    setCloudError('');
+    loadMyClasses().then((rows) => {
+      if (!active) return;
+      const preferred = localStorage.getItem('solar-active-class');
+      setActiveClassId(rows.some((row) => row.id === preferred) ? preferred : rows[0]?.id ?? null);
+    }).catch((error) => { if (active) setCloudError(error instanceof Error ? error.message : 'Không thể tải danh sách lớp học.'); })
+      .finally(() => { if (active) setCloudLoading(false); });
+    return () => { active = false; };
+  }, [auth.profile?.role, auth.user?.id]);
+
+  useEffect(() => {
+    setActiveCloudClass(activeClassId);
+    if (!activeClassId) { setCustomLessons([]); setActivities([]); return; }
+    localStorage.setItem('solar-active-class', activeClassId);
+    let active = true;
+    setCloudError('');
+    Promise.all([loadCloudLessons(activeClassId), loadCloudActivities(activeClassId)]).then(([lessonRows, activityRows]) => {
+      if (!active) return;
+      setCustomLessons(lessonRows as TeacherLesson[]);
+      setActivities(activityRows);
+    }).catch((error) => { if (active) setCloudError(error instanceof Error ? error.message : 'Không thể tải dữ liệu lớp học.'); });
+    return () => { active = false; };
+  }, [activeClassId]);
 
   useEffect(() => {
     const readSavedMaps = () => {
@@ -65,23 +95,32 @@ export function App() {
     recordStudentActivity({ lessonId, type: 'lesson_opened' });
   };
 
-  const createLesson = (lesson: TeacherLesson) => {
-    const next = [...customLessons, lesson];
-    saveTeacherLessons(next);
-    setCustomLessons(next);
+  const createLesson = async (lesson: TeacherLesson, pdf?: File) => {
+    if (!activeClassId || !auth.user) throw new Error('Chưa chọn lớp học.');
+    await createCloudLesson(activeClassId, auth.user.id, lesson, pdf);
+    setCustomLessons(await loadCloudLessons(activeClassId) as TeacherLesson[]);
   };
 
-  const toggleLessonPublish = (lessonId: string) => {
-    const next = customLessons.map((lesson) => lesson.id === lessonId ? { ...lesson, published: !lesson.published, updatedAt: new Date().toISOString() } : lesson);
-    saveTeacherLessons(next);
-    setCustomLessons(next);
+  const toggleLessonPublish = async (lessonId: string) => {
+    if (!activeClassId) return;
+    const lesson = customLessons.find((item) => item.id === lessonId);
+    await setCloudLessonPublished(lessonId, !lesson?.published);
+    setCustomLessons(await loadCloudLessons(activeClassId) as TeacherLesson[]);
+  };
+
+  const refreshActivities = async () => {
+    if (!activeClassId) return;
+    setActivities(await loadCloudActivities(activeClassId));
   };
 
   if (!auth.configured || (!auth.loading && !auth.user)) return <AuthScreen />;
   if (auth.loading) return <main className="auth-screen"><div className="auth-message">Đang tải tài khoản…</div></main>;
   if (!auth.profile) return <main className="auth-screen"><section className="auth-card"><div className="auth-message error" role="alert">{auth.error || 'Không thể tải hồ sơ tài khoản.'}</div><button className="auth-primary" onClick={() => void auth.signOut()}>Đăng xuất và thử lại</button></section></main>;
   if (auth.profile.role === 'admin') return <AdminDashboard currentUserId={auth.profile.id} onSignOut={() => void auth.signOut()} />;
-  if (teacherMode && auth.profile.role === 'teacher') return <TeacherDashboard lessons={teacherLessons} customLessons={customLessons} activities={activities} onCreateLesson={createLesson} onTogglePublish={toggleLessonPublish} onClose={() => setTeacherMode(false)} />;
+  if (cloudLoading) return <main className="auth-screen"><div className="auth-message">Đang tải lớp học…</div></main>;
+  if (cloudError) return <main className="auth-screen"><section className="auth-card"><div className="auth-message error" role="alert">{cloudError}</div><button className="auth-primary" onClick={() => window.location.reload()}>Thử tải lại</button><button className="auth-switch" onClick={() => void auth.signOut()}>Đăng xuất</button></section></main>;
+  if (!activeClassId) return <ClassroomOnboarding profile={auth.profile} onReady={setActiveClassId} onSignOut={() => void auth.signOut()} />;
+  if (teacherMode && auth.profile.role === 'teacher') return <TeacherDashboard lessons={customLessons} customLessons={customLessons} activities={activities} onCreateLesson={createLesson} onTogglePublish={toggleLessonPublish} onRefreshActivities={refreshActivities} onClose={() => setTeacherMode(false)} />;
 
   return (
     <main className="app-shell">

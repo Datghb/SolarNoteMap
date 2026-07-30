@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { appendActivity, createTeacherLesson, summarizeClassroom, type StudentActivity } from './courseStore';
+import { appendActivity, buildCloudActivityMetadata, createTeacherLesson, summarizeClassroom, type StudentActivity } from './courseStore';
 
 describe('teacher course store', () => {
   it('creates a normalized lesson without mutating the form input', () => {
@@ -24,5 +24,11 @@ describe('teacher course store', () => {
       { id: '3', studentId: 'b', studentName: 'Bình', lessonId: 'l1', type: 'question_posted', occurredAt: '3' },
     ];
     expect(summarizeClassroom(activities)).toEqual({ activeStudents: 2, notes: 1, maps: 0, questions: 1, totalEvents: 3 });
+  });
+
+  it('preserves the viewed slide id in cloud activity metadata', () => {
+    const metadata = { status: 'reviewing' };
+    expect(buildCloudActivityMetadata('slide-7', metadata)).toEqual({ status: 'reviewing', slideId: 'slide-7' });
+    expect(metadata).toEqual({ status: 'reviewing' });
   });
 });
