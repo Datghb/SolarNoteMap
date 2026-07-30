@@ -11,7 +11,7 @@ import { AuthScreen } from './components/AuthScreen';
 import { ClassroomOnboarding } from './components/ClassroomOnboarding';
 import { AdminDashboard } from './components/AdminDashboard';
 import { useAuth } from './hooks/useAuth';
-import { createCloudLesson, loadCloudActivities, loadCloudLessons, loadMyClasses, setCloudLessonPublished } from './utils/cloudClassroom';
+import { createClassroom, createCloudLesson, loadCloudActivities, loadCloudLessons, loadMyClasses, setCloudLessonPublished } from './utils/cloudClassroom';
 
 export function App() {
   const auth = useAuth();
@@ -113,14 +113,21 @@ export function App() {
     setActivities(await loadCloudActivities(activeClassId));
   };
 
+  const createClass = async (name: string, description: string) => {
+    const created = await createClassroom(name, description);
+    setTeacherMode(true);
+    setActiveClassId(created.classId);
+    return created;
+  };
+
   if (!auth.configured || (!auth.loading && !auth.user)) return <AuthScreen />;
   if (auth.loading) return <main className="auth-screen"><div className="auth-message">Đang tải tài khoản…</div></main>;
   if (!auth.profile) return <main className="auth-screen"><section className="auth-card"><div className="auth-message error" role="alert">{auth.error || 'Không thể tải hồ sơ tài khoản.'}</div><button className="auth-primary" onClick={() => void auth.signOut()}>Đăng xuất và thử lại</button></section></main>;
   if (auth.profile.role === 'admin') return <AdminDashboard currentUserId={auth.profile.id} onSignOut={() => void auth.signOut()} />;
   if (cloudLoading) return <main className="auth-screen"><div className="auth-message">Đang tải lớp học…</div></main>;
   if (cloudError) return <main className="auth-screen"><section className="auth-card"><div className="auth-message error" role="alert">{cloudError}</div><button className="auth-primary" onClick={() => window.location.reload()}>Thử tải lại</button><button className="auth-switch" onClick={() => void auth.signOut()}>Đăng xuất</button></section></main>;
-  if (!activeClassId) return <ClassroomOnboarding profile={auth.profile} onReady={setActiveClassId} onSignOut={() => void auth.signOut()} />;
-  if (teacherMode && auth.profile.role === 'teacher') return <TeacherDashboard lessons={customLessons} customLessons={customLessons} activities={activities} onCreateLesson={createLesson} onTogglePublish={toggleLessonPublish} onRefreshActivities={refreshActivities} onClose={() => setTeacherMode(false)} />;
+  if (!activeClassId && auth.profile.role === 'student') return <ClassroomOnboarding profile={auth.profile} onReady={setActiveClassId} onSignOut={() => void auth.signOut()} />;
+  if (auth.profile.role === 'teacher' && (!activeClassId || teacherMode)) return <TeacherDashboard hasActiveClass={Boolean(activeClassId)} lessons={customLessons} customLessons={customLessons} activities={activities} onCreateClass={createClass} onCreateLesson={createLesson} onTogglePublish={toggleLessonPublish} onRefreshActivities={refreshActivities} onClose={() => setTeacherMode(false)} onSignOut={() => void auth.signOut()} />;
 
   return (
     <main className="app-shell">
