@@ -36,7 +36,12 @@ export async function updateAccountRole(userId: string, role: ManagedAccountRole
     target_user_id: targetUserId,
     target_role: role,
   });
-  if (error) throw error;
+  if (error) {
+    const message = error.message === 'Teacher still owns one or more classes'
+      ? 'Giáo viên đang sở hữu lớp. Hãy chạy migration quản lý vai trò mới trước.'
+      : error.message;
+    throw new Error(message || 'Không thể cập nhật quyền tài khoản.');
+  }
 }
 
 export async function loadAdminCourses(): Promise<AdminCourse[]> {

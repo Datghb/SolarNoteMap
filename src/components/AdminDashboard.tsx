@@ -44,6 +44,7 @@ export function AdminDashboard({ currentUserId, onSignOut }: { currentUserId: st
 
   const setRole = async (account: AdminAccount, role: ManagedAccountRole) => {
     if (account.role === role) return;
+    if (account.role === 'teacher' && role === 'student' && !window.confirm(`Hạ ${account.display_name} xuống học sinh? Mọi lớp và chương trình do tài khoản này sở hữu sẽ được lưu trữ, không bị xóa.`)) return;
     setSavingId(account.id);
     setError('');
     try {
