@@ -21,10 +21,14 @@ export function isClassLessonReleased(releaseAt: string | null | undefined, now 
 
 interface SupabaseErrorLike { code?: string; message?: string; details?: string }
 
-function courseSchemaIsMissing(value: unknown) {
+export function courseSchemaIsMissing(value: unknown) {
   if (!value || typeof value !== 'object') return false;
   const error = value as SupabaseErrorLike;
-  return error.code === 'PGRST202' || error.code === 'PGRST204' || error.code === 'PGRST205' || error.code === '42703' || error.code === '42P01' || error.message?.includes('course_id') === true || error.message?.includes('load_class_lessons') === true || error.message?.includes("public.courses") === true;
+  const message = error.message ?? '';
+  if (error.code === 'PGRST202' || error.code === '42883') return ['load_class_lessons', 'load_course_lessons', 'create_course_secure', 'create_class_for_course', 'set_class_lesson_release'].some((name) => message.includes(name));
+  if (error.code === 'PGRST204' || error.code === '42703') return message.includes('course_id');
+  if (error.code === 'PGRST205' || error.code === '42P01') return message.includes('courses');
+  return false;
 }
 
 function asError(value: unknown, fallback: string) {
@@ -85,6 +89,7 @@ export async function loadMyCourses() {
 
 export async function createCourse(name: string, description: string) {
   const { data, error } = await requireSupabase().rpc('create_course_secure', { course_name: name.trim(), course_description: description.trim() });
+  if (error && courseSchemaIsMissing(error)) throw new Error('Database chưa có chức năng chương trình học. Hãy chạy migration 20260730100000_course_programs.sql.');
   if (error) throw asError(error, 'Không thể tạo chương trình học.');
   if (typeof data !== 'string') throw new Error('Máy chủ trả về chương trình không hợp lệ.');
   return data;
@@ -92,6 +97,7 @@ export async function createCourse(name: string, description: string) {
 
 export async function createClassForCourse(courseId: string, name: string, description: string): Promise<{ classId: string; joinCode: string }> {
   const { data, error } = await requireSupabase().rpc('create_class_for_course', { target_course_id: courseId, class_name: name.trim(), class_description: description.trim() });
+  if (error && courseSchemaIsMissing(error)) throw new Error('Database chưa có chức năng nhiều lớp. Hãy chạy migration 20260730100000_course_programs.sql.');
   if (error) throw asError(error, 'Không thể tạo lớp học.');
   if (!data || typeof data !== 'object' || typeof data.classId !== 'string' || typeof data.joinCode !== 'string') throw new Error('Máy chủ trả về lớp học không hợp lệ.');
   return { classId: data.classId, joinCode: data.joinCode };

@@ -17,7 +17,10 @@ export interface AdminClassroom { id: string; name: string; course_id: string; t
 function courseSchemaIsMissing(error: unknown) {
   if (!error || typeof error !== 'object') return false;
   const value = error as { code?: string; message?: string };
-  return ['PGRST204', 'PGRST205', '42703', '42P01'].includes(value.code ?? '') || value.message?.includes('course_id') === true || value.message?.includes('public.courses') === true;
+  const message = value.message ?? '';
+  if (value.code === 'PGRST204' || value.code === '42703') return message.includes('course_id');
+  if (value.code === 'PGRST205' || value.code === '42P01') return message.includes('courses');
+  return false;
 }
 
 export async function loadAdminAccounts(): Promise<AdminAccount[]> {
