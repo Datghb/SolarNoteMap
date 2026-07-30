@@ -21,6 +21,12 @@ export function isClassLessonReleased(releaseAt: string | null | undefined, now 
 
 interface SupabaseErrorLike { code?: string; message?: string; details?: string }
 
+function courseSchemaIsMissing(value: unknown) {
+  if (!value || typeof value !== 'object') return false;
+  const error = value as SupabaseErrorLike;
+  return error.code === 'PGRST202' || error.code === 'PGRST204' || error.code === 'PGRST205' || error.code === '42703' || error.code === '42P01' || error.message?.includes('course_id') === true || error.message?.includes('load_class_lessons') === true || error.message?.includes("public.courses") === true;
+}
+
 function asError(value: unknown, fallback: string) {
   if (value instanceof Error) return value;
   if (value && typeof value === 'object') {
@@ -38,8 +44,14 @@ function secureCreateRpcIsMissing(value: unknown) {
 }
 
 export async function loadMyClasses() {
-  const { data, error } = await requireSupabase().from('classes').select('id,name,description,teacher_id,course_id,created_at').is('archived_at', null).order('created_at');
-  if (error) throw error;
+  const client = requireSupabase();
+  const { data, error } = await client.from('classes').select('id,name,description,teacher_id,course_id,created_at').is('archived_at', null).order('created_at');
+  if (error && courseSchemaIsMissing(error)) {
+    const legacy = await client.from('classes').select('id,name,description,teacher_id,created_at').is('archived_at', null).order('created_at');
+    if (legacy.error) throw asError(legacy.error, 'Không thể tải lớp học.');
+    return (legacy.data ?? []).map((row) => ({ ...row, course_id: row.id })) as CloudClassroom[];
+  }
+  if (error) throw asError(error, 'Không thể tải lớp học.');
   return (data ?? []) as CloudClassroom[];
 }
 
@@ -48,6 +60,11 @@ export async function loadOwnedClasses() {
   const { data: auth } = await client.auth.getUser();
   if (!auth.user) return [];
   const { data, error } = await client.from('classes').select('id,name,description,teacher_id,course_id,created_at').eq('teacher_id', auth.user.id).is('archived_at', null).order('created_at');
+  if (error && courseSchemaIsMissing(error)) {
+    const legacy = await client.from('classes').select('id,name,description,teacher_id,created_at').eq('teacher_id', auth.user.id).is('archived_at', null).order('created_at');
+    if (legacy.error) throw asError(legacy.error, 'Không thể tải lớp học.');
+    return (legacy.data ?? []).map((row) => ({ ...row, course_id: row.id })) as CloudClassroom[];
+  }
   if (error) throw asError(error, 'Không thể tải lớp học.');
   return (data ?? []) as CloudClassroom[];
 }
@@ -57,6 +74,11 @@ export async function loadMyCourses() {
   const { data: auth } = await client.auth.getUser();
   if (!auth.user) return [];
   const { data, error } = await client.from('courses').select('id,name,description,owner_id,created_at').eq('owner_id', auth.user.id).is('archived_at', null).order('created_at');
+  if (error && courseSchemaIsMissing(error)) {
+    const legacy = await client.from('classes').select('id,name,description,teacher_id,created_at').eq('teacher_id', auth.user.id).is('archived_at', null).order('created_at');
+    if (legacy.error) throw asError(legacy.error, 'Không thể tải chương trình học.');
+    return (legacy.data ?? []).map((row) => ({ id: row.id, name: row.name, description: row.description, owner_id: row.teacher_id, created_at: row.created_at })) as CloudCourse[];
+  }
   if (error) throw asError(error, 'Không thể tải chương trình học.');
   return (data ?? []) as CloudCourse[];
 }
@@ -97,7 +119,12 @@ export async function joinClassroom(joinCode: string) {
 export async function loadCloudLessons(classId: string): Promise<Lesson[]> {
   const client = requireSupabase();
   const { data, error } = await client.rpc('load_class_lessons', { target_class_id: classId });
-  if (error) throw error;
+  if (error && courseSchemaIsMissing(error)) {
+    const legacy = await client.from('lessons').select('*').eq('class_id', classId).order('created_at');
+    if (legacy.error) throw asError(legacy.error, 'Không thể tải bài giảng.');
+    return mapLessonRows(client, legacy.data ?? []);
+  }
+  if (error) throw asError(error, 'Không thể tải bài giảng.');
   return mapLessonRows(client, data ?? []);
 }
 
