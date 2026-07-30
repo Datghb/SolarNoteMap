@@ -9,6 +9,8 @@ export interface UserProfile {
   display_name: string;
   avatar_url: string | null;
   role: UserRole;
+  blocked_at?: string | null;
+  block_reason?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -76,6 +78,23 @@ export function useAuth() {
       listener.subscription.unsubscribe();
     };
   }, [fetchProfile]);
+
+  useEffect(() => {
+    if (!state.user) return;
+    let active = true;
+    const refreshAccess = () => {
+      void fetchProfile(state.user!).then((profile) => {
+        if (active) setState((current) => ({ ...current, profile }));
+      }).catch(() => undefined);
+    };
+    const timer = window.setInterval(refreshAccess, 30_000);
+    window.addEventListener('focus', refreshAccess);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refreshAccess);
+    };
+  }, [fetchProfile, state.user]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     setState((current) => ({ ...current, loading: true, error: null }));

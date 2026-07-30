@@ -6,7 +6,7 @@ vi.mock('../lib/supabase', () => ({
   requireSupabase: () => ({ rpc }),
 }));
 
-import { loadAdminAccounts, updateAccountRole } from './adminAccounts';
+import { loadAdminAccounts, setAccountBlocked } from './adminAccounts';
 
 beforeEach(() => rpc.mockReset());
 
@@ -19,15 +19,15 @@ describe('admin account API', () => {
     expect(rpc).toHaveBeenCalledWith('admin_list_accounts');
   });
 
-  it('changes a target account to an allowed role', async () => {
+  it('blocks a target account without changing its role', async () => {
     rpc.mockResolvedValue({ data: true, error: null });
 
-    await expect(updateAccountRole(' user-1 ', 'teacher')).resolves.toBeUndefined();
-    expect(rpc).toHaveBeenCalledWith('admin_set_account_role', { target_user_id: 'user-1', target_role: 'teacher' });
+    await expect(setAccountBlocked(' user-1 ', true, 'Vi phạm nội quy')).resolves.toBeUndefined();
+    expect(rpc).toHaveBeenCalledWith('admin_set_account_blocked', { target_user_id: 'user-1', should_block: true, reason: 'Vi phạm nội quy' });
   });
 
   it('rejects an empty account id before contacting Supabase', async () => {
-    await expect(updateAccountRole(' ', 'student')).rejects.toThrow('Tài khoản không hợp lệ');
+    await expect(setAccountBlocked(' ', true)).rejects.toThrow('Tài khoản không hợp lệ');
     expect(rpc).not.toHaveBeenCalled();
   });
 });

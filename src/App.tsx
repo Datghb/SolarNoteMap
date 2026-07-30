@@ -288,6 +288,10 @@ export function App() {
         </section>
       </main>
     );
+  if (auth.profile.blocked_at)
+    return (
+      <main className="auth-screen"><section className="auth-card"><span className="auth-kicker">TÀI KHOẢN ĐÃ BỊ CHẶN</span><h1>Quyền truy cập tạm dừng</h1><div className="auth-message error" role="alert">{auth.profile.block_reason || "Vui lòng liên hệ quản trị viên để được hỗ trợ."}</div><button className="auth-primary" onClick={() => void auth.signOut()}>Đăng xuất</button></section></main>
+    );
   if (auth.profile.role === "admin")
     return (
       <AdminDashboard

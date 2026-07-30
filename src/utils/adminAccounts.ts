@@ -1,7 +1,5 @@
 import { requireSupabase } from '../lib/supabase';
 
-export type ManagedAccountRole = 'student' | 'teacher';
-
 export interface AdminAccount {
   id: string;
   email: string;
@@ -9,6 +7,8 @@ export interface AdminAccount {
   role: 'student' | 'teacher' | 'admin';
   created_at: string;
   class_count: number;
+  blocked_at: string | null;
+  block_reason: string | null;
 }
 
 export interface AdminCourse { id: string; name: string; description: string; owner_id: string; created_at: string }
@@ -29,19 +29,15 @@ export async function loadAdminAccounts(): Promise<AdminAccount[]> {
   return (data ?? []) as AdminAccount[];
 }
 
-export async function updateAccountRole(userId: string, role: ManagedAccountRole): Promise<void> {
+export async function setAccountBlocked(userId: string, blocked: boolean, reason?: string): Promise<void> {
   const targetUserId = userId.trim();
   if (!targetUserId) throw new Error('Tài khoản không hợp lệ.');
-  const { error } = await requireSupabase().rpc('admin_set_account_role', {
+  const { error } = await requireSupabase().rpc('admin_set_account_blocked', {
     target_user_id: targetUserId,
-    target_role: role,
+    should_block: blocked,
+    reason: reason?.trim() || null,
   });
-  if (error) {
-    const message = error.message === 'Teacher still owns one or more classes'
-      ? 'Giáo viên đang sở hữu lớp. Hãy chạy migration quản lý vai trò mới trước.'
-      : error.message;
-    throw new Error(message || 'Không thể cập nhật quyền tài khoản.');
-  }
+  if (error) throw new Error(error.message || 'Không thể cập nhật trạng thái tài khoản.');
 }
 
 export async function loadAdminCourses(): Promise<AdminCourse[]> {

@@ -1,7 +1,7 @@
 # Supabase setup
 
 1. Create a Supabase project.
-2. Open **SQL Editor** and run every migration in timestamp order through `20260730110000_admin_role_management.sql`.
+2. Open **SQL Editor** and run every migration in timestamp order through `20260730120000_account_blocking.sql`.
 3. Copy the Project URL and Publishable key into `.env.local`:
 
    ```env
