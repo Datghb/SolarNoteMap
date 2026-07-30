@@ -29,7 +29,7 @@ export interface TeacherLesson extends Lesson {
 
 export interface TeacherLessonInput {
   name: string;
-  shortName: string;
+  shortName?: string;
   description: string;
   pdfName?: string;
 }
@@ -52,8 +52,10 @@ function limited(value: string, max: number, label: string) {
 
 export function createTeacherLesson(input: TeacherLessonInput, id: string = crypto.randomUUID(), now = new Date().toISOString()): TeacherLesson {
   const name = limited(input.name, 120, 'Tên bài giảng');
-  const shortName = limited(input.shortName, 48, 'Tên ngắn');
-  if (!name || !shortName) throw new Error('Tên bài giảng và tên ngắn không được để trống.');
+  const shortName = input.shortName
+    ? limited(input.shortName, 48, 'Tên ngắn')
+    : name;
+  if (!name) throw new Error('Tên bài giảng không được để trống.');
   return {
     id,
     name,

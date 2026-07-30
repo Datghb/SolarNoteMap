@@ -86,7 +86,6 @@ export function TeacherDashboard({
   const [showCreator, setShowCreator] = useState(false);
   const [form, setForm] = useState<TeacherLessonInput>({
     name: "",
-    shortName: "",
     description: "",
   });
   const [formError, setFormError] = useState("");
@@ -131,7 +130,7 @@ export function TeacherDashboard({
     setSavingLesson(true);
     try {
       await onCreateLesson(createTeacherLesson(form), pdfFile);
-      setForm({ name: "", shortName: "", description: "" });
+      setForm({ name: "", description: "" });
       setPdfFile(undefined);
       setFormError("");
       setShowCreator(false);
@@ -818,20 +817,6 @@ export function TeacherDashboard({
               />
             </label>
             <label>
-              Tên ngắn
-              <input
-                maxLength={48}
-                value={form.shortName}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    shortName: event.target.value,
-                  }))
-                }
-                placeholder="Prompt Engineering"
-              />
-            </label>
-            <label>
               Mô tả
               <textarea
                 maxLength={500}
@@ -846,7 +831,7 @@ export function TeacherDashboard({
               />
             </label>
             <label className="lesson-file">
-              Tài liệu PDF
+              Tài liệu PDF <em>· Bắt buộc</em>
               <input
                 type="file"
                 accept="application/pdf"
@@ -856,17 +841,17 @@ export function TeacherDashboard({
                   setForm((current) => ({ ...current, pdfName: file?.name }));
                 }}
               />
-              <span>{form.pdfName || "Chọn tệp PDF từ máy"}</span>
+              <span>{form.pdfName || "Chọn tệp PDF để AI phân tích nội dung"}</span>
             </label>
             {formError && <p className="creator-error">{formError}</p>}
             <footer>
               <button onClick={() => setShowCreator(false)}>Hủy</button>
               <button
                 className="primary"
-                disabled={savingLesson}
+                disabled={savingLesson || !form.name.trim() || !pdfFile}
                 onClick={submitLesson}
               >
-                {savingLesson ? "Đang tải lên…" : "Lưu bản nháp"}
+                {savingLesson ? "AI đang phân tích…" : "Tạo bài & tóm tắt"}
               </button>
             </footer>
           </section>

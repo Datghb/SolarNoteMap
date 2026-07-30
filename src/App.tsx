@@ -40,6 +40,7 @@ import {
   type CloudCourse,
 } from "./utils/cloudClassroom";
 import { getVisibleLessons } from "./utils/lessonVisibility";
+import { fetchLessonSummary } from "./utils/lessonSummary";
 
 export function App() {
   const auth = useAuth();
@@ -196,8 +197,29 @@ export function App() {
   const createLesson = async (lesson: TeacherLesson, pdf?: File) => {
     if (!auth.user) throw new Error("Chưa đăng nhập.");
     if (!activeCourseId) throw new Error("Chưa chọn chương trình học.");
-    await createCloudLesson(activeCourseId, auth.user.id, lesson, pdf);
-    setCustomLessons((await (activeClassId ? loadCloudLessons(activeClassId) : loadCourseLessons(activeCourseId))) as TeacherLesson[]);
+    if (!pdf) throw new Error("Vui lòng chọn tài liệu PDF để AI tạo bản tóm tắt.");
+    const retryLesson = customLessons.find(
+      (item) => item.name === lesson.name && !item.published && item.pdfUrl,
+    );
+    if (retryLesson?.pdfUrl) {
+      await fetchLessonSummary(retryLesson.id, retryLesson.pdfUrl);
+      return;
+    }
+    const created = await createCloudLesson(activeCourseId, auth.user.id, lesson, pdf);
+    const nextLessons = (await (activeClassId
+      ? loadCloudLessons(activeClassId)
+      : loadCourseLessons(activeCourseId))) as TeacherLesson[];
+    setCustomLessons(nextLessons);
+    const createdLesson = nextLessons.find((item) => item.id === created.id);
+    if (!createdLesson?.pdfUrl) {
+      throw new Error("Bài giảng đã được lưu nhưng chưa thể đọc lại tệp PDF.");
+    }
+    try {
+      await fetchLessonSummary(createdLesson.id, createdLesson.pdfUrl);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "AI chưa thể phân tích PDF.";
+      throw new Error(`Bài giảng đã được lưu nhưng chưa tạo được bản tóm tắt: ${reason}`);
+    }
   };
 
   const toggleLessonPublish = async (lessonId: string) => {

@@ -38,7 +38,7 @@ export function LessonSummary({ lesson }: { lesson: Lesson }) {
     setAsking(false);
     setLoading(true);
     setError('');
-    fetchLessonSummary(lesson.id).then((result) => {
+    fetchLessonSummary(lesson.id, lesson.pdfUrl).then((result) => {
       if (!active) return;
       setSummary(result.summary);
       setSource(result.source);
@@ -46,7 +46,7 @@ export function LessonSummary({ lesson }: { lesson: Lesson }) {
       if (active) setError(reason instanceof Error ? reason.message : 'Không thể tạo bản tóm tắt.');
     }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; chatControllerRef.current?.abort(); };
-  }, [lesson.id]);
+  }, [lesson.id, lesson.pdfUrl]);
 
   useEffect(() => {
     const container = messagesRef.current;
@@ -64,7 +64,7 @@ export function LessonSummary({ lesson }: { lesson: Lesson }) {
     const controller = new AbortController();
     chatControllerRef.current = controller;
     try {
-      const answer = await askLessonSummaryAI(lesson.id, content, messages, controller.signal);
+      const answer = await askLessonSummaryAI(lesson.id, content, messages, controller.signal, lesson.pdfUrl);
       if (controller.signal.aborted) return;
       setMessages((current) => [...current, { role: 'assistant', content: answer }]);
     } catch (reason) {

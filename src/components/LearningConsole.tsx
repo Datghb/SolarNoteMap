@@ -46,8 +46,8 @@ export function LearningConsole({ lesson, classId, onClose }: { lesson: Lesson; 
   const slides = usesDay01Pdf ? getPdfPageSlides(pdfPageCount) : getLessonSlides(lesson.id, lesson.name);
 
   useEffect(() => {
-    if (usesDay01Pdf) fetchLessonSummary(lesson.id).catch(() => undefined);
-  }, [lesson.id, usesDay01Pdf]);
+    if (usesDay01Pdf) fetchLessonSummary(lesson.id, lesson.pdfUrl).catch(() => undefined);
+  }, [lesson.id, lesson.pdfUrl, usesDay01Pdf]);
 
   useEffect(() => {
     recordStudentActivity({ lessonId: lesson.id, slideId: slides[slideIndex]?.id, type: 'slide_viewed' });
@@ -262,9 +262,9 @@ export function LearningConsole({ lesson, classId, onClose }: { lesson: Lesson; 
         <button className="icon-button" onClick={onClose} aria-label="Đóng">×</button>
       </header>
 
-      <nav className="console-tabs" style={{ gridTemplateColumns: `repeat(${lesson.id === 'ai-foundations' ? 4 : 3}, 1fr)` }}>
+      <nav className="console-tabs" style={{ gridTemplateColumns: `repeat(${usesDay01Pdf ? 4 : 3}, 1fr)` }}>
         <button className={tab === 'brief' ? 'active' : ''} onClick={() => setTab('brief')}>Bài giảng</button>
-        {lesson.id === 'ai-foundations' && <button className={tab === 'summary' ? 'active' : ''} onClick={() => setTab('summary')}>Tóm tắt</button>}
+        {usesDay01Pdf && <button className={tab === 'summary' ? 'active' : ''} onClick={() => setTab('summary')}>Tóm tắt</button>}
         <button className={tab === 'map' ? 'active' : ''} onClick={() => setTab('map')}>Sơ đồ <span>{map.nodes.length}</span></button>
         <button className={tab === 'community' ? 'active' : ''} onClick={() => { setCommunitySlideId(undefined); setTab('community'); }}>Cộng đồng</button>
       </nav>

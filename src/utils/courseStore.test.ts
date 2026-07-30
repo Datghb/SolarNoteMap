@@ -9,6 +9,16 @@ describe('teacher course store', () => {
     expect(lesson).toMatchObject({ id: 'lesson-id', name: 'Prompt Engineering', shortName: 'Prompt', published: false, pdfName: 'lesson.pdf' });
   });
 
+  it('uses the lesson name when no short name is provided', () => {
+    const lesson = createTeacherLesson(
+      { name: 'Agentic AI cho doanh nghiệp', description: '' },
+      'lesson-id',
+      '2026-07-29T00:00:00.000Z',
+    );
+
+    expect(lesson.shortName).toBe('Agentic AI cho doanh nghiệp');
+  });
+
   it('prepends activity immutably and caps the history', () => {
     const current = Array.from({ length: 1000 }, (_, index) => ({ id: String(index), studentId: 's', studentName: 'A', lessonId: 'l', type: 'lesson_opened' as const, occurredAt: String(index) }));
     const next = appendActivity(current, { id: 'new', studentId: 's', studentName: 'A', lessonId: 'l', type: 'map_saved', occurredAt: 'now' });

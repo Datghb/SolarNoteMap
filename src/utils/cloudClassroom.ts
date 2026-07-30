@@ -172,7 +172,8 @@ function safeSlug(value: string) {
 export async function createCloudLesson(courseId: string, userId: string, input: TeacherLessonInput, pdf?: File) {
   const client = requireSupabase();
   const id = safeSlug(input.name);
-  const lessonDraft = { id, course_id: courseId, created_by: userId, title: input.name.trim(), short_name: input.shortName.trim(), description: input.description.trim(), prompt: '', pdf_path: null };
+  const lessonName = input.name.trim();
+  const lessonDraft = { id, course_id: courseId, created_by: userId, title: lessonName, short_name: input.shortName?.trim() || lessonName, description: input.description.trim(), prompt: '', pdf_path: null };
   let { data, error } = await client.from('lessons').insert(lessonDraft).select().single();
   if (error && courseSchemaIsMissing(error)) {
     const legacy = await client.from('lessons').insert({ ...lessonDraft, course_id: undefined, class_id: courseId }).select().single();

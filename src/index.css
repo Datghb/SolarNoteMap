@@ -370,3 +370,4 @@ body { margin: 0; overflow: hidden; }
 .slide-ai-answer { max-height:210px; margin-top:9px; padding:10px; overflow-y:auto; border:1px solid #35304e; border-radius:8px; background:#11101d; }
 .slide-ai-answer b { color:#c9b7ff; font-size:10px; text-transform:uppercase; letter-spacing:.07em; }.slide-ai-answer p { margin:6px 0 9px; color:#d8dbe5; font-size:12px; line-height:1.6; white-space:pre-wrap; }.slide-ai-answer button { padding:6px 8px; border:1px solid #4a4268; border-radius:7px; background:#1d1930; color:#c9b7ff; font-size:10px; cursor:pointer; }
 @media (max-width:760px) { .slide-context-composer { width:min(360px,86%); }.pdf-view-actions { flex-wrap:wrap; justify-content:flex-end; } }
+.lesson-file > em { color:#f0a1b1; font-style:normal; font-weight:600; }
