@@ -31,6 +31,11 @@ export function SelectablePdfPage({ pageNumber, pdfUrl, onDocumentLoad }: { page
   const textRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState('');
   const [retryToken, setRetryToken] = useState(0);
+  const onDocumentLoadRef = useRef(onDocumentLoad);
+
+  useEffect(() => {
+    onDocumentLoadRef.current = onDocumentLoad;
+  }, [onDocumentLoad]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -46,7 +51,8 @@ export function SelectablePdfPage({ pageNumber, pdfUrl, onDocumentLoad }: { page
     const render = async (currentGeneration: number) => {
       try {
         const document = await loadSlides(pdfUrl);
-        onDocumentLoad?.(document.numPages);
+        if (cancelled || currentGeneration !== generation) return;
+        onDocumentLoadRef.current?.(document.numPages);
         const page = await document.getPage(pageNumber);
         if (cancelled || currentGeneration !== generation) return;
         const base = page.getViewport({ scale: 1 });
@@ -96,7 +102,7 @@ export function SelectablePdfPage({ pageNumber, pdfUrl, onDocumentLoad }: { page
       renderTask?.cancel();
       textLayer?.cancel();
     };
-  }, [pageNumber, pdfUrl, onDocumentLoad, retryToken]);
+  }, [pageNumber, pdfUrl, retryToken]);
 
   return <div ref={hostRef} className="selectable-pdf-page">
     <div className="pdf-page-surface"><canvas ref={canvasRef} /><div ref={textRef} className="pdf-text-host" /></div>
