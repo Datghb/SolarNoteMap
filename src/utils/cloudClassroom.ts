@@ -15,6 +15,24 @@ const ACTIVITY_TO_DB: Record<StudentActivity['type'], string> = {
 export function toCloudActivityKind(type: StudentActivity['type']) { return ACTIVITY_TO_DB[type]; }
 export function fromCloudActivityKind(kind: string) { return DB_TO_ACTIVITY[kind] ?? 'lesson_opened'; }
 
+interface SupabaseErrorLike { code?: string; message?: string; details?: string }
+
+function asError(value: unknown, fallback: string) {
+  if (value instanceof Error) return value;
+  if (value && typeof value === 'object') {
+    const error = value as SupabaseErrorLike;
+    const message = [error.message, error.details].filter(Boolean).join(' — ');
+    if (message) return new Error(message);
+  }
+  return new Error(fallback);
+}
+
+function secureCreateRpcIsMissing(value: unknown) {
+  if (!value || typeof value !== 'object') return false;
+  const error = value as SupabaseErrorLike;
+  return error.code === 'PGRST202' || error.code === '42883' || error.message?.includes('create_class_secure') === true && error.message.includes('not find');
+}
+
 export async function loadMyClasses() {
   const { data, error } = await requireSupabase().from('classes').select('id,name,description,teacher_id,created_at').is('archived_at', null).order('created_at');
   if (error) throw error;
@@ -22,8 +40,13 @@ export async function loadMyClasses() {
 }
 
 export async function createClassroom(name: string, description: string): Promise<{ classId: string; joinCode: string }> {
-  const { data, error } = await requireSupabase().rpc('create_class_secure', { class_name: name.trim(), class_description: description.trim() });
-  if (error) throw error;
+  const client = requireSupabase();
+  const args = { class_name: name.trim(), class_description: description.trim() };
+  const { data, error } = await client.rpc('create_class_secure', args);
+  if (error && secureCreateRpcIsMissing(error)) {
+    throw new Error('Supabase chưa được cập nhật chức năng tạo lớp. Hãy chạy migration 20260730090200_join_code_rate_limit.sql.');
+  }
+  if (error) throw asError(error, 'Không thể tạo lớp học.');
   if (!data || typeof data !== 'object' || typeof data.classId !== 'string' || typeof data.joinCode !== 'string') throw new Error('Không thể tạo lớp học.');
   return { classId: data.classId, joinCode: data.joinCode };
 }
