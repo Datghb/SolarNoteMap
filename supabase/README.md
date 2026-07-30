@@ -20,15 +20,6 @@
 
 6. Users enter the personal learning space directly. Built-in lessons, teacher-created lessons, notes, maps, and activity are stored locally on the current device.
 
-## Google sign-in
-
-1. In Google Cloud, create an OAuth 2.0 Web client.
-2. Add `https://YOUR_PROJECT_REF.supabase.co/auth/v1/callback` as an authorized redirect URI.
-3. In Supabase Dashboard, open **Authentication → Providers → Google**, enable Google, then add the Google client ID and client secret.
-4. In **Authentication → URL Configuration**, add `http://localhost:5173` and the production application URL to Redirect URLs.
-
-The application sends users back to the current origin after Google authentication, so every origin used for testing or deployment must be allowlisted.
-
 ## Bootstrapping the first administrator
 
 After applying `20260729180000_admin_accounts.sql`, register the administrator normally, then run this once in SQL Editor:
@@ -45,4 +36,3 @@ Sign out and back in. Admins open the account dashboard automatically and can sw
 
 - Never expose a Supabase secret/service-role key in a `VITE_` variable.
 - All application tables have Row Level Security enabled.
-- Google OAuth secrets belong only in Google Cloud and the Supabase provider configuration, never in client environment variables.

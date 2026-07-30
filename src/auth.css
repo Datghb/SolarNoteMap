@@ -6,9 +6,6 @@
 .auth-kicker { margin:0; color:#8f99df; text-align:center; font-size:10px; font-weight:700; letter-spacing:.22em; }
 .auth-card h1 { margin:10px 0 8px; text-align:center; font:600 30px 'Space Grotesk',sans-serif; letter-spacing:-.04em; }
 .auth-subtitle { margin:0 0 26px; color:#8f95a9; text-align:center; font-size:13px; line-height:1.6; }
-.auth-google { width:100%; min-height:46px; display:flex; align-items:center; justify-content:center; gap:10px; border:1px solid #343a50; border-radius:10px; background:#fff; color:#252733; font-weight:700; cursor:pointer; }
-.auth-google:hover { background:#f2f4fb; }.auth-google:disabled { opacity:.5; cursor:not-allowed; }.auth-google svg { width:19px; height:19px; }
-.auth-divider { display:flex; align-items:center; gap:10px; margin:20px 0; color:#666e82; font-size:9px; text-transform:uppercase; letter-spacing:.08em; }.auth-divider::before,.auth-divider::after { content:''; flex:1; height:1px; background:#252a3b; }.auth-divider span { white-space:nowrap; }
 .auth-card form { display:grid; gap:15px; }
 .auth-card label { display:grid; gap:7px; color:#aeb4c7; font-size:11px; font-weight:600; }
 .auth-card input { width:100%; min-height:45px; padding:11px 13px; border:1px solid #2b3046; border-radius:10px; outline:none; background:#0d101e; color:#f4f6ff; }
