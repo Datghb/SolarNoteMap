@@ -39,6 +39,7 @@ import {
   type CloudClassroom,
   type CloudCourse,
 } from "./utils/cloudClassroom";
+import { getVisibleLessons } from "./utils/lessonVisibility";
 
 export function App() {
   const auth = useAuth();
@@ -55,7 +56,10 @@ export function App() {
   const [courses, setCourses] = useState<CloudCourse[]>([]);
   const [cloudLoading, setCloudLoading] = useState(true);
   const [cloudError, setCloudError] = useState("");
-  const lessons = customLessons.filter((lesson) => lesson.published);
+  const lessons = getVisibleLessons(customLessons, auth.profile?.role);
+  const publishedLessonCount = customLessons.filter(
+    (lesson) => lesson.published,
+  ).length;
   const selectedLesson =
     lessons.find((lesson) => lesson.id === selectedLessonId) ?? null;
   const activeCourse =
@@ -479,6 +483,7 @@ export function App() {
             />
             <Comet startPosition={[-20, 42, -60]} speed={0.5} color="#ffe4a8" />
             <SolarSystem
+              lessons={lessons}
               speedMultiplier={speedMultiplier}
               onPlanetClick={selectByPlanetName}
               showOrbits={showOrbits}
@@ -513,12 +518,12 @@ export function App() {
           <div>
             <i
               style={{
-                width: `${customLessons.length ? Math.round((lessons.length / customLessons.length) * 100) : 0}%`,
+                width: `${customLessons.length ? Math.round((publishedLessonCount / customLessons.length) * 100) : 0}%`,
               }}
             />
           </div>
           <b>
-            {lessons.length} / {customLessons.length || 0}
+            {publishedLessonCount} / {customLessons.length || 0}
           </b>
         </div>
         <div className="account-actions">

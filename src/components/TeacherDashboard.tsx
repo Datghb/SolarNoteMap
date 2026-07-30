@@ -275,39 +275,41 @@ export function TeacherDashboard({
 
       <section className="teacher-shell">
         <aside className="teacher-sidebar">
-          <label>
-            Chương trình
-            <select
-              value={activeCourseId ?? ""}
-              onChange={(event) => onSelectCourse(event.target.value)}
-            >
-              <option value="" disabled>
-                Chọn chương trình
-              </option>
-              {courses.map((course) => (
-                <option key={course.id} value={course.id}>
-                  {course.name}
+          <div className="teacher-context-selectors">
+            <label>
+              <span>Chương trình</span>
+              <select
+                value={activeCourseId ?? ""}
+                onChange={(event) => onSelectCourse(event.target.value)}
+              >
+                <option value="" disabled>
+                  Chọn chương trình
                 </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Lớp đang xem
-            <select
-              value={activeClassId ?? ""}
-              disabled={!activeCourseId}
-              onChange={(event) => onSelectClass(event.target.value)}
-            >
-              <option value="">Chưa chọn lớp</option>
-              {classes
-                .filter((item) => item.course_id === activeCourseId)
-                .map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
+                {courses.map((course) => (
+                  <option key={course.id} value={course.id}>
+                    {course.name}
                   </option>
                 ))}
-            </select>
-          </label>
+              </select>
+            </label>
+            <label>
+              <span>Lớp đang xem</span>
+              <select
+                value={activeClassId ?? ""}
+                disabled={!activeCourseId}
+                onChange={(event) => onSelectClass(event.target.value)}
+              >
+                <option value="">Chưa chọn lớp</option>
+                {classes
+                  .filter((item) => item.course_id === activeCourseId)
+                  .map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+              </select>
+            </label>
+          </div>
           <span className="teacher-kicker">
             {hasActiveClass ? "LỚP ĐANG QUẢN LÝ" : "KHÔNG GIAN GIÁO VIÊN"}
           </span>

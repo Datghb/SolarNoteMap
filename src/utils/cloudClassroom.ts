@@ -1,4 +1,5 @@
 import type { Lesson } from '../data/lessons';
+import { resolveLessonPalettes } from './lessonPalette';
 import type { StudentActivity, TeacherLessonInput } from './courseStore';
 import { requireSupabase } from '../lib/supabase';
 
@@ -142,15 +143,21 @@ export async function loadCourseLessons(courseId: string): Promise<Lesson[]> {
 }
 
 async function mapLessonRows(client: ReturnType<typeof requireSupabase>, rows: Record<string, any>[]) {
-  return Promise.all(rows.map(async (row) => {
+  const palettes = resolveLessonPalettes(rows.map((row) => ({
+    id: row.id,
+    shortName: row.short_name,
+    name: row.title,
+  })));
+  return Promise.all(rows.map(async (row, index) => {
     const signed = row.pdf_path
       ? await client.storage.from('lesson-pdfs').createSignedUrl(row.pdf_path, 3600)
       : { data: null, error: null };
     if (signed.error) throw signed.error;
+    const palette = palettes[index];
     return {
     id: row.id, name: row.title, shortName: row.short_name, subtitle: isClassLessonReleased(row.published_at) ? 'Bài giảng đang mở' : row.published_at ? 'Bài giảng đã lên lịch' : 'Bài giảng đang khóa',
-    description: row.description, color: '#8ea1ff',
-    colors: ['#d8deff', '#7289ff', '#314387'], published: isClassLessonReleased(row.published_at), availableAt: row.published_at ?? undefined, pdfName: row.pdf_path?.split('/').pop(),
+    description: row.description, color: palette.color,
+    colors: palette.colors, published: isClassLessonReleased(row.published_at), availableAt: row.published_at ?? undefined, pdfName: row.pdf_path?.split('/').pop(),
     pdfPath: row.pdf_path ?? undefined, pdfUrl: signed.data?.signedUrl,
     createdAt: row.created_at, updatedAt: row.updated_at,
     };

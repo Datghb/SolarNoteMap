@@ -4,9 +4,10 @@ import { Line } from '@react-three/drei';
 import * as THREE from 'three';
 import { Planet } from './Planet';
 import { Sun } from './Sun';
-import { LESSONS } from '../data/lessons';
+import type { Lesson } from '../data/lessons';
 
-const PLANETS_DATA = LESSONS.map((lesson, index) => ({
+const createPlanetsData = (lessons: Lesson[]) => lessons.map((lesson, index) => ({
+  id: lesson.id,
   name: lesson.shortName,
   radius: 1.8 + index * 0.32,
   distance: 18 + index * 14,
@@ -26,26 +27,28 @@ interface SolarSystemProps {
   showLabels: boolean;
   accentColor: string;
   savedMaps: Record<string, number>;
+  lessons: Lesson[];
 }
 
-export function SolarSystem({ speedMultiplier, onPlanetClick, showOrbits, showLabels, accentColor, savedMaps }: SolarSystemProps) {
+export function SolarSystem({ speedMultiplier, onPlanetClick, showOrbits, showLabels, accentColor, savedMaps, lessons }: SolarSystemProps) {
+  const planets = useMemo(() => createPlanetsData(lessons), [lessons]);
   return (
     <group>
       <Sun />
       <AsteroidBelt innerRadius={44} outerRadius={49} count={140} speedMultiplier={speedMultiplier} />
-      {PLANETS_DATA.map((planet) => <Planet key={planet.name} {...planet} speedMultiplier={speedMultiplier} onClick={() => onPlanetClick(planet.name)} showLabel={showLabels} />)}
+      {planets.map((planet) => <Planet key={planet.id} {...planet} speedMultiplier={speedMultiplier} onClick={() => onPlanetClick(planet.name)} showLabel={showLabels} />)}
       {[27, 38, 59, 76].map((distance, index) => (
         <SystemSatellite
           key={distance}
           distance={distance}
-          color={LESSONS[index % LESSONS.length].color}
+          color={lessons[index % lessons.length]?.color ?? accentColor}
           speedMultiplier={speedMultiplier}
           orbitIndex={index}
           phase={index * 1.55 + 0.4}
           isOwn={index === 3 && Object.keys(savedMaps).length > 0}
         />
       ))}
-      {showOrbits && PLANETS_DATA.map((planet) => <OrbitPath key={planet.name} distance={planet.distance} eccentricity={planet.eccentricity} color={accentColor} />)}
+      {showOrbits && planets.map((planet) => <OrbitPath key={planet.id} distance={planet.distance} eccentricity={planet.eccentricity} color={accentColor} />)}
     </group>
   );
 }
@@ -146,4 +149,4 @@ function AsteroidBelt({ innerRadius, outerRadius, count, speedMultiplier }: { in
   return <instancedMesh ref={ref} args={[undefined, undefined, count]}><dodecahedronGeometry args={[1, 0]} /><meshStandardMaterial color="#9a6e43" roughness={0.9} /></instancedMesh>;
 }
 
-export { PLANETS_DATA };
+export { createPlanetsData };
