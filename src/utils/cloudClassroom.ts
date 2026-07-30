@@ -165,22 +165,46 @@ function safeSlug(value: string) {
 export async function createCloudLesson(courseId: string, userId: string, input: TeacherLessonInput, pdf?: File) {
   const client = requireSupabase();
   const id = safeSlug(input.name);
+  const lessonDraft = { id, course_id: courseId, created_by: userId, title: input.name.trim(), short_name: input.shortName.trim(), description: input.description.trim(), prompt: input.prompt.trim(), pdf_path: null };
+  let { data, error } = await client.from('lessons').insert(lessonDraft).select().single();
+  if (error && courseSchemaIsMissing(error)) {
+    const legacy = await client.from('lessons').insert({ ...lessonDraft, course_id: undefined, class_id: courseId }).select().single();
+    data = legacy.data;
+    error = legacy.error;
+  }
+  if (error) throw asError(error, 'Không thể tạo bản nháp bài giảng.');
+  if (!pdf) return data;
+
   let pdfPath: string | null = null;
   if (pdf) {
-    if (pdf.size > 50 * 1024 * 1024) throw new Error('PDF không được vượt quá 50 MB.');
+    if (pdf.size > 50 * 1024 * 1024) {
+      await client.from('lessons').delete().eq('id', id);
+      throw new Error('PDF không được vượt quá 50 MB.');
+    }
     const signature = new TextDecoder().decode(new Uint8Array(await pdf.slice(0, 5).arrayBuffer()));
-    if (pdf.type !== 'application/pdf' || signature !== '%PDF-') throw new Error('Tệp tải lên không phải PDF hợp lệ.');
-    const cleanName = pdf.name.replace(/[^a-zA-Z0-9._-]/g, '-').slice(-120);
-    pdfPath = `${courseId}/${id}/${crypto.randomUUID()}-${cleanName}`;
+    if (pdf.type !== 'application/pdf' || signature !== '%PDF-') {
+      await client.from('lessons').delete().eq('id', id);
+      throw new Error('Tệp tải lên không phải PDF hợp lệ.');
+    }
+    pdfPath = `${courseId}/${id}/lesson.pdf`;
+    // Clear an interrupted, unattached upload from an earlier attempt. The path
+    // is deterministic, so one draft lesson can never accumulate many objects.
+    await client.storage.from('lesson-pdfs').remove([pdfPath]);
     const { error: uploadError } = await client.storage.from('lesson-pdfs').upload(pdfPath, pdf, { contentType: 'application/pdf', upsert: false });
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+      await client.from('lessons').delete().eq('id', id);
+      throw new Error(`Không thể tải PDF lên: ${uploadError.message}`);
+    }
   }
-  const { data, error } = await client.from('lessons').insert({ id, course_id: courseId, created_by: userId, title: input.name.trim(), short_name: input.shortName.trim(), description: input.description.trim(), prompt: input.prompt.trim(), pdf_path: pdfPath }).select().single();
-  if (error) {
-    if (pdfPath) await client.storage.from('lesson-pdfs').remove([pdfPath]);
-    throw error;
+
+  if (!pdfPath) return data;
+  const updated = await client.from('lessons').update({ pdf_path: pdfPath }).eq('id', id).select().single();
+  if (updated.error) {
+    await client.storage.from('lesson-pdfs').remove([pdfPath]);
+    await client.from('lessons').delete().eq('id', id);
+    throw asError(updated.error, 'Không thể gắn PDF vào bài giảng.');
   }
-  return data;
+  return updated.data;
 }
 
 export async function setCloudLessonPublished(classId: string, lessonId: string, published: boolean) {
