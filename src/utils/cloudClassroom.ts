@@ -1,5 +1,6 @@
 import type { Lesson } from '../data/lessons';
 import { resolveLessonPalettes } from './lessonPalette';
+import { assertPdfCanOpen } from './pdfValidation';
 import type { StudentActivity, TeacherLessonInput } from './courseStore';
 import { requireSupabase } from '../lib/supabase';
 
@@ -213,6 +214,12 @@ export async function createCloudLesson(courseId: string, userId: string, input:
       await client.from('lessons').delete().eq('id', id);
       throw new Error('Tệp tải lên không phải PDF hợp lệ.');
     }
+    try {
+      await assertPdfCanOpen(pdf);
+    } catch (validationError) {
+      await client.from('lessons').delete().eq('id', id);
+      throw validationError;
+    }
     pdfPath = `${courseId}/${id}/lesson.pdf`;
     // Clear an interrupted, unattached upload from an earlier attempt. The path
     // is deterministic, so one draft lesson can never accumulate many objects.
@@ -232,6 +239,62 @@ export async function createCloudLesson(courseId: string, userId: string, input:
     throw asError(updated.error, 'Không thể gắn PDF vào bài giảng.');
   }
   return updated.data;
+}
+
+export async function updateCloudLesson(lessonId: string, input: TeacherLessonInput, pdf?: File) {
+  const client = requireSupabase();
+  const name = input.name.trim();
+  const description = input.description.trim();
+  if (!name || name.length > 120) throw new Error('Tên bài giảng phải có từ 1 đến 120 ký tự.');
+  if (description.length > 500) throw new Error('Mô tả không được vượt quá 500 ký tự.');
+  const current = await client.from('lessons').select('pdf_path').eq('id', lessonId).single();
+  if (current.error) throw asError(current.error, 'Không tìm thấy bài giảng cần sửa.');
+
+  if (pdf) {
+    if (pdf.size > 50 * 1024 * 1024) throw new Error('PDF không được vượt quá 50 MB.');
+    const signature = new TextDecoder().decode(new Uint8Array(await pdf.slice(0, 5).arrayBuffer()));
+    if (pdf.type !== 'application/pdf' || signature !== '%PDF-') throw new Error('Tệp tải lên không phải PDF hợp lệ.');
+    await assertPdfCanOpen(pdf);
+    if (!current.data.pdf_path) throw new Error('Bài giảng chưa có đường dẫn PDF hợp lệ.');
+    const uploaded = await client.storage.from('lesson-pdfs').upload(current.data.pdf_path, pdf, { contentType: 'application/pdf', upsert: true });
+    if (uploaded.error) throw asError(uploaded.error, 'Không thể thay thế PDF bài giảng.');
+  }
+
+  const patch: Record<string, unknown> = {
+    title: name,
+    short_name: input.shortName?.trim() || name,
+    description,
+  };
+  if (pdf) {
+    patch.summary = null;
+    patch.summary_model = null;
+    patch.summary_pdf_path = null;
+    patch.summarized_at = null;
+  }
+  let updated = await client.from('lessons').update(patch).eq('id', lessonId).select().single();
+  const summarySchemaMissing = updated.error && (
+    updated.error.code === 'PGRST204'
+    || updated.error.code === '42703'
+    || /summary_(?:model|pdf_path)|summarized_at/i.test(updated.error.message)
+  );
+  if (summarySchemaMissing) {
+    const metadataPatch = { title: name, short_name: input.shortName?.trim() || name, description };
+    updated = await client.from('lessons').update(metadataPatch).eq('id', lessonId).select().single();
+  }
+  if (updated.error) throw asError(updated.error, 'Không thể cập nhật bài giảng.');
+  return updated.data;
+}
+
+export async function deleteCloudLesson(lessonId: string) {
+  const client = requireSupabase();
+  const current = await client.from('lessons').select('pdf_path').eq('id', lessonId).single();
+  if (current.error) throw asError(current.error, 'Không tìm thấy bài giảng cần xoá.');
+  const removed = await client.from('lessons').delete().eq('id', lessonId);
+  if (removed.error) throw asError(removed.error, 'Không thể xoá bài giảng.');
+  if (current.data.pdf_path) {
+    const storageResult = await client.storage.from('lesson-pdfs').remove([current.data.pdf_path]);
+    if (storageResult.error) console.error('Không thể dọn tệp PDF đã xoá:', storageResult.error.message);
+  }
 }
 
 export async function setCloudLessonPublished(classId: string, lessonId: string, published: boolean) {

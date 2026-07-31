@@ -3,6 +3,11 @@ export function isExpiredPdfAccessError(error: unknown) {
   return /(?:response|status).*\b(?:400|401|403)\b/i.test(message);
 }
 
+export function isPdfPasswordError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /password/i.test(message);
+}
+
 export function getSafePdfErrorMessage(error: unknown) {
   if (isExpiredPdfAccessError(error)) {
     return 'Liên kết tài liệu đã hết hạn. Hệ thống đang yêu cầu liên kết mới.';

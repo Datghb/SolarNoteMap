@@ -206,7 +206,7 @@ Yêu cầu bắt buộc:
   return result.output_text.trim().slice(0, 15_000);
 }
 
-async function getCachedDeckSummary(lessonId, uploadedPdfUrl, database) {
+async function getCachedDeckSummary(lessonId, uploadedPdfUrl, database, force = false) {
   let lessonRow = null;
   if (database) {
     const stored = await database
@@ -222,7 +222,7 @@ async function getCachedDeckSummary(lessonId, uploadedPdfUrl, database) {
       console.warn('Lesson summary columns are not migrated yet; using the local persistent cache.');
     }
     lessonRow = stored.error ? null : stored.data;
-    if (
+    if (!force &&
       lessonRow?.summary?.trim()
       && lessonRow.summary_pdf_path === lessonRow.pdf_path
     ) {
@@ -233,7 +233,7 @@ async function getCachedDeckSummary(lessonId, uploadedPdfUrl, database) {
   const cacheKey = `${signature}:${provider}:${model}:${lessonSummaryVersion}:lesson-${lessonId}`;
   const cache = await loadSlideSummaryCache();
   const cached = cache[cacheKey];
-  if (cached && typeof cached.summary === 'string' && cached.summary.trim()) return { summary: cached.summary, source: 'cache' };
+  if (!force && cached && typeof cached.summary === 'string' && cached.summary.trim()) return { summary: cached.summary, source: 'cache' };
   if (deckSummaryInFlight.has(cacheKey)) return deckSummaryInFlight.get(cacheKey);
   const task = (async () => {
     const deckText = await getDeckText(uploadedPdfUrl);
@@ -463,7 +463,7 @@ app.get('/api/lesson-summary', async (request, response) => {
   if (lessonId !== 'ai-foundations' && !uploadedPdfUrl) return response.status(404).json({ error: 'Bài học này chưa có tệp slide để tóm tắt.' });
   if (!client) return response.status(503).json({ error: `Máy chủ chưa được cấu hình ${provider === 'groq' ? 'GROQ_API_KEY' : 'OPENAI_API_KEY'}.` });
   try {
-    response.json(await getCachedDeckSummary(lessonId, uploadedPdfUrl, createRequestDatabase(request)));
+    response.json(await getCachedDeckSummary(lessonId, uploadedPdfUrl, createRequestDatabase(request), request.query?.force === 'true'));
   } catch (error) {
     console.error('Lesson summary failed:', error instanceof Error ? error.message : 'Unknown error');
     response.status(502).json({ error: 'AI chưa thể tạo bản tóm tắt bài học lúc này.' });

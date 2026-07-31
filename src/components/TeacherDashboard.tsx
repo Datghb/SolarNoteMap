@@ -8,6 +8,7 @@ import {
   type TeacherLessonInput,
 } from "../utils/courseStore";
 import type { CloudClassroom, CloudCourse } from "../utils/cloudClassroom";
+import { toFutureReleaseIso } from "../utils/lessonSchedule";
 
 const EVENT_LABELS: Record<StudentActivity["type"], string> = {
   lesson_opened: "Mở bài học",
@@ -49,6 +50,8 @@ export function TeacherDashboard({
   onCreateCourse,
   onCreateClass,
   onCreateLesson,
+  onUpdateLesson,
+  onDeleteLesson,
   onTogglePublish,
   onScheduleLesson,
   onRefreshActivities,
@@ -71,6 +74,8 @@ export function TeacherDashboard({
     description: string,
   ) => Promise<{ classId: string; joinCode: string }>;
   onCreateLesson: (lesson: TeacherLesson, pdf?: File) => void | Promise<void>;
+  onUpdateLesson: (lessonId: string, input: TeacherLessonInput, pdf?: File) => void | Promise<void>;
+  onDeleteLesson: (lessonId: string) => void | Promise<void>;
   onTogglePublish: (lessonId: string) => void | Promise<void>;
   onScheduleLesson: (
     lessonId: string,
@@ -84,6 +89,7 @@ export function TeacherDashboard({
     "overview" | "lessons" | "classes" | "students"
   >("overview");
   const [showCreator, setShowCreator] = useState(false);
+  const [editingLesson, setEditingLesson] = useState<TeacherLesson | null>(null);
   const [form, setForm] = useState<TeacherLessonInput>({
     name: "",
     description: "",
@@ -106,6 +112,10 @@ export function TeacherDashboard({
   const [scheduleDrafts, setScheduleDrafts] = useState<Record<string, string>>(
     {},
   );
+  const [schedulingLesson, setSchedulingLesson] = useState<TeacherLesson | null>(null);
+  const [deletingLesson, setDeletingLesson] = useState<TeacherLesson | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const metrics = summarizeClassroom(activities);
   const students = useMemo(
     () =>
@@ -129,9 +139,11 @@ export function TeacherDashboard({
   const submitLesson = async () => {
     setSavingLesson(true);
     try {
-      await onCreateLesson(createTeacherLesson(form), pdfFile);
+      if (editingLesson) await onUpdateLesson(editingLesson.id, form, pdfFile);
+      else await onCreateLesson(createTeacherLesson(form), pdfFile);
       setForm({ name: "", description: "" });
       setPdfFile(undefined);
+      setEditingLesson(null);
       setFormError("");
       setShowCreator(false);
       setView("lessons");
@@ -143,6 +155,42 @@ export function TeacherDashboard({
       );
     } finally {
       setSavingLesson(false);
+    }
+  };
+
+  const openLessonCreator = () => {
+    setEditingLesson(null);
+    setForm({ name: "", description: "" });
+    setPdfFile(undefined);
+    setFormError("");
+    setShowCreator(true);
+  };
+
+  const openLessonEditor = (lesson: TeacherLesson) => {
+    setEditingLesson(lesson);
+    setForm({ name: lesson.name, description: lesson.description, pdfName: lesson.pdfName });
+    setPdfFile(undefined);
+    setFormError("");
+    setShowCreator(true);
+  };
+
+  const closeLessonCreator = () => {
+    if (savingLesson) return;
+    setShowCreator(false);
+    setEditingLesson(null);
+  };
+
+  const confirmDeleteLesson = async () => {
+    if (!deletingLesson) return;
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      await onDeleteLesson(deletingLesson.id);
+      setDeletingLesson(null);
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : "Không thể xoá bài giảng.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -168,7 +216,8 @@ export function TeacherDashboard({
     setPublishingId(lessonId);
     setActionError("");
     try {
-      await onScheduleLesson(lessonId, releaseAt);
+      await onScheduleLesson(lessonId, toFutureReleaseIso(releaseAt));
+      setSchedulingLesson(null);
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Không thể đặt lịch bài giảng.");
     } finally {
@@ -336,7 +385,7 @@ export function TeacherDashboard({
           {activeCourseId && (
             <button
               className="teacher-create"
-              onClick={() => setShowCreator(true)}
+              onClick={openLessonCreator}
             >
               ＋ Thêm bài giảng chung
             </button>
@@ -469,7 +518,7 @@ export function TeacherDashboard({
                 {activeCourseId && (
                   <button
                     className="teacher-create inline"
-                    onClick={() => setShowCreator(true)}
+                    onClick={openLessonCreator}
                   >
                     ＋ Thêm bài giảng
                   </button>
@@ -510,19 +559,34 @@ export function TeacherDashboard({
                           ).length
                         }
                       </span>
-                      {custom && hasActiveClass ? (
-                        <button
-                          disabled={publishingId === custom.id}
-                          onClick={() => void togglePublish(custom.id)}
-                        >
-                          {publishingId === custom.id
-                            ? "Đang lưu…"
-                            : custom.published
-                              ? "Khóa với lớp này"
-                              : custom.availableAt
-                                ? "Hủy lịch"
-                                : "Mở cho lớp này"}
-                        </button>
+                      {custom ? (
+                        <div className="lesson-actions">
+                          <button onClick={() => openLessonEditor(custom)}>Chỉnh sửa</button>
+                          <button className="danger" onClick={() => {
+                            setDeleteError("");
+                            setDeletingLesson(custom);
+                          }}>Xoá</button>
+                          {hasActiveClass && <button onClick={() => {
+                            setActionError("");
+                            setScheduleDrafts((current) => ({
+                              ...current,
+                              [custom.id]: current[custom.id] ?? toDateTimeLocalValue(custom.availableAt),
+                            }));
+                            setSchedulingLesson(custom);
+                          }}>Hẹn mở</button>}
+                          {hasActiveClass && <button
+                            disabled={publishingId === custom.id}
+                            onClick={() => void togglePublish(custom.id)}
+                          >
+                            {publishingId === custom.id
+                              ? "Đang lưu…"
+                              : custom.published
+                                ? "Khóa với lớp này"
+                                : custom.availableAt
+                                  ? "Hủy lịch"
+                                  : "Mở cho lớp này"}
+                          </button>}
+                        </div>
                       ) : (
                         <small>Chọn lớp để đặt lịch</small>
                       )}
@@ -537,19 +601,6 @@ export function TeacherDashboard({
               </div>
             </section>
           )}
-
-        {view === "lessons" && hasActiveClass && lessons.length > 0 && (
-          <section className="teacher-panel schedule-panel">
-            <header><div><span>Lịch mở bài riêng của lớp</span><small>Chọn ngày giờ cho lớp đang xem</small></div></header>
-            {lessons.map((lesson) => (
-              <div className="schedule-row" key={lesson.id}>
-                <b>{lesson.name}</b>
-                <input aria-label={`Lịch mở ${lesson.name}`} type="datetime-local" value={scheduleDrafts[lesson.id] ?? toDateTimeLocalValue(lesson.availableAt)} onChange={(event) => setScheduleDrafts((current) => ({ ...current, [lesson.id]: event.target.value }))} />
-                <button disabled={!scheduleDrafts[lesson.id] || publishingId === lesson.id} onClick={() => void scheduleRelease(lesson.id)}>{publishingId === lesson.id ? "Đang lưu…" : "Đặt lịch"}</button>
-              </div>
-            ))}
-          </section>
-        )}
 
         {view === "classes" && (
             <section className="teacher-list-page">
@@ -791,16 +842,16 @@ export function TeacherDashboard({
         <div
           className="lesson-creator-backdrop"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setShowCreator(false);
+            if (event.target === event.currentTarget) closeLessonCreator();
           }}
         >
           <section className="lesson-creator">
             <header>
               <div>
-                <span>＋ BÀI GIẢNG MỚI</span>
-                <h2>Thêm nội dung cho lớp</h2>
+                <span>{editingLesson ? "✎ CHỈNH SỬA BÀI GIẢNG" : "＋ BÀI GIẢNG MỚI"}</span>
+                <h2>{editingLesson ? "Cập nhật nội dung bài học" : "Thêm nội dung cho lớp"}</h2>
               </div>
-              <button onClick={() => setShowCreator(false)}>×</button>
+              <button onClick={closeLessonCreator}>×</button>
             </header>
             <label>
               Tên bài giảng
@@ -831,7 +882,7 @@ export function TeacherDashboard({
               />
             </label>
             <label className="lesson-file">
-              Tài liệu PDF <em>· Bắt buộc</em>
+              Tài liệu PDF <em>{editingLesson ? "· Chọn tệp mới nếu muốn thay thế" : "· Bắt buộc"}</em>
               <input
                 type="file"
                 accept="application/pdf"
@@ -841,17 +892,86 @@ export function TeacherDashboard({
                   setForm((current) => ({ ...current, pdfName: file?.name }));
                 }}
               />
-              <span>{form.pdfName || "Chọn tệp PDF để AI phân tích nội dung"}</span>
+              <span>{form.pdfName || (editingLesson ? "Giữ nguyên PDF hiện tại" : "Chọn tệp PDF từ máy")}</span>
             </label>
             {formError && <p className="creator-error">{formError}</p>}
             <footer>
-              <button onClick={() => setShowCreator(false)}>Hủy</button>
+              <button onClick={closeLessonCreator}>Hủy</button>
               <button
                 className="primary"
-                disabled={savingLesson || !form.name.trim() || !pdfFile}
+                disabled={savingLesson || !form.name.trim() || (!editingLesson && !pdfFile)}
                 onClick={submitLesson}
               >
-                {savingLesson ? "AI đang phân tích…" : "Tạo bài & tóm tắt"}
+                {savingLesson
+                  ? "Đang lưu…"
+                  : editingLesson ? "Lưu thay đổi" : "Thêm bài giảng"}
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
+
+      {schedulingLesson && (
+        <div
+          className="lesson-creator-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !publishingId) setSchedulingLesson(null);
+          }}
+        >
+          <section className="lesson-creator lesson-schedule-dialog">
+            <header>
+              <div>
+                <span>◷ HẸN GIỜ MỞ BÀI</span>
+                <h2>{schedulingLesson.name}</h2>
+              </div>
+              <button disabled={Boolean(publishingId)} onClick={() => setSchedulingLesson(null)}>×</button>
+            </header>
+            <p>Học sinh sẽ tự động nhìn thấy bài giảng khi đến thời gian đã chọn.</p>
+            <label>
+              Ngày giờ mở bài
+              <input
+                type="datetime-local"
+                min={toDateTimeLocalValue(new Date(Date.now() + 60_000).toISOString())}
+                value={scheduleDrafts[schedulingLesson.id] ?? ""}
+                onChange={(event) => setScheduleDrafts((current) => ({ ...current, [schedulingLesson.id]: event.target.value }))}
+              />
+            </label>
+            {actionError && <p className="creator-error">{actionError}</p>}
+            <footer>
+              <button disabled={Boolean(publishingId)} onClick={() => setSchedulingLesson(null)}>Hủy</button>
+              <button
+                className="primary"
+                disabled={!scheduleDrafts[schedulingLesson.id] || publishingId === schedulingLesson.id}
+                onClick={() => void scheduleRelease(schedulingLesson.id)}
+              >
+                {publishingId === schedulingLesson.id ? "Đang lưu…" : "Xác nhận hẹn giờ"}
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
+
+      {deletingLesson && (
+        <div
+          className="lesson-creator-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !deleting) setDeletingLesson(null);
+          }}
+        >
+          <section className="lesson-creator lesson-delete-dialog">
+            <header>
+              <div>
+                <span>XOÁ BÀI GIẢNG</span>
+                <h2>Bạn chắc chắn muốn xoá?</h2>
+              </div>
+              <button disabled={deleting} onClick={() => setDeletingLesson(null)}>×</button>
+            </header>
+            <p><b>{deletingLesson.name}</b> sẽ bị xoá khỏi chương trình và tất cả lớp đang sử dụng bài này. Ghi chú, sơ đồ và hoạt động liên quan cũng không thể khôi phục.</p>
+            {deleteError && <p className="creator-error">{deleteError}</p>}
+            <footer>
+              <button disabled={deleting} onClick={() => setDeletingLesson(null)}>Giữ lại</button>
+              <button className="danger-confirm" disabled={deleting} onClick={() => void confirmDeleteLesson()}>
+                {deleting ? "Đang xoá…" : "Xoá vĩnh viễn"}
               </button>
             </footer>
           </section>
