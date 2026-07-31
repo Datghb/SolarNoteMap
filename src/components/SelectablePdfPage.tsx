@@ -3,6 +3,7 @@ import { GlobalWorkerOptions, getDocument, type PDFDocumentProxy } from 'pdfjs-d
 import { TextLayerBuilder } from 'pdfjs-dist/legacy/web/pdf_viewer.mjs';
 import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 import 'pdfjs-dist/legacy/web/pdf_viewer.css';
+import { getSafePdfErrorMessage, isExpiredPdfAccessError } from '../utils/pdfAccess';
 
 GlobalWorkerOptions.workerSrc = workerUrl;
 export const builtInSlidePdfUrl = new URL('../../day01-llm-foundation.pdf', import.meta.url).href;
@@ -25,13 +26,14 @@ function loadSlides(pdfUrl: string) {
   return promise;
 }
 
-export function SelectablePdfPage({ pageNumber, pdfUrl, onDocumentLoad }: { pageNumber: number; pdfUrl: string; onDocumentLoad?: (pageCount: number) => void }) {
+export function SelectablePdfPage({ pageNumber, pdfUrl, onDocumentLoad, onPdfAccessError }: { pageNumber: number; pdfUrl: string; onDocumentLoad?: (pageCount: number) => void; onPdfAccessError?: () => Promise<void> }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState('');
   const [retryToken, setRetryToken] = useState(0);
   const onDocumentLoadRef = useRef(onDocumentLoad);
+  const refreshAttemptedUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     onDocumentLoadRef.current = onDocumentLoad;
@@ -73,7 +75,16 @@ export function SelectablePdfPage({ pageNumber, pdfUrl, onDocumentLoad }: { page
       } catch (renderError) {
         if (!cancelled && currentGeneration === generation && !(renderError instanceof Error && renderError.name === 'RenderingCancelledException')) {
           console.error('PDF slide rendering failed:', renderError);
-          setError(renderError instanceof Error ? renderError.message : 'Không thể hiển thị nội dung slide.');
+          if (isExpiredPdfAccessError(renderError) && onPdfAccessError && refreshAttemptedUrlRef.current !== pdfUrl) {
+            refreshAttemptedUrlRef.current = pdfUrl;
+            try {
+              await onPdfAccessError();
+              return;
+            } catch (refreshError) {
+              console.error('PDF URL refresh failed:', refreshError);
+            }
+          }
+          setError(getSafePdfErrorMessage(renderError));
         }
       }
     };
@@ -106,6 +117,6 @@ export function SelectablePdfPage({ pageNumber, pdfUrl, onDocumentLoad }: { page
 
   return <div ref={hostRef} className="selectable-pdf-page">
     <div className="pdf-page-surface"><canvas ref={canvasRef} /><div ref={textRef} className="pdf-text-host" /></div>
-    {error && <div className="pdf-render-error"><b>Không thể hiển thị nội dung slide</b><small>{error}</small><button onClick={() => setRetryToken((value) => value + 1)}>Thử lại</button></div>}
+    {error && <div className="pdf-render-error"><b>Không thể hiển thị nội dung slide</b><small>{error}</small><button onClick={() => { refreshAttemptedUrlRef.current = null; setRetryToken((value) => value + 1); }}>Thử lại</button></div>}
   </div>;
 }

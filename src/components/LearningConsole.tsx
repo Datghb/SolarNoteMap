@@ -16,7 +16,7 @@ import { loadCloudLearningState } from '../utils/cloudClassroom';
 
 const EMPTY_MAP: KnowledgeMap = { nodes: [], edges: [] };
 
-export function LearningConsole({ lesson, classId, onClose }: { lesson: Lesson; classId: string; onClose: () => void }) {
+export function LearningConsole({ lesson, classId, onClose, onRefreshPdf }: { lesson: Lesson; classId: string; onClose: () => void; onRefreshPdf: () => Promise<void> }) {
   const [tab, setTab] = useState<'brief' | 'summary' | 'map' | 'community'>('brief');
   const [map, setMap] = useState<KnowledgeMap>(EMPTY_MAP);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -251,7 +251,6 @@ export function LearningConsole({ lesson, classId, onClose }: { lesson: Lesson; 
     <aside className={`learning-console ${tab === 'brief' ? 'slide-open' : ''} ${tab === 'summary' ? 'summary-open' : ''} ${tab === 'map' ? 'map-open' : ''} ${tab === 'community' ? 'community-open' : ''}`} style={{ '--lesson-color': lesson.color } as React.CSSProperties}>
       <header className="console-header">
         <div>
-          <span className="eyebrow">{lesson.subtitle}</span>
           <h2>{lesson.name}</h2>
         </div>
         <button className="icon-button" onClick={onClose} aria-label="Đóng">×</button>
@@ -272,6 +271,7 @@ export function LearningConsole({ lesson, classId, onClose }: { lesson: Lesson; 
             pdfUrl={lesson.pdfUrl ?? builtInSlidePdfUrl}
             onDocumentLoad={(pageCount) => { setPdfPageCount(pageCount); setPdfLoadedLessonId(lesson.id); }}
             useBundledPdfContext={lesson.id === 'ai-foundations'}
+            onPdfAccessError={onRefreshPdf}
             note={slideNotes[slides[slideIndex].id] ?? ''}
             map={map}
             accent={lesson.color}

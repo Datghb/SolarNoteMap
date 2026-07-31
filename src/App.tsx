@@ -34,6 +34,7 @@ import {
   loadMyClasses,
   loadMyCourses,
   loadOwnedClasses,
+  refreshCloudLessonPdfUrl,
   setCloudLessonPublished,
   setCloudLessonRelease,
   type CloudClassroom,
@@ -41,6 +42,7 @@ import {
 } from "./utils/cloudClassroom";
 import { getVisibleLessons } from "./utils/lessonVisibility";
 import { fetchLessonSummary } from "./utils/lessonSummary";
+import { getLessonSessionKey, resolveRestoredLessonId } from "./utils/lessonSession";
 
 export function App() {
   const auth = useAuth();
@@ -57,6 +59,7 @@ export function App() {
   const [courses, setCourses] = useState<CloudCourse[]>([]);
   const [cloudLoading, setCloudLoading] = useState(true);
   const [cloudError, setCloudError] = useState("");
+  const [loadedLessonsClassId, setLoadedLessonsClassId] = useState<string | null>(null);
   const lessons = getVisibleLessons(customLessons, auth.profile?.role);
   const publishedLessonCount = customLessons.filter(
     (lesson) => lesson.published,
@@ -118,6 +121,7 @@ export function App() {
 
   useEffect(() => {
     setActiveCloudClass(activeClassId);
+    setLoadedLessonsClassId(null);
     if (!activeClassId) {
       setActivities([]);
       if (auth.profile?.role === "teacher" && activeCourseId) {
@@ -141,6 +145,7 @@ export function App() {
         if (!active) return;
         setCustomLessons(lessonRows as TeacherLesson[]);
         setActivities(activityRows);
+        setLoadedLessonsClassId(activeClassId);
       })
       .catch((error) => {
         if (active)
@@ -181,17 +186,46 @@ export function App() {
       window.removeEventListener("solar-note-map:saved", readSavedMaps);
   }, [activeClassId, customLessons]);
 
+  useEffect(() => {
+    if (!activeClassId || cloudLoading || loadedLessonsClassId !== activeClassId) return;
+    const storageKey = getLessonSessionKey(activeClassId);
+    const restoredLessonId = resolveRestoredLessonId(
+      selectedLessonId,
+      localStorage.getItem(storageKey),
+      lessons.map((lesson) => lesson.id),
+    );
+    if (restoredLessonId !== selectedLessonId) {
+      setSelectedLessonId(restoredLessonId);
+    }
+    if (restoredLessonId) localStorage.setItem(storageKey, restoredLessonId);
+    else localStorage.removeItem(storageKey);
+  }, [activeClassId, auth.profile?.role, cloudLoading, customLessons, loadedLessonsClassId, selectedLessonId]);
+
   const selectByPlanetName = (shortName: string) => {
     const lesson = lessons.find((item) => item.shortName === shortName);
     if (lesson) {
       setSelectedLessonId(lesson.id);
+      if (activeClassId) localStorage.setItem(getLessonSessionKey(activeClassId), lesson.id);
       recordStudentActivity({ lessonId: lesson.id, type: "lesson_opened" });
     }
   };
 
   const openLesson = (lessonId: string) => {
     setSelectedLessonId(lessonId);
+    if (activeClassId) localStorage.setItem(getLessonSessionKey(activeClassId), lessonId);
     recordStudentActivity({ lessonId, type: "lesson_opened" });
+  };
+
+  const closeLesson = () => {
+    setSelectedLessonId(null);
+    if (activeClassId) localStorage.removeItem(getLessonSessionKey(activeClassId));
+  };
+
+  const refreshLessonPdf = async (lessonId: string) => {
+    const pdfUrl = await refreshCloudLessonPdfUrl(lessonId);
+    setCustomLessons((current) => current.map((lesson) =>
+      lesson.id === lessonId ? { ...lesson, pdfUrl } : lesson,
+    ));
   };
 
   const createLesson = async (lesson: TeacherLesson, pdf?: File) => {
@@ -527,7 +561,7 @@ export function App() {
       </div>
 
       <header className="top-bar">
-        <button className="brand" onClick={() => setSelectedLessonId(null)}>
+        <button className="brand" onClick={closeLesson}>
           <img className="brand-mark" src="/share-icon.svg" alt="" />
           <span>
             Solar Note Map<small>AI Learning Universe</small>
@@ -689,7 +723,8 @@ export function App() {
         <LearningConsole
           lesson={selectedLesson}
           classId={activeClassId}
-          onClose={() => setSelectedLessonId(null)}
+          onRefreshPdf={() => refreshLessonPdf(selectedLesson.id)}
+          onClose={closeLesson}
         />
       )}
     </main>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Lesson } from '../data/lessons';
 import { askLessonSummaryAI, fetchLessonSummary, type SummaryChatMessage } from '../utils/lessonSummary';
+import { loadSummaryChat, saveSummaryChat } from '../utils/summaryChatStore';
 
 function renderSummary(summary: string) {
   const cleanInline = (value: string) => value.replace(/\*\*/g, '');
@@ -18,26 +19,38 @@ function renderSummary(summary: string) {
 }
 
 export function LessonSummary({ lesson }: { lesson: Lesson }) {
-  const [summary, setSummary] = useState('');
+  const [summary, setSummary] = useState(lesson.summary ?? '');
   const [source, setSource] = useState<'cache' | 'generated' | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!lesson.summary);
   const [error, setError] = useState('');
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState<SummaryChatMessage[]>([]);
   const [asking, setAsking] = useState(false);
   const messagesRef = useRef<HTMLDivElement>(null);
   const chatControllerRef = useRef<AbortController | null>(null);
+  const chatSaveChainRef = useRef(Promise.resolve());
+
+  const persistMessages = (lessonId: string, nextMessages: SummaryChatMessage[]) => {
+    chatSaveChainRef.current = chatSaveChainRef.current
+      .catch(() => undefined)
+      .then(() => saveSummaryChat(lessonId, nextMessages))
+      .catch((reason) => console.error('Không đồng bộ được lịch sử hỏi đáp:', reason));
+  };
 
   useEffect(() => {
     let active = true;
     chatControllerRef.current?.abort();
-    setSummary('');
-    setSource(null);
+    setSummary(lesson.summary ?? '');
+    setSource(lesson.summary ? 'cache' : null);
     setMessages([]);
     setQuestion('');
     setAsking(false);
-    setLoading(true);
+    setLoading(!lesson.summary);
     setError('');
+    loadSummaryChat(lesson.id).then((storedMessages) => {
+      if (active) setMessages(storedMessages);
+    }).catch((reason) => console.error('Không tải được lịch sử hỏi đáp:', reason));
+    if (lesson.summary) return () => { active = false; chatControllerRef.current?.abort(); };
     fetchLessonSummary(lesson.id, lesson.pdfUrl).then((result) => {
       if (!active) return;
       setSummary(result.summary);
@@ -46,7 +59,7 @@ export function LessonSummary({ lesson }: { lesson: Lesson }) {
       if (active) setError(reason instanceof Error ? reason.message : 'Không thể tạo bản tóm tắt.');
     }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; chatControllerRef.current?.abort(); };
-  }, [lesson.id, lesson.pdfUrl]);
+  }, [lesson.id, lesson.pdfUrl, lesson.summary]);
 
   useEffect(() => {
     const container = messagesRef.current;
@@ -58,6 +71,7 @@ export function LessonSummary({ lesson }: { lesson: Lesson }) {
     if (!content || asking || !summary) return;
     const nextMessages = [...messages, { role: 'user' as const, content }];
     setMessages(nextMessages);
+    persistMessages(lesson.id, nextMessages);
     setQuestion('');
     setAsking(true);
     setError('');
@@ -66,7 +80,9 @@ export function LessonSummary({ lesson }: { lesson: Lesson }) {
     try {
       const answer = await askLessonSummaryAI(lesson.id, content, messages, controller.signal, lesson.pdfUrl, summary);
       if (controller.signal.aborted) return;
-      setMessages((current) => [...current, { role: 'assistant', content: answer }]);
+      const completedMessages = [...nextMessages, { role: 'assistant' as const, content: answer }];
+      setMessages(completedMessages);
+      persistMessages(lesson.id, completedMessages);
     } catch (reason) {
       if (controller.signal.aborted) return;
       setError(reason instanceof Error ? reason.message : 'AI chưa thể trả lời lúc này.');

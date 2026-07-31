@@ -25,6 +25,7 @@ export function PdfSlideWorkspace({
   onUnderstandingChange,
   onDocumentLoad,
   useBundledPdfContext,
+  onPdfAccessError,
 }: {
   page: number;
   pageCount: number;
@@ -41,6 +42,7 @@ export function PdfSlideWorkspace({
   onUnderstandingChange: (status: 'understood' | 'question' | 'unmarked') => void;
   onDocumentLoad?: (pageCount: number) => void;
   useBundledPdfContext: boolean;
+  onPdfAccessError?: () => Promise<void>;
 }) {
   const [interactionMode, setInteractionMode] = useState<InteractionMode>(null);
   const [anchor, setAnchor] = useState<SlideAnchor | null>(null);
@@ -217,7 +219,7 @@ export function PdfSlideWorkspace({
       </header>
 
       <div className="pdf-stage" onWheel={handleSlideWheel}>
-        <SelectablePdfPage pageNumber={page} pdfUrl={pdfUrl} onDocumentLoad={onDocumentLoad} />
+        <SelectablePdfPage pageNumber={page} pdfUrl={pdfUrl} onDocumentLoad={onDocumentLoad} onPdfAccessError={onPdfAccessError} />
         {interactionMode === 'region' && <div className="region-select-layer region" onPointerDown={beginRegion} onPointerMove={updateRegion} onPointerUp={finishRegion}>
           {!regionDraft && !pendingRegion && <span>Kéo một khung quanh nội dung muốn hỏi AI</span>}
           {regionDraft && <i className="slide-region-box draft" style={{ left: `${regionDraft.x}%`, top: `${regionDraft.y}%`, width: `${regionDraft.width}%`, height: `${regionDraft.height}%` }} />}
