@@ -2,9 +2,10 @@ export type SummaryChatRole = 'user' | 'assistant';
 export interface SummaryChatMessage { role: SummaryChatRole; content: string }
 export interface LessonSummaryResult { summary: string; source: 'cache' | 'generated' }
 
-export async function fetchLessonSummary(lessonId: string, pdfUrl?: string): Promise<LessonSummaryResult> {
+export async function fetchLessonSummary(lessonId: string, pdfUrl?: string, force = false): Promise<LessonSummaryResult> {
   const query = new URLSearchParams({ lessonId });
   if (pdfUrl) query.set('pdfUrl', pdfUrl);
+  if (force) query.set('force', 'true');
   return fetch(`/api/lesson-summary?${query.toString()}`, { headers: await getSupabaseAuthHeaders() })
     .then(async (response) => {
       const payload = await response.json().catch(() => ({}));

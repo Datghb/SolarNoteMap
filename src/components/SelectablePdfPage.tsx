@@ -3,7 +3,7 @@ import { GlobalWorkerOptions, getDocument, type PDFDocumentProxy } from 'pdfjs-d
 import { TextLayerBuilder } from 'pdfjs-dist/legacy/web/pdf_viewer.mjs';
 import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 import 'pdfjs-dist/legacy/web/pdf_viewer.css';
-import { getSafePdfErrorMessage, isExpiredPdfAccessError } from '../utils/pdfAccess';
+import { getSafePdfErrorMessage, isExpiredPdfAccessError, isPdfPasswordError } from '../utils/pdfAccess';
 
 GlobalWorkerOptions.workerSrc = workerUrl;
 export const builtInSlidePdfUrl = new URL('../../day01-llm-foundation.pdf', import.meta.url).href;
@@ -71,10 +71,16 @@ export function SelectablePdfPage({ pageNumber, pdfUrl, onDocumentLoad, onPdfAcc
         renderTask = page.render({ canvasContext: context, viewport, transform: pixelRatio === 1 ? undefined : [pixelRatio, 0, 0, pixelRatio, 0, 0] });
         textLayer = new TextLayerBuilder({ pdfPage: page, onAppend: ((layer: HTMLDivElement) => textHost.append(layer)) as never });
         await Promise.all([renderTask.promise, textLayer.render(viewport)]);
-        if (!cancelled && currentGeneration === generation) setError('');
+        if (!cancelled && currentGeneration === generation) {
+          setError('');
+        }
       } catch (renderError) {
         if (!cancelled && currentGeneration === generation && !(renderError instanceof Error && renderError.name === 'RenderingCancelledException')) {
           console.error('PDF slide rendering failed:', renderError);
+          if (isPdfPasswordError(renderError)) {
+            setError('PDF này có mật khẩu. Giáo viên cần thay bằng bản PDF không đặt mật khẩu.');
+            return;
+          }
           if (isExpiredPdfAccessError(renderError) && onPdfAccessError && refreshAttemptedUrlRef.current !== pdfUrl) {
             refreshAttemptedUrlRef.current = pdfUrl;
             try {
