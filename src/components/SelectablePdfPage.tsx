@@ -11,12 +11,12 @@ const documentPromises = new Map<string, Promise<PDFDocumentProxy>>();
 function loadSlides(pdfUrl: string) {
   const cached = documentPromises.get(pdfUrl);
   if (cached) return cached;
-  const promise = fetch(pdfUrl)
-    .then((response) => {
-      if (!response.ok) throw new Error(`Không tải được PDF (${response.status}).`);
-      return response.arrayBuffer();
-    })
-    .then((buffer) => getDocument({ data: new Uint8Array(buffer) }).promise)
+  const promise = getDocument({
+    url: pdfUrl,
+    disableAutoFetch: false,
+    disableStream: false,
+    disableRange: false,
+  }).promise
     .catch((error) => {
       documentPromises.delete(pdfUrl);
       throw error;
