@@ -142,6 +142,23 @@ export async function loadCourseLessons(courseId: string): Promise<Lesson[]> {
   return mapLessonRows(client, data ?? []);
 }
 
+export async function refreshCloudLessonPdfUrl(lessonId: string) {
+  const client = requireSupabase();
+  const { data, error } = await client
+    .from('lessons')
+    .select('pdf_path')
+    .eq('id', lessonId)
+    .single();
+  if (error || !data?.pdf_path) throw asError(error, 'Không tìm thấy PDF của bài giảng.');
+  const signed = await client.storage
+    .from('lesson-pdfs')
+    .createSignedUrl(data.pdf_path, 3600);
+  if (signed.error || !signed.data?.signedUrl) {
+    throw asError(signed.error, 'Không thể làm mới liên kết PDF.');
+  }
+  return signed.data.signedUrl;
+}
+
 async function mapLessonRows(client: ReturnType<typeof requireSupabase>, rows: Record<string, any>[]) {
   const palettes = resolveLessonPalettes(rows.map((row) => ({
     id: row.id,
@@ -159,6 +176,8 @@ async function mapLessonRows(client: ReturnType<typeof requireSupabase>, rows: R
     description: row.description, color: palette.color,
     colors: palette.colors, published: isClassLessonReleased(row.published_at), availableAt: row.published_at ?? undefined, pdfName: row.pdf_path?.split('/').pop(),
     pdfPath: row.pdf_path ?? undefined, pdfUrl: signed.data?.signedUrl,
+    summary: typeof row.summary === 'string' && row.summary.trim() ? row.summary.trim() : undefined,
+    summarizedAt: row.summarized_at ?? undefined,
     createdAt: row.created_at, updatedAt: row.updated_at,
     };
   }));

@@ -13,6 +13,8 @@ export interface Lesson {
   availableAt?: string;
   createdAt?: string;
   updatedAt?: string;
+  summary?: string;
+  summarizedAt?: string;
 }
 
 export const LESSONS: Lesson[] = [
