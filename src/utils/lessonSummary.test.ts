@@ -28,6 +28,12 @@ describe('lesson summary API', () => {
     expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ lessonId: 'ai-foundations', question: 'Giải thích LLM', history: [{ role: 'assistant', content: 'Chào bạn' }] });
   });
 
+  it('sends the loaded summary as chat context', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ answer: 'Giải thích' }), { status: 200 }));
+    await askLessonSummaryAI('custom-lesson', 'Giải thích', [], undefined, undefined, 'Nội dung tóm tắt đã lưu');
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body)).summary).toBe('Nội dung tóm tắt đã lưu');
+  });
+
   it('rejects an empty summary question locally', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch');
     await expect(askLessonSummaryAI('ai-foundations', '   ', [])).rejects.toThrow('Câu hỏi phải có');

@@ -10,7 +10,6 @@ import { combineSlideNotes, restoreSlideThoughts, updateSlideNote } from '../uti
 import { CommunityQuestions } from './CommunityQuestions';
 import { PdfSlideWorkspace } from './PdfSlideWorkspace';
 import { LessonSummary } from './LessonSummary';
-import { fetchLessonSummary } from '../utils/lessonSummary';
 import { persistCloudMap, persistCloudNote, recordStudentActivity } from '../utils/courseStore';
 import { builtInSlidePdfUrl } from './SelectablePdfPage';
 import { loadCloudLearningState } from '../utils/cloudClassroom';
@@ -44,10 +43,6 @@ export function LearningConsole({ lesson, classId, onClose }: { lesson: Lesson; 
   const [pdfPageCount, setPdfPageCount] = useState(42);
   const [pdfLoadedLessonId, setPdfLoadedLessonId] = useState<string | null>(null);
   const slides = usesDay01Pdf ? getPdfPageSlides(pdfPageCount) : getLessonSlides(lesson.id, lesson.name);
-
-  useEffect(() => {
-    if (usesDay01Pdf) fetchLessonSummary(lesson.id, lesson.pdfUrl).catch(() => undefined);
-  }, [lesson.id, lesson.pdfUrl, usesDay01Pdf]);
 
   useEffect(() => {
     recordStudentActivity({ lessonId: lesson.id, slideId: slides[slideIndex]?.id, type: 'slide_viewed' });

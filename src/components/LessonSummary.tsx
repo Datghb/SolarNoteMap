@@ -64,7 +64,7 @@ export function LessonSummary({ lesson }: { lesson: Lesson }) {
     const controller = new AbortController();
     chatControllerRef.current = controller;
     try {
-      const answer = await askLessonSummaryAI(lesson.id, content, messages, controller.signal, lesson.pdfUrl);
+      const answer = await askLessonSummaryAI(lesson.id, content, messages, controller.signal, lesson.pdfUrl, summary);
       if (controller.signal.aborted) return;
       setMessages((current) => [...current, { role: 'assistant', content: answer }]);
     } catch (reason) {
