@@ -26,6 +26,7 @@ export function LessonSummary({ lesson }: { lesson: Lesson }) {
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState<SummaryChatMessage[]>([]);
   const [asking, setAsking] = useState(false);
+  const [summaryRetryToken, setSummaryRetryToken] = useState(0);
   const messagesRef = useRef<HTMLDivElement>(null);
   const chatControllerRef = useRef<AbortController | null>(null);
   const chatSaveChainRef = useRef(Promise.resolve());
@@ -59,7 +60,7 @@ export function LessonSummary({ lesson }: { lesson: Lesson }) {
       if (active) setError(reason instanceof Error ? reason.message : 'Không thể tạo bản tóm tắt.');
     }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; chatControllerRef.current?.abort(); };
-  }, [lesson.id, lesson.pdfUrl, lesson.summary]);
+  }, [lesson.id, lesson.pdfUrl, lesson.summary, summaryRetryToken]);
 
   useEffect(() => {
     const container = messagesRef.current;
@@ -95,7 +96,7 @@ export function LessonSummary({ lesson }: { lesson: Lesson }) {
     <div className="summary-document">
       <header><div><span>✦ Bản tóm tắt toàn bài</span><h3>{lesson.name}</h3></div><small>{loading ? 'AI đang đọc slide…' : source === 'cache' ? 'Đã lưu' : 'Vừa tạo bởi AI'}</small></header>
       {loading && <div className="summary-loading"><i /><b>AI đang tổng hợp toàn bộ slide</b><span>Kết quả sẽ được lưu để dùng cho những lần mở sau.</span></div>}
-      {!loading && error && !summary && <div className="summary-error"><b>Chưa thể tạo bản tóm tắt</b><span>{error}</span></div>}
+      {!loading && error && !summary && <div className="summary-error"><b>Chưa thể tải bản tóm tắt</b><span>{error}</span><button onClick={() => setSummaryRetryToken((value) => value + 1)}>Thử lại</button></div>}
       {summary && <div className="summary-copy">{renderSummary(summary)}</div>}
     </div>
     <aside className="summary-chat">

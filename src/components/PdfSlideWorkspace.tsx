@@ -3,6 +3,7 @@ import type { KnowledgeMap } from '../utils/smartMap';
 import { askSlideAI } from '../utils/slideAi';
 import { KnowledgeFlow } from './KnowledgeFlow';
 import { SelectablePdfPage } from './SelectablePdfPage';
+import { getPdfLessonLabel } from '../utils/lessonLabels';
 
 type Understanding = 'understood' | 'question' | null;
 type InteractionMode = 'region' | 'ask' | null;
@@ -26,6 +27,7 @@ export function PdfSlideWorkspace({
   onDocumentLoad,
   useBundledPdfContext,
   onPdfAccessError,
+  lessonName,
 }: {
   page: number;
   pageCount: number;
@@ -43,6 +45,7 @@ export function PdfSlideWorkspace({
   onDocumentLoad?: (pageCount: number) => void;
   useBundledPdfContext: boolean;
   onPdfAccessError?: () => Promise<void>;
+  lessonName: string;
 }) {
   const [interactionMode, setInteractionMode] = useState<InteractionMode>(null);
   const [anchor, setAnchor] = useState<SlideAnchor | null>(null);
@@ -213,7 +216,7 @@ export function PdfSlideWorkspace({
   return (
     <section className={`pdf-learning-workspace ${focusMode ? 'focus-mode' : ''}`}>
       <header className="pdf-toolbar">
-        <div><span className="live-indicator"><i /> Day 01 · PDF</span><b>AI &amp; LLM Foundation</b></div>
+        <div><span className="live-indicator"><i /> {getPdfLessonLabel(lessonName)}</span><b>{lessonName}</b></div>
         <div className="pdf-page-controls"><button disabled={page === 1} onClick={() => onPageChange(page - 1)}>←</button><span>Trang <b>{page}</b> / {pageCount}</span><button disabled={page === pageCount} onClick={() => onPageChange(page + 1)}>→</button></div>
         <div className="pdf-view-actions"><button onClick={() => setFocusMode((value) => !value)}>{focusMode ? 'Thu nhỏ' : '⛶ Xem lớn'}</button><button className={interactionMode === 'region' ? 'pin-mode active ai-mode' : 'pin-mode'} onClick={() => selectMode('region')}>▱ Chọn vùng hỏi AI</button></div>
       </header>

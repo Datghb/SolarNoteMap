@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { askLessonSummaryAI, fetchLessonSummary } from './lessonSummary';
+import { askLessonSummaryAI, fetchLessonSummary, queueLessonSummaryGeneration } from './lessonSummary';
 
 vi.mock('../lib/supabase', () => ({
   getSupabaseAuthHeaders: vi.fn().mockResolvedValue({ Authorization: 'Bearer test-access-token' }),
@@ -26,6 +26,12 @@ describe('lesson summary API', () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ summary: 'Bản mới', source: 'generated' }), { status: 200 }));
     await fetchLessonSummary('custom-lesson', 'https://school.supabase.co/storage/v1/object/sign/lesson.pdf', true);
     expect(String(fetchMock.mock.calls[0][0])).toContain('force=true');
+  });
+
+  it('queues summary generation without waiting for the AI result', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ queued: true }), { status: 202 }));
+    await queueLessonSummaryGeneration('lesson-9', 'https://school.supabase.co/storage/v1/object/sign/lesson.pdf');
+    expect(fetchMock).toHaveBeenCalledWith('/api/lesson-summary/generate', expect.objectContaining({ method: 'POST' }));
   });
 
   it('sends a bounded chat history with the question', async () => {

@@ -272,6 +272,7 @@ export function LearningConsole({ lesson, classId, onClose, onRefreshPdf }: { le
             onDocumentLoad={(pageCount) => { setPdfPageCount(pageCount); setPdfLoadedLessonId(lesson.id); }}
             useBundledPdfContext={lesson.id === 'ai-foundations'}
             onPdfAccessError={onRefreshPdf}
+            lessonName={lesson.name}
             note={slideNotes[slides[slideIndex].id] ?? ''}
             map={map}
             accent={lesson.color}

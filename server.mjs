@@ -24,9 +24,10 @@ const rootDirectory = path.dirname(fileURLToPath(import.meta.url));
 const pdfPath = path.join(rootDirectory, 'day01-llm-foundation.pdf');
 const summaryCacheDirectory = path.join(rootDirectory, '.solar-cache');
 const summaryCachePath = path.join(summaryCacheDirectory, 'slide-summaries.json');
-const lessonSummaryVersion = 'v2-detailed';
+const lessonSummaryVersion = 'v3-resilient';
 const summaryInFlight = new Map();
 const deckSummaryInFlight = new Map();
+const backgroundSummaryJobs = new Map();
 let pdfDocumentPromise;
 let slideSummaryCachePromise;
 let cacheWriteQueue = Promise.resolve();
@@ -161,14 +162,23 @@ async function getDeckDocument(uploadedPdfUrl) {
   }
   const result = await fetch(uploadedPdfUrl, { redirect: 'error' });
   if (!result.ok) throw new Error('Không thể tải PDF bài giảng.');
-  const contentType = result.headers.get('content-type') || '';
-  if (!contentType.toLowerCase().includes('application/pdf')) throw new Error('Tệp bài giảng không phải PDF.');
   const declaredSize = Number(result.headers.get('content-length') || 0);
   if (declaredSize > 50 * 1024 * 1024) throw new Error('PDF vượt quá giới hạn 50 MB.');
   const buffer = await result.arrayBuffer();
   if (buffer.byteLength > 50 * 1024 * 1024) throw new Error('PDF vượt quá giới hạn 50 MB.');
   if (new TextDecoder().decode(buffer.slice(0, 5)) !== '%PDF-') throw new Error('Tệp bài giảng không phải PDF hợp lệ.');
   return getDocument({ data: new Uint8Array(buffer) }).promise;
+}
+
+function createExtractedDeckSummary(deckText) {
+  const pages = [...deckText.matchAll(/\[Trang (\d+)\]\n([\s\S]*?)(?=\n\n\[Trang \d+\]|$)/g)]
+    .map((match) => ({ page: Number(match[1]), text: match[2].trim() }))
+    .filter((page) => page.text);
+  if (!pages.length) throw new Error('Không đọc được nội dung chữ trong bài giảng.');
+
+  const opening = pages.slice(0, 3).map((page) => page.text).join(' ');
+  const topics = pages.map((page) => `### Trang ${page.page}\n${page.text}`).join('\n\n');
+  return `## Tổng quan bài học\n${opening}\n\n## Nội dung theo từng slide\n\n${topics}\n\n## Checklist ghi nhớ\n- Xem lại các khái niệm, quy trình và ví dụ quan trọng ở từng trang.\n- Đối chiếu các thuật ngữ liên quan và ghi lại phần cần hỏi thêm.\n- Thực hành lại những bước hoặc bài tập được nêu trong slide.`.slice(0, 15_000);
 }
 
 async function createDeckSummary(deckText) {
@@ -238,14 +248,23 @@ async function getCachedDeckSummary(lessonId, uploadedPdfUrl, database, force = 
   const task = (async () => {
     const deckText = await getDeckText(uploadedPdfUrl);
     if (!deckText) throw new Error('Không đọc được nội dung bài giảng.');
-    const summary = await createDeckSummary(deckText);
-    await persistSummaryEntry(cacheKey, { summary, lessonId, model, provider, createdAt: new Date().toISOString() });
+    let summary;
+    let summaryModel = `${provider}:${model}`;
+    try {
+      if (!client) throw new Error('AI provider is not configured.');
+      summary = await createDeckSummary(deckText);
+    } catch (error) {
+      console.error('AI lesson summary generation failed; persisting extracted summary:', error instanceof Error ? error.message : 'Unknown error');
+      summary = createExtractedDeckSummary(deckText);
+      summaryModel = 'extractive-fallback:v1';
+    }
+    await persistSummaryEntry(cacheKey, { summary, lessonId, model: summaryModel, provider, createdAt: new Date().toISOString() });
     if (database && lessonRow) {
       const persisted = await database
         .from('lessons')
         .update({
           summary,
-          summary_model: `${provider}:${model}`,
+          summary_model: summaryModel,
           summary_pdf_path: lessonRow.pdf_path,
           summarized_at: new Date().toISOString(),
         })
@@ -258,6 +277,22 @@ async function getCachedDeckSummary(lessonId, uploadedPdfUrl, database, force = 
   })().finally(() => deckSummaryInFlight.delete(cacheKey));
   deckSummaryInFlight.set(cacheKey, task);
   return task;
+}
+
+function startBackgroundSummaryJob(lessonId, uploadedPdfUrl, database, force) {
+  if (backgroundSummaryJobs.has(lessonId)) return;
+  const job = (async () => {
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        await getCachedDeckSummary(lessonId, uploadedPdfUrl, database, force);
+        return;
+      } catch (error) {
+        console.error(`Background lesson summary attempt ${attempt} failed:`, error instanceof Error ? error.message : 'Unknown error');
+        if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, attempt * 2_000));
+      }
+    }
+  })().finally(() => backgroundSummaryJobs.delete(lessonId));
+  backgroundSummaryJobs.set(lessonId, job);
 }
 
 app.disable('x-powered-by');
@@ -451,6 +486,20 @@ app.post('/api/slide-question', async (request, response) => {
   }
 });
 
+app.post('/api/lesson-summary/generate', (request, response) => {
+  const lessonId = typeof request.body?.lessonId === 'string' ? request.body.lessonId.trim() : '';
+  if (!/^[a-z0-9-]{2,64}$/.test(lessonId)) return response.status(400).json({ error: 'Bài học không hợp lệ.' });
+  let uploadedPdfUrl = null;
+  try {
+    uploadedPdfUrl = validateUploadedPdfUrl(typeof request.body?.pdfUrl === 'string' ? request.body.pdfUrl : '');
+  } catch {
+    return response.status(400).json({ error: 'Nguồn PDF không hợp lệ.' });
+  }
+  if (!uploadedPdfUrl) return response.status(400).json({ error: 'Bài học chưa có PDF để tóm tắt.' });
+  startBackgroundSummaryJob(lessonId, uploadedPdfUrl, createRequestDatabase(request), request.body?.force === true);
+  return response.status(202).json({ queued: true });
+});
+
 app.get('/api/lesson-summary', async (request, response) => {
   const lessonId = typeof request.query?.lessonId === 'string' ? request.query.lessonId.trim() : '';
   if (!/^[a-z0-9-]{2,64}$/.test(lessonId)) return response.status(400).json({ error: 'Bài học không hợp lệ.' });
@@ -461,7 +510,6 @@ app.get('/api/lesson-summary', async (request, response) => {
     return response.status(400).json({ error: 'Nguồn PDF không hợp lệ.' });
   }
   if (lessonId !== 'ai-foundations' && !uploadedPdfUrl) return response.status(404).json({ error: 'Bài học này chưa có tệp slide để tóm tắt.' });
-  if (!client) return response.status(503).json({ error: `Máy chủ chưa được cấu hình ${provider === 'groq' ? 'GROQ_API_KEY' : 'OPENAI_API_KEY'}.` });
   try {
     response.json(await getCachedDeckSummary(lessonId, uploadedPdfUrl, createRequestDatabase(request), request.query?.force === 'true'));
   } catch (error) {

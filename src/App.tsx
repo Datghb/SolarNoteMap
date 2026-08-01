@@ -1,6 +1,6 @@
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Stars } from "@react-three/drei";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { SolarSystem } from "./components/SolarSystem";
 import {
@@ -44,7 +44,7 @@ import {
   type CloudCourse,
 } from "./utils/cloudClassroom";
 import { getVisibleLessons } from "./utils/lessonVisibility";
-import { fetchLessonSummary } from "./utils/lessonSummary";
+import { queueLessonSummaryGeneration } from "./utils/lessonSummary";
 import { getLessonSessionKey, resolveRestoredLessonId } from "./utils/lessonSession";
 
 export function App() {
@@ -63,6 +63,7 @@ export function App() {
   const [cloudLoading, setCloudLoading] = useState(true);
   const [cloudError, setCloudError] = useState("");
   const [loadedLessonsClassId, setLoadedLessonsClassId] = useState<string | null>(null);
+  const queuedSummaryLessons = useRef(new Set<string>());
   const lessons = getVisibleLessons(customLessons, auth.profile?.role);
   const publishedLessonCount = customLessons.filter(
     (lesson) => lesson.published,
@@ -204,6 +205,19 @@ export function App() {
     else localStorage.removeItem(storageKey);
   }, [activeClassId, auth.profile?.role, cloudLoading, customLessons, loadedLessonsClassId, selectedLessonId]);
 
+  useEffect(() => {
+    if (auth.profile?.role !== "teacher") return;
+    customLessons.forEach((lesson) => {
+      if (lesson.summary || !lesson.pdfUrl || queuedSummaryLessons.current.has(lesson.id)) return;
+      queuedSummaryLessons.current.add(lesson.id);
+      void queueLessonSummaryGeneration(lesson.id, lesson.pdfUrl)
+        .catch((error) => {
+          queuedSummaryLessons.current.delete(lesson.id);
+          console.error("Không thể tự động bổ sung tóm tắt:", error);
+        });
+    });
+  }, [auth.profile?.role, customLessons]);
+
   const selectByPlanetName = (shortName: string) => {
     const lesson = lessons.find((item) => item.shortName === shortName);
     if (lesson) {
@@ -242,12 +256,7 @@ export function App() {
     setCustomLessons(nextLessons);
     const createdLesson = nextLessons.find((item) => item.id === created.id);
     if (createdLesson?.pdfUrl) {
-      void fetchLessonSummary(createdLesson.id, createdLesson.pdfUrl)
-        .then((result) => setCustomLessons((current) => current.map((item) =>
-          item.id === createdLesson.id
-            ? { ...item, summary: result.summary, summarizedAt: new Date().toISOString() }
-            : item,
-        )))
+      void queueLessonSummaryGeneration(createdLesson.id, createdLesson.pdfUrl)
         .catch((error) => console.error("Không thể tạo tóm tắt nền:", error));
     }
   };
@@ -261,12 +270,7 @@ export function App() {
     if (pdf) {
       const updatedLesson = nextLessons.find((item) => item.id === lessonId);
       if (updatedLesson?.pdfUrl) {
-        void fetchLessonSummary(lessonId, updatedLesson.pdfUrl, true)
-          .then((result) => setCustomLessons((current) => current.map((item) =>
-            item.id === lessonId
-              ? { ...item, summary: result.summary, summarizedAt: new Date().toISOString() }
-              : item,
-          )))
+        void queueLessonSummaryGeneration(lessonId, updatedLesson.pdfUrl, true)
           .catch((error) => console.error('Không thể tạo lại tóm tắt nền:', error));
       }
     }
