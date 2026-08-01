@@ -7,6 +7,7 @@ import {
   type TeacherLesson,
   type TeacherLessonInput,
 } from "../utils/courseStore";
+import { getLessonTitleFromPdfName } from "../utils/fileTitle";
 import type { CloudClassroom, CloudCourse } from "../utils/cloudClassroom";
 import { toFutureReleaseIso } from "../utils/lessonSchedule";
 
@@ -889,7 +890,11 @@ export function TeacherDashboard({
                 onChange={(event) => {
                   const file = event.target.files?.[0];
                   setPdfFile(file);
-                  setForm((current) => ({ ...current, pdfName: file?.name }));
+                  setForm((current) => ({
+                    ...current,
+                    pdfName: file?.name,
+                    ...(file ? { name: getLessonTitleFromPdfName(file.name) } : {}),
+                  }));
                 }}
               />
               <span>{form.pdfName || (editingLesson ? "Giữ nguyên PDF hiện tại" : "Chọn tệp PDF từ máy")}</span>

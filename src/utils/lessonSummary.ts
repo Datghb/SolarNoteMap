@@ -2,6 +2,16 @@ export type SummaryChatRole = 'user' | 'assistant';
 export interface SummaryChatMessage { role: SummaryChatRole; content: string }
 export interface LessonSummaryResult { summary: string; source: 'cache' | 'generated' }
 
+export async function queueLessonSummaryGeneration(lessonId: string, pdfUrl: string, force = false) {
+  const response = await fetch('/api/lesson-summary/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...await getSupabaseAuthHeaders() },
+    body: JSON.stringify({ lessonId, pdfUrl, force }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(typeof payload.error === 'string' ? payload.error : 'Không thể bắt đầu tạo bản tóm tắt.');
+}
+
 export async function fetchLessonSummary(lessonId: string, pdfUrl?: string, force = false): Promise<LessonSummaryResult> {
   const query = new URLSearchParams({ lessonId });
   if (pdfUrl) query.set('pdfUrl', pdfUrl);
