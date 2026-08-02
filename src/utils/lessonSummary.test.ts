@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { askLessonSummaryAI, fetchLessonSummary, queueLessonSummaryGeneration } from './lessonSummary';
+import { askLessonSummaryAI, fetchLessonKeywords, fetchLessonSummary, generateLessonKeywords, isExtractiveFallbackSummary, queueLessonSummaryGeneration } from './lessonSummary';
 
 vi.mock('../lib/supabase', () => ({
   getSupabaseAuthHeaders: vi.fn().mockResolvedValue({ Authorization: 'Bearer test-access-token' }),
@@ -8,12 +8,28 @@ vi.mock('../lib/supabase', () => ({
 afterEach(() => vi.restoreAllMocks());
 
 describe('lesson summary API', () => {
+  it('recognizes obsolete extractive summaries', () => {
+    expect(isExtractiveFallbackSummary('## Tổng quan bài học\n## Nội dung theo từng slide\n### Trang 1\nRaw text')).toBe(true);
+    expect(isExtractiveFallbackSummary('## Tổng quan bài học\nAI đã tổng hợp nội dung.')).toBe(false);
+  });
+
   it('loads a persisted lesson summary', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ summary: 'Tổng quan bài học', source: 'cache' }), { status: 200 }));
-    await expect(fetchLessonSummary('ai-foundations')).resolves.toEqual({ summary: 'Tổng quan bài học', source: 'cache' });
+    await expect(fetchLessonSummary('ai-foundations')).resolves.toEqual({ summary: 'Tổng quan bài học', source: 'cache', keywords: [] });
     expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledWith('/api/lesson-summary?lessonId=ai-foundations', {
       headers: { Authorization: 'Bearer test-access-token' },
     });
+  });
+
+  it('loads persisted keyword definitions for a lesson', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ keywords: [{ term: 'LLM', definition: 'Mô hình ngôn ngữ lớn.' }] }), { status: 200 }));
+    await expect(fetchLessonKeywords('ai-foundations')).resolves.toEqual([{ term: 'LLM', definition: 'Mô hình ngôn ngữ lớn.' }]);
+  });
+
+  it('requests pedagogical keyword explanations for an existing summary', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ keywords: [{ term: 'Eval', definition: 'Eval là quy trình kiểm tra có hệ thống chất lượng đầu ra của mô hình AI.' }] }), { status: 200 }));
+    await expect(generateLessonKeywords('day-5', 'Nội dung bài học có **Eval**.')).resolves.toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledWith('/api/lesson-keywords/generate', expect.objectContaining({ method: 'POST' }));
   });
 
   it('passes the uploaded PDF URL when summarizing a custom lesson', async () => {

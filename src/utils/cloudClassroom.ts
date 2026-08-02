@@ -3,6 +3,7 @@ import { resolveLessonPalettes } from './lessonPalette';
 import { assertPdfCanOpen } from './pdfValidation';
 import type { StudentActivity, TeacherLessonInput } from './courseStore';
 import { requireSupabase } from '../lib/supabase';
+import type { CommunityQuestion } from './communityQuestions';
 
 export interface CloudClassroom { id: string; name: string; description: string; teacher_id: string; course_id: string; created_at: string }
 export interface CloudCourse { id: string; name: string; description: string; owner_id: string; created_at: string }
@@ -21,6 +22,107 @@ export function isClassLessonReleased(releaseAt: string | null | undefined, now 
   return Boolean(releaseAt && new Date(releaseAt).getTime() <= now);
 }
 
+function relatedProfileName(value: unknown) {
+  const profile = Array.isArray(value) ? value[0] : value;
+  return profile && typeof profile === 'object' && typeof (profile as { display_name?: unknown }).display_name === 'string'
+    ? (profile as { display_name: string }).display_name
+    : 'Thành viên lớp';
+}
+
+export function mapCommunityQuestionRows(rows: Record<string, any>[], currentUserId: string): CommunityQuestion[] {
+  return rows.map((row) => ({
+    id: row.id,
+    lessonId: row.lesson_id,
+    slideId: row.slide_id ?? '',
+    author: relatedProfileName(row.author),
+    content: row.body || row.title,
+    createdAt: row.created_at,
+    votes: Array.isArray(row.votes) ? row.votes.length : 0,
+    voted: Array.isArray(row.votes) && row.votes.some((vote: { user_id?: string }) => vote.user_id === currentUserId),
+    answers: (Array.isArray(row.answers) ? row.answers : []).map((answer: Record<string, any>) => ({
+      id: answer.id,
+      author: relatedProfileName(answer.author),
+      content: answer.body,
+      createdAt: answer.created_at,
+    })),
+  }));
+}
+
+const communitySelect = `
+  id,lesson_id,slide_id,title,body,created_at,
+  author:profiles!community_questions_author_id_fkey(display_name),
+  answers:community_answers(
+    id,body,created_at,
+    author:profiles!community_answers_author_id_fkey(display_name)
+  ),
+  votes:community_question_votes(user_id)
+`;
+
+export async function loadCommunityQuestions(classId: string, lessonId: string) {
+  const client = requireSupabase();
+  const { data: auth } = await client.auth.getUser();
+  if (!auth.user) throw new Error('Bạn cần đăng nhập để xem thảo luận.');
+  const { data, error } = await client
+    .from('community_questions')
+    .select(communitySelect)
+    .eq('class_id', classId)
+    .eq('lesson_id', lessonId)
+    .order('created_at', { ascending: false });
+  if (error && communitySchemaIsMissing(error)) {
+    throw new Error('Database chưa được cập nhật chức năng Cộng đồng. Hãy chạy migration 20260802100000_complete_community_discussions.sql rồi tải lại trang.');
+  }
+  if (error) throw asError(error, 'Không thể tải thảo luận của lớp.');
+  return mapCommunityQuestionRows((data ?? []) as Record<string, any>[], auth.user.id);
+}
+
+export async function createCommunityQuestion(classId: string, lessonId: string, slideId: string, content: string) {
+  const client = requireSupabase();
+  const { data: auth } = await client.auth.getUser();
+  const body = content.trim();
+  if (!auth.user) throw new Error('Bạn cần đăng nhập để đăng câu hỏi.');
+  if (!body || body.length > 20_000) throw new Error('Câu hỏi phải có từ 1 đến 20.000 ký tự.');
+  const { error } = await client.from('community_questions').insert({
+    class_id: classId,
+    lesson_id: lessonId,
+    slide_id: slideId,
+    author_id: auth.user.id,
+    title: body.slice(0, 240),
+    body,
+  });
+  if (error) throw asError(error, 'Không thể đăng câu hỏi.');
+}
+
+export async function createCommunityAnswer(questionId: string, content: string) {
+  const client = requireSupabase();
+  const { data: auth } = await client.auth.getUser();
+  const body = content.trim();
+  if (!auth.user) throw new Error('Bạn cần đăng nhập để phản hồi.');
+  if (!body || body.length > 20_000) throw new Error('Phản hồi phải có từ 1 đến 20.000 ký tự.');
+  const { error } = await client.from('community_answers').insert({ question_id: questionId, author_id: auth.user.id, body });
+  if (error) throw asError(error, 'Không thể đăng phản hồi.');
+}
+
+export async function setCommunityQuestionVote(questionId: string, voted: boolean) {
+  const client = requireSupabase();
+  const { data: auth } = await client.auth.getUser();
+  if (!auth.user) throw new Error('Bạn cần đăng nhập để bình chọn.');
+  const result = voted
+    ? await client.from('community_question_votes').insert({ question_id: questionId, user_id: auth.user.id })
+    : await client.from('community_question_votes').delete().eq('question_id', questionId).eq('user_id', auth.user.id);
+  if (result.error && result.error.code !== '23505') throw asError(result.error, 'Không thể cập nhật bình chọn.');
+}
+
+export function subscribeCommunityQuestions(lessonId: string, onChange: () => void) {
+  const client = requireSupabase();
+  const channel = client
+    .channel(`community:${lessonId}:${crypto.randomUUID()}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'community_questions', filter: `lesson_id=eq.${lessonId}` }, onChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'community_answers' }, onChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'community_question_votes' }, onChange)
+    .subscribe();
+  return () => { void client.removeChannel(channel); };
+}
+
 interface SupabaseErrorLike { code?: string; message?: string; details?: string }
 
 export function courseSchemaIsMissing(value: unknown) {
@@ -31,6 +133,14 @@ export function courseSchemaIsMissing(value: unknown) {
   if (error.code === 'PGRST204' || error.code === '42703') return message.includes('course_id');
   if (error.code === 'PGRST205' || error.code === '42P01') return message.includes('courses');
   return false;
+}
+
+export function communitySchemaIsMissing(value: unknown) {
+  if (!value || typeof value !== 'object') return false;
+  const error = value as SupabaseErrorLike;
+  const message = `${error.message ?? ''} ${error.details ?? ''}`;
+  return ['PGRST200', 'PGRST204', 'PGRST205', '42P01', '42703'].includes(error.code ?? '')
+    && /community_question_votes|slide_id/i.test(message);
 }
 
 function asError(value: unknown, fallback: string) {
@@ -103,6 +213,24 @@ export async function createClassForCourse(courseId: string, name: string, descr
   if (error) throw asError(error, 'Không thể tạo lớp học.');
   if (!data || typeof data !== 'object' || typeof data.classId !== 'string' || typeof data.joinCode !== 'string') throw new Error('Máy chủ trả về lớp học không hợp lệ.');
   return { classId: data.classId, joinCode: data.joinCode };
+}
+
+export function parseRegeneratedJoinCode(data: unknown) {
+  if (!data || typeof data !== 'object' || typeof (data as { joinCode?: unknown }).joinCode !== 'string' || (data as { joinCode: string }).joinCode.length < 8) {
+    throw new Error('Máy chủ trả về mã lớp mới không hợp lệ.');
+  }
+  return (data as { joinCode: string }).joinCode;
+}
+
+export async function regenerateClassJoinCode(classId: string) {
+  const targetClassId = classId.trim();
+  if (!targetClassId) throw new Error('Lớp học không hợp lệ.');
+  const { data, error } = await requireSupabase().rpc('regenerate_class_join_code', { target_class_id: targetClassId });
+  if (error && (error.code === 'PGRST202' || error.code === '42883')) {
+    throw new Error('Database chưa có chức năng tạo lại mã lớp. Hãy chạy migration 20260802120000_regenerate_class_join_code.sql.');
+  }
+  if (error) throw asError(error, 'Không thể tạo lại mã lớp.');
+  return parseRegeneratedJoinCode(data);
 }
 
 export async function createClassroom(name: string, description: string): Promise<{ classId: string; joinCode: string }> {

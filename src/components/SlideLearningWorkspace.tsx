@@ -16,7 +16,6 @@ export function SlideLearningWorkspace({
   onIndexChange,
   onNoteChange,
   onOpenMap,
-  onAskCommunity,
   onUnderstandingChange,
 }: {
   slides: LessonSlide[];
@@ -29,7 +28,6 @@ export function SlideLearningWorkspace({
   onIndexChange: (index: number) => void;
   onNoteChange: (note: string) => void;
   onOpenMap: () => void;
-  onAskCommunity: () => void;
   onUnderstandingChange: (status: 'understood' | 'question' | 'unmarked') => void;
 }) {
   const slide = slides[index];
@@ -73,7 +71,6 @@ export function SlideLearningWorkspace({
           <span>Slide này với bạn thế nào?</span>
           <button className={status === 'understood' ? 'active understood' : ''} onClick={() => changeUnderstanding('understood')}>✓ Đã hiểu</button>
           <button className={status === 'question' ? 'active question' : ''} onClick={() => changeUnderstanding('question')}>? Chưa rõ</button>
-          <button onClick={onAskCommunity}>Hỏi cộng đồng →</button>
         </div>
       </div>
 
@@ -84,6 +81,7 @@ export function SlideLearningWorkspace({
           <textarea value={note} onChange={(event) => onNoteChange(event.target.value)} placeholder={selectedPoint ? `Bạn hiểu gì về “${slide.points.find((point) => point.id === selectedPoint)?.label}”?` : 'Ghi nhanh điều bạn hiểu, thắc mắc hoặc một ví dụ…'} />
           <div className="inline-ai-status"><i>{isThinking ? '✦' : mapSource === 'fallback' ? '!' : '✓'}</i><span>{isThinking ? 'AI đang nối các ý…' : mapSource === 'ai' ? 'Đã đồng bộ vào sơ đồ' : mapSource === 'fallback' ? 'Đang dùng phân tích cục bộ' : 'Sơ đồ cập nhật khi bạn viết'}</span></div>
         </div>
+
 
         <div className="inline-map-card">
           <header><div><span>Mind map đang hình thành</span><small>{map.nodes.length} ý · {map.edges.length} liên kết</small></div><button onClick={onOpenMap}>Mở rộng ↗</button></header>

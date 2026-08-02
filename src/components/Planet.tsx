@@ -432,6 +432,7 @@ export function Planet({
         <Html
           position={[0, radius + 1.5, 0]}
           center
+          zIndexRange={[1, 0]}
           style={{
             pointerEvents: 'none',
             userSelect: 'none',

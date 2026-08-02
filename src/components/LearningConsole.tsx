@@ -16,7 +16,7 @@ import { loadCloudLearningState } from '../utils/cloudClassroom';
 
 const EMPTY_MAP: KnowledgeMap = { nodes: [], edges: [] };
 
-export function LearningConsole({ lesson, classId, onClose, onRefreshPdf }: { lesson: Lesson; classId: string; onClose: () => void; onRefreshPdf: () => Promise<void> }) {
+export function LearningConsole({ lesson, classId, onClose, onRefreshPdf, canManageLesson = false }: { lesson: Lesson; classId: string; onClose: () => void; onRefreshPdf: () => Promise<string>; canManageLesson?: boolean }) {
   const [tab, setTab] = useState<'brief' | 'summary' | 'map' | 'community'>('brief');
   const [map, setMap] = useState<KnowledgeMap>(EMPTY_MAP);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -28,7 +28,6 @@ export function LearningConsole({ lesson, classId, onClose, onRefreshPdf }: { le
   const [isThinking, setIsThinking] = useState(false);
   const [mapSource, setMapSource] = useState<'local' | 'ai' | 'fallback'>('local');
   const [analysisError, setAnalysisError] = useState('');
-  const [communitySlideId, setCommunitySlideId] = useState<string | undefined>();
   const noteActivityTimer = useRef<number | null>(null);
   const cloudNoteTimer = useRef<number | null>(null);
   const cloudNoteSaveChain = useRef(Promise.resolve());
@@ -92,7 +91,6 @@ export function LearningConsole({ lesson, classId, onClose, onRefreshPdf }: { le
     setSlideIndex(0);
     setSelectedId(null);
     setTab('brief');
-    setCommunitySlideId(undefined);
     let active = true;
     loadCloudLearningState(classId, lesson.id).then((cloud) => {
       if (!active || learningStateDirty.current) return;
@@ -260,7 +258,7 @@ export function LearningConsole({ lesson, classId, onClose, onRefreshPdf }: { le
         <button className={tab === 'brief' ? 'active' : ''} onClick={() => setTab('brief')}>Bài giảng</button>
         {usesDay01Pdf && <button className={tab === 'summary' ? 'active' : ''} onClick={() => setTab('summary')}>Tóm tắt</button>}
         <button className={tab === 'map' ? 'active' : ''} onClick={() => setTab('map')}>Sơ đồ <span>{map.nodes.length}</span></button>
-        <button className={tab === 'community' ? 'active' : ''} onClick={() => { setCommunitySlideId(undefined); setTab('community'); }}>Cộng đồng</button>
+        <button className={tab === 'community' ? 'active' : ''} onClick={() => setTab('community')}>Cộng đồng</button>
       </nav>
 
       <div className="console-content">
@@ -281,10 +279,6 @@ export function LearningConsole({ lesson, classId, onClose, onRefreshPdf }: { le
             onPageChange={(page) => setSlideIndex(page - 1)}
             onNoteChange={changeSlideNote}
             onOpenMap={() => setTab('map')}
-            onAskCommunity={() => {
-              setCommunitySlideId(slides[slideIndex].id);
-              setTab('community');
-            }}
             onUnderstandingChange={(status) => recordStudentActivity({ lessonId: lesson.id, slideId: slides[slideIndex].id, type: 'understanding_updated', metadata: { status } })}
           /> : <SlideLearningWorkspace
             slides={slides}
@@ -297,10 +291,6 @@ export function LearningConsole({ lesson, classId, onClose, onRefreshPdf }: { le
             onIndexChange={setSlideIndex}
             onNoteChange={changeSlideNote}
             onOpenMap={() => setTab('map')}
-            onAskCommunity={() => {
-              setCommunitySlideId(slides[slideIndex].id);
-              setTab('community');
-            }}
             onUnderstandingChange={(status) => recordStudentActivity({ lessonId: lesson.id, slideId: slides[slideIndex].id, type: 'understanding_updated', metadata: { status } })}
           />
         )}
@@ -344,21 +334,19 @@ export function LearningConsole({ lesson, classId, onClose, onRefreshPdf }: { le
           </section>
         )}
 
-        {tab === 'summary' && <LessonSummary lesson={lesson} />}
+        {tab === 'summary' && <LessonSummary lesson={lesson} onRefreshPdf={onRefreshPdf} canGenerateKeywords={canManageLesson} />}
 
-        {tab === 'community' && (
-          <CommunityQuestions
-            lesson={lesson}
-            classId={classId}
-            slides={slides}
-            initialSlideId={communitySlideId}
-            onOpenSlide={(slideId) => {
-              const index = slides.findIndex((slide) => slide.id === slideId);
-              if (index >= 0) setSlideIndex(index);
-              setTab('brief');
-            }}
-          />
-        )}
+        {tab === 'community' && <CommunityQuestions
+          lesson={lesson}
+          classId={classId}
+          slides={slides}
+          onOpenSlide={(slideId) => {
+            const index = slides.findIndex((slide) => slide.id === slideId);
+            if (index >= 0) setSlideIndex(index);
+            setTab('brief');
+          }}
+        />}
+
       </div>
     </aside>
   );

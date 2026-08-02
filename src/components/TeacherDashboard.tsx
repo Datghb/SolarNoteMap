@@ -9,7 +9,8 @@ import {
 } from "../utils/courseStore";
 import { getLessonTitleFromPdfName } from "../utils/fileTitle";
 import type { CloudClassroom, CloudCourse } from "../utils/cloudClassroom";
-import { toFutureReleaseIso } from "../utils/lessonSchedule";
+import { getInitialReleaseLocalValue, toFutureReleaseIso } from "../utils/lessonSchedule";
+import { copyTextToClipboard } from "../utils/clipboard";
 
 const EVENT_LABELS: Record<StudentActivity["type"], string> = {
   lesson_opened: "Mở bài học",
@@ -20,14 +21,6 @@ const EVENT_LABELS: Record<StudentActivity["type"], string> = {
   answer_posted: "Phản hồi thảo luận",
   understanding_updated: "Đánh dấu mức độ hiểu",
 };
-
-function toDateTimeLocalValue(value?: string) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 16);
-}
 
 function describeLessonSchedule(lesson: Lesson) {
   if (lesson.published) return "Đang mở";
@@ -50,6 +43,7 @@ export function TeacherDashboard({
   activities,
   onCreateCourse,
   onCreateClass,
+  onRegenerateJoinCode,
   onCreateLesson,
   onUpdateLesson,
   onDeleteLesson,
@@ -74,6 +68,7 @@ export function TeacherDashboard({
     name: string,
     description: string,
   ) => Promise<{ classId: string; joinCode: string }>;
+  onRegenerateJoinCode: (classId: string) => Promise<string>;
   onCreateLesson: (lesson: TeacherLesson, pdf?: File) => void | Promise<void>;
   onUpdateLesson: (lessonId: string, input: TeacherLessonInput, pdf?: File) => void | Promise<void>;
   onDeleteLesson: (lessonId: string) => void | Promise<void>;
@@ -106,6 +101,10 @@ export function TeacherDashboard({
   const [classDescription, setClassDescription] = useState("");
   const [creatingClass, setCreatingClass] = useState(false);
   const [createdJoinCode, setCreatedJoinCode] = useState("");
+  const [regeneratingClass, setRegeneratingClass] = useState<CloudClassroom | null>(null);
+  const [regeneratedJoinCode, setRegeneratedJoinCode] = useState("");
+  const [regeneratingCode, setRegeneratingCode] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<"" | "copied" | "error">("");
   const [showCourseCreator, setShowCourseCreator] = useState(false);
   const [courseName, setCourseName] = useState("Chương trình AI căn bản");
   const [courseDescription, setCourseDescription] = useState("");
@@ -260,8 +259,32 @@ export function TeacherDashboard({
 
   const openClassCreator = () => {
     setCreatedJoinCode("");
+    setCopyStatus("");
     setActionError("");
     setShowClassCreator(true);
+  };
+
+  const copyJoinCode = async (joinCode: string) => {
+    setCopyStatus("");
+    try {
+      await copyTextToClipboard(joinCode);
+      setCopyStatus("copied");
+    } catch {
+      setCopyStatus("error");
+    }
+  };
+
+  const regenerateJoinCode = async () => {
+    if (!regeneratingClass) return;
+    setRegeneratingCode(true);
+    setActionError("");
+    try {
+      setRegeneratedJoinCode(await onRegenerateJoinCode(regeneratingClass.id));
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Không thể tạo lại mã lớp.");
+    } finally {
+      setRegeneratingCode(false);
+    }
   };
 
   const submitCourse = async () => {
@@ -571,7 +594,7 @@ export function TeacherDashboard({
                             setActionError("");
                             setScheduleDrafts((current) => ({
                               ...current,
-                              [custom.id]: current[custom.id] ?? toDateTimeLocalValue(custom.availableAt),
+                              [custom.id]: getInitialReleaseLocalValue(custom.availableAt),
                             }));
                             setSchedulingLesson(custom);
                           }}>Hẹn mở</button>}
@@ -638,9 +661,15 @@ export function TeacherDashboard({
                       <span>
                         {item.id === activeClassId ? "Đang xem" : "Sẵn sàng"}
                       </span>
-                      <button onClick={() => onSelectClass(item.id)}>
-                        Chọn lớp
-                      </button>
+                      <div className="class-actions">
+                        <button onClick={() => onSelectClass(item.id)}>Chọn lớp</button>
+                        <button onClick={() => {
+                          setActionError("");
+                          setCopyStatus("");
+                          setRegeneratedJoinCode("");
+                          setRegeneratingClass(item);
+                        }}>Tạo lại mã</button>
+                      </div>
                     </article>
                   ))}
                 {!classes.some((item) => item.course_id === activeCourseId) && (
@@ -788,7 +817,13 @@ export function TeacherDashboard({
                     onFocus={(event) => event.currentTarget.select()}
                   />
                 </label>
+                {copyStatus === "error" && (
+                  <p className="creator-error">Không thể sao chép tự động. Hãy chọn mã và sao chép thủ công.</p>
+                )}
                 <footer>
+                  <button onClick={() => void copyJoinCode(createdJoinCode)}>
+                    {copyStatus === "copied" ? "✓ Đã sao chép" : "Sao chép mã"}
+                  </button>
                   <button
                     className="primary"
                     onClick={() => setShowClassCreator(false)}
@@ -832,6 +867,42 @@ export function TeacherDashboard({
                   >
                     {creatingClass ? "Đang tạo…" : "Tạo lớp"}
                   </button>
+                </footer>
+              </>
+            )}
+          </section>
+        </div>
+      )}
+
+      {regeneratingClass && (
+        <div className="lesson-creator-backdrop" onMouseDown={(event) => {
+          if (event.target === event.currentTarget && !regeneratingCode) setRegeneratingClass(null);
+        }}>
+          <section className="lesson-creator lesson-delete-dialog">
+            <header>
+              <div>
+                <span>MÃ MỜI HỌC SINH</span>
+                <h2>{regeneratedJoinCode ? "Mã lớp mới đã sẵn sàng" : `Tạo lại mã cho ${regeneratingClass.name}?`}</h2>
+              </div>
+              <button disabled={regeneratingCode} onClick={() => setRegeneratingClass(null)}>×</button>
+            </header>
+            {regeneratedJoinCode ? (
+              <>
+                <p>Mã cũ đã hết hiệu lực. Gửi riêng mã mới này cho học sinh cần tham gia lớp.</p>
+                <label>Mã lớp mới<input readOnly value={regeneratedJoinCode} onFocus={(event) => event.currentTarget.select()} /></label>
+                {copyStatus === "error" && <p className="creator-error">Không thể sao chép tự động. Hãy chọn mã và sao chép thủ công.</p>}
+                <footer>
+                  <button className="primary" onClick={() => void copyJoinCode(regeneratedJoinCode)}>{copyStatus === "copied" ? "✓ Đã sao chép" : "Sao chép mã"}</button>
+                  <button onClick={() => setRegeneratingClass(null)}>Đóng</button>
+                </footer>
+              </>
+            ) : (
+              <>
+                <p>Mã lớp hiện tại sẽ hết hiệu lực ngay. Học sinh đã tham gia vẫn ở trong lớp, nhưng học sinh mới phải dùng mã mới.</p>
+                {actionError && <p className="creator-error">{actionError}</p>}
+                <footer>
+                  <button disabled={regeneratingCode} onClick={() => setRegeneratingClass(null)}>Hủy</button>
+                  <button className="danger-confirm" disabled={regeneratingCode} onClick={() => void regenerateJoinCode()}>{regeneratingCode ? "Đang tạo…" : "Tạo mã mới"}</button>
                 </footer>
               </>
             )}
@@ -936,7 +1007,7 @@ export function TeacherDashboard({
               Ngày giờ mở bài
               <input
                 type="datetime-local"
-                min={toDateTimeLocalValue(new Date(Date.now() + 60_000).toISOString())}
+                min={getInitialReleaseLocalValue()}
                 value={scheduleDrafts[schedulingLesson.id] ?? ""}
                 onChange={(event) => setScheduleDrafts((current) => ({ ...current, [schedulingLesson.id]: event.target.value }))}
               />

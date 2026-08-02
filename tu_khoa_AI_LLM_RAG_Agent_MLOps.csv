@@ -1,0 +1,188 @@
+﻿Category,Keyword,Vietnamese_Term,Explanation,Level,Origin
+01. Nền tảng AI & Machine Learning,Alignment,Căn chỉnh hành vi,"Quá trình làm cho hành vi của mô hình phù hợp hơn với mục tiêu, quy tắc an toàn và mong muốn của người sử dụng.",Trung cấp,Từ nội dung gốc
+01. Nền tảng AI & Machine Learning,Artificial Intelligence (AI),Trí tuệ nhân tạo,"Lĩnh vực xây dựng hệ thống có khả năng thực hiện các nhiệm vụ thường cần trí thông minh của con người như nhận biết, suy luận, dự đoán và ra quyết định.",Cơ bản,Bổ sung
+01. Nền tảng AI & Machine Learning,Attention,Cơ chế chú ý,Cơ chế cho phép mô hình xác định phần thông tin nào trong đầu vào cần được ưu tiên khi tạo biểu diễn hoặc sinh đầu ra.,Trung cấp,Bổ sung
+01. Nền tảng AI & Machine Learning,Context Window,Cửa sổ ngữ cảnh,Tổng số token đầu vào và đầu ra mà mô hình có thể xử lý trong một lần gọi.,Cơ bản,Bổ sung
+01. Nền tảng AI & Machine Learning,Deep Learning,Học sâu,Nhánh của Machine Learning sử dụng mạng nơ-ron nhiều lớp để học các biểu diễn phức tạp từ dữ liệu.,Cơ bản,Từ nội dung gốc
+01. Nền tảng AI & Machine Learning,Dense Vector,Vector đặc,"Vector số thực có nhiều chiều, thường được tạo bởi embedding model để biểu diễn ý nghĩa ngữ nghĩa.",Trung cấp,Từ nội dung gốc
+01. Nền tảng AI & Machine Learning,DPO (Direct Preference Optimization),Tối ưu trực tiếp theo sở thích,Phương pháp căn chỉnh mô hình trực tiếp từ các cặp phản hồi được ưu tiên và không được ưu tiên mà không cần huấn luyện mô hình phần thưởng riêng.,Nâng cao,Bổ sung
+01. Nền tảng AI & Machine Learning,Embedding,Vector biểu diễn,Biểu diễn dữ liệu dưới dạng vector số sao cho các nội dung có ý nghĩa gần nhau nằm gần nhau trong không gian vector.,Cơ bản,Bổ sung
+01. Nền tảng AI & Machine Learning,Fine-tuning,Tinh chỉnh mô hình,Huấn luyện bổ sung một mô hình có sẵn trên dữ liệu chuyên biệt để thay đổi năng lực hoặc hành vi cho một tác vụ cụ thể.,Trung cấp,Từ nội dung gốc
+01. Nền tảng AI & Machine Learning,Foundation Model,Mô hình nền tảng,Mô hình quy mô lớn được huấn luyện trên dữ liệu rộng và có thể thích nghi cho nhiều tác vụ khác nhau.,Cơ bản,Bổ sung
+01. Nền tảng AI & Machine Learning,Generative AI,AI tạo sinh,"Nhóm hệ thống AI có khả năng tạo nội dung mới như văn bản, hình ảnh, âm thanh, video hoặc mã nguồn.",Cơ bản,Bổ sung
+01. Nền tảng AI & Machine Learning,Hallucination,Ảo giác mô hình,"Hiện tượng mô hình tạo thông tin nghe hợp lý nhưng sai, không được hỗ trợ bởi nguồn hoặc không tồn tại.",Cơ bản,Từ nội dung gốc
+01. Nền tảng AI & Machine Learning,Inference,Suy luận mô hình,Giai đoạn sử dụng mô hình đã huấn luyện để tạo dự đoán hoặc câu trả lời cho dữ liệu mới.,Cơ bản,Bổ sung
+01. Nền tảng AI & Machine Learning,Knowledge Distillation,Chưng cất tri thức,Huấn luyện một mô hình nhỏ học hành vi của mô hình lớn để giảm chi phí triển khai.,Nâng cao,Bổ sung
+01. Nền tảng AI & Machine Learning,Large Language Model (LLM),Mô hình ngôn ngữ lớn,Mô hình nền tảng được huấn luyện trên lượng lớn văn bản để hiểu và sinh ngôn ngữ tự nhiên.,Cơ bản,Bổ sung
+01. Nền tảng AI & Machine Learning,Machine Learning (ML),Học máy,Nhánh của AI trong đó mô hình học quy luật từ dữ liệu để dự đoán hoặc ra quyết định mà không cần lập trình tường minh cho mọi trường hợp.,Cơ bản,Bổ sung
+01. Nền tảng AI & Machine Learning,Multimodal Model,Mô hình đa phương thức,"Mô hình có thể tiếp nhận hoặc tạo nhiều loại dữ liệu như văn bản, hình ảnh, âm thanh và video.",Trung cấp,Bổ sung
+01. Nền tảng AI & Machine Learning,Neural Network,Mạng nơ-ron,"Mô hình tính toán gồm các lớp nút liên kết, học trọng số từ dữ liệu để ánh xạ đầu vào thành đầu ra.",Cơ bản,Bổ sung
+01. Nền tảng AI & Machine Learning,Pretraining,Tiền huấn luyện,Giai đoạn huấn luyện mô hình trên tập dữ liệu rất lớn để học kiến thức và mẫu tổng quát trước khi tinh chỉnh.,Trung cấp,Bổ sung
+01. Nền tảng AI & Machine Learning,Quantization,Lượng tử hóa,"Giảm độ chính xác số của trọng số hoặc phép tính để giảm bộ nhớ, chi phí và tăng tốc suy luận, có thể đánh đổi một phần chất lượng.",Nâng cao,Bổ sung
+01. Nền tảng AI & Machine Learning,RLHF,Học tăng cường từ phản hồi con người,Phương pháp căn chỉnh mô hình bằng mô hình phần thưởng được xây dựng từ đánh giá hoặc lựa chọn của con người.,Nâng cao,Bổ sung
+01. Nền tảng AI & Machine Learning,SFT (Supervised Fine-Tuning),Tinh chỉnh có giám sát,Tinh chỉnh mô hình bằng các cặp đầu vào và đầu ra mẫu đã được con người hoặc hệ thống gán nhãn.,Trung cấp,Từ nội dung gốc
+01. Nền tảng AI & Machine Learning,Sparse Vector,Vector thưa,"Biểu diễn có phần lớn giá trị bằng 0, thường dựa trên từ khóa hoặc tần suất từ và phù hợp với khớp thuật ngữ chính xác.",Trung cấp,Từ nội dung gốc
+01. Nền tảng AI & Machine Learning,Temperature,Tham số nhiệt độ,"Tham số ảnh hưởng đến độ phân tán khi chọn token; giá trị thấp thường cho đầu ra ổn định hơn, giá trị cao thường đa dạng hơn.",Cơ bản,Từ nội dung gốc
+01. Nền tảng AI & Machine Learning,Token,Đơn vị token,"Đơn vị văn bản mà mô hình xử lý. Một token có thể là một từ, một phần của từ, dấu câu hoặc ký tự tùy bộ tokenizer.",Cơ bản,Từ nội dung gốc
+01. Nền tảng AI & Machine Learning,Tokenization,Phân tách token,Quá trình chuyển văn bản thành chuỗi token trước khi đưa vào mô hình.,Cơ bản,Bổ sung
+01. Nền tảng AI & Machine Learning,Top-p Sampling,Lấy mẫu top-p,"Cách chọn token từ tập nhỏ nhất có tổng xác suất đạt ngưỡng p, giúp điều chỉnh độ đa dạng của đầu ra.",Trung cấp,Bổ sung
+01. Nền tảng AI & Machine Learning,Transformer,Kiến trúc Transformer,"Kiến trúc mạng nơ-ron sử dụng cơ chế attention, là nền tảng của phần lớn mô hình ngôn ngữ lớn hiện đại.",Cơ bản,Từ nội dung gốc
+01. Nền tảng AI & Machine Learning,Uncertainty,Độ không chắc chắn,"Mức độ không chắc chắn trong dữ liệu, dự đoán hoặc quá trình xử lý; cần được quản trị bằng thiết kế, kiểm thử và cơ chế từ chối phù hợp.",Trung cấp,Từ nội dung gốc
+02. Prompting & Tương tác mô hình,Chain-of-Thought Prompting,Prompt suy luận theo bước,"Kỹ thuật khuyến khích mô hình giải quyết bài toán theo các bước trung gian trước khi đưa ra kết luận, thường hữu ích với bài toán nhiều bước.",Trung cấp,Từ nội dung gốc
+02. Prompting & Tương tác mô hình,Few-shot Prompting,Prompt có vài ví dụ,Cung cấp một số ví dụ đầu vào–đầu ra để mô hình hiểu cách xử lý hoặc định dạng mong muốn.,Cơ bản,Từ nội dung gốc
+02. Prompting & Tương tác mô hình,Function Calling,Gọi hàm,Khả năng để mô hình chọn một hàm và tạo đối số có cấu trúc nhằm yêu cầu ứng dụng thực thi công cụ bên ngoài.,Trung cấp,Từ nội dung gốc
+02. Prompting & Tương tác mô hình,Grounding,Neo vào nguồn,"Giới hạn hoặc định hướng câu trả lời dựa trên dữ liệu, công cụ hoặc ngữ cảnh đáng tin cậy thay vì chỉ dựa vào kiến thức nội tại của mô hình.",Trung cấp,Từ nội dung gốc
+02. Prompting & Tương tác mô hình,Jailbreak,Vượt rào an toàn,Kỹ thuật cố gắng làm mô hình vượt qua các chính sách hoặc giới hạn an toàn đã được thiết lập.,Trung cấp,Bổ sung
+02. Prompting & Tương tác mô hình,JSON Schema,Lược đồ JSON,"Đặc tả tên trường, kiểu dữ liệu, trường bắt buộc và ràng buộc của một đối tượng JSON.",Trung cấp,Bổ sung
+02. Prompting & Tương tác mô hình,Prompt Engineering,Kỹ thuật thiết kế prompt,"Quá trình thiết kế, thử nghiệm và tối ưu chỉ dẫn, ngữ cảnh, ví dụ và định dạng đầu ra để mô hình thực hiện đúng mục tiêu.",Cơ bản,Từ nội dung gốc
+02. Prompting & Tương tác mô hình,Prompt Injection,Tấn công chèn chỉ dẫn,Tấn công trong đó nội dung đầu vào cố gắng khiến mô hình bỏ qua chỉ dẫn hệ thống hoặc thực hiện hành động ngoài ý muốn.,Trung cấp,Bổ sung
+02. Prompting & Tương tác mô hình,Stop Sequence,Chuỗi dừng,Chuỗi ký tự báo cho hệ thống dừng quá trình sinh khi mô hình tạo đến một mẫu xác định.,Trung cấp,Bổ sung
+02. Prompting & Tương tác mô hình,Structured Output,Đầu ra có cấu trúc,"Yêu cầu mô hình trả kết quả theo cấu trúc xác định như JSON, XML hoặc bảng để hệ thống phía sau dễ kiểm tra và xử lý.",Trung cấp,Bổ sung
+02. Prompting & Tương tác mô hình,System Prompt,Chỉ dẫn hệ thống,"Chỉ dẫn cấp cao xác định vai trò, quy tắc, giới hạn và cách hành xử của mô hình trong một phiên làm việc.",Cơ bản,Bổ sung
+02. Prompting & Tương tác mô hình,Tool Calling,Gọi công cụ,"Cơ chế để mô hình lựa chọn và sử dụng API, cơ sở dữ liệu, trình duyệt hoặc dịch vụ khác để hoàn thành nhiệm vụ.",Trung cấp,Bổ sung
+02. Prompting & Tương tác mô hình,User Prompt,Yêu cầu người dùng,Nội dung yêu cầu trực tiếp của người dùng được gửi cho mô hình.,Cơ bản,Bổ sung
+02. Prompting & Tương tác mô hình,Zero-shot Prompting,Prompt không ví dụ,Yêu cầu mô hình thực hiện tác vụ mà không cung cấp ví dụ mẫu trong prompt.,Cơ bản,Từ nội dung gốc
+"03. RAG, Tìm kiếm & Knowledge Base",Answer Relevance,Độ liên quan của câu trả lời,Mức độ câu trả lời trực tiếp giải quyết câu hỏi và tránh nội dung thừa hoặc lạc đề.,Trung cấp,Bổ sung
+"03. RAG, Tìm kiếm & Knowledge Base",BM25,Xếp hạng từ khóa BM25,"Thuật toán xếp hạng văn bản dựa trên mức độ xuất hiện của từ khóa, độ hiếm của từ và độ dài tài liệu.",Trung cấp,Bổ sung
+"03. RAG, Tìm kiếm & Knowledge Base",Chunk Overlap,Độ chồng lấn đoạn,Phần nội dung được lặp lại giữa các chunk liên tiếp để hạn chế mất ngữ cảnh tại ranh giới chia đoạn.,Trung cấp,Bổ sung
+"03. RAG, Tìm kiếm & Knowledge Base",Chunk Size,Kích thước đoạn,"Số token hoặc ký tự trong mỗi chunk; ảnh hưởng đến độ đầy đủ ngữ cảnh, độ chính xác truy xuất và chi phí.",Trung cấp,Bổ sung
+"03. RAG, Tìm kiếm & Knowledge Base",Chunking,Chia đoạn dữ liệu,"Chia tài liệu dài thành các đoạn nhỏ để tạo embedding, truy xuất và đưa vào ngữ cảnh của mô hình.",Cơ bản,Bổ sung
+"03. RAG, Tìm kiếm & Knowledge Base",Citation,Trích dẫn nguồn,Liên kết phát biểu trong câu trả lời với tài liệu hoặc đoạn nguồn cụ thể để người dùng kiểm chứng.,Cơ bản,Bổ sung
+"03. RAG, Tìm kiếm & Knowledge Base",Context Precision,Độ chính xác ngữ cảnh,Tỷ lệ nội dung được truy xuất thực sự liên quan đến câu hỏi trong tổng nội dung đưa vào mô hình.,Nâng cao,Bổ sung
+"03. RAG, Tìm kiếm & Knowledge Base",Context Recall,Độ bao phủ ngữ cảnh,Mức độ hệ thống truy xuất được đầy đủ các thông tin cần thiết để trả lời câu hỏi.,Nâng cao,Bổ sung
+"03. RAG, Tìm kiếm & Knowledge Base",Cosine Similarity,Độ tương đồng cosine,"Thước đo góc giữa hai vector, thường dùng để so sánh độ tương đồng ngữ nghĩa của embedding.",Trung cấp,Bổ sung
+"03. RAG, Tìm kiếm & Knowledge Base",Document Ingestion,Nạp tài liệu,"Quy trình đưa tài liệu từ nguồn vào hệ thống, thường gồm tải, phân tích, làm sạch, chia đoạn, gắn metadata và lập chỉ mục.",Trung cấp,Bổ sung
+"03. RAG, Tìm kiếm & Knowledge Base",Faithfulness,Độ trung thực với nguồn,Mức độ các khẳng định trong câu trả lời được hỗ trợ bởi ngữ cảnh hoặc nguồn đã cung cấp.,Trung cấp,Từ nội dung gốc
+"03. RAG, Tìm kiếm & Knowledge Base",Freshness,Độ mới của dữ liệu,Mức độ cập nhật của dữ liệu và thời gian từ khi nguồn thay đổi đến khi thay đổi có thể được hệ thống sử dụng.,Trung cấp,Từ nội dung gốc
+"03. RAG, Tìm kiếm & Knowledge Base",HNSW,Chỉ mục HNSW,"Cấu trúc đồ thị nhiều lớp dùng cho tìm kiếm láng giềng gần đúng, thường có tốc độ cao nhưng cần thêm bộ nhớ.",Nâng cao,Bổ sung
+"03. RAG, Tìm kiếm & Knowledge Base",Hybrid Search,Tìm kiếm lai,Kết hợp tìm kiếm từ khóa và tìm kiếm vector để tận dụng cả khớp chính xác lẫn tương đồng ngữ nghĩa.,Trung cấp,Từ nội dung gốc
+"03. RAG, Tìm kiếm & Knowledge Base",HyDE (Hypothetical Document Embeddings),Embedding tài liệu giả định,"Sinh một đoạn trả lời hoặc tài liệu giả định, tạo embedding cho đoạn đó rồi dùng để truy xuất tài liệu thật.",Nâng cao,Từ nội dung gốc
+"03. RAG, Tìm kiếm & Knowledge Base",Knowledge Base,Kho tri thức,"Tập hợp tài liệu hoặc dữ liệu được tổ chức để hệ thống tìm kiếm, RAG hoặc agent sử dụng.",Cơ bản,Bổ sung
+"03. RAG, Tìm kiếm & Knowledge Base",Lost in the Middle,Mất thông tin ở giữa,Hiện tượng mô hình có thể bỏ sót thông tin quan trọng nằm giữa một ngữ cảnh dài.,Trung cấp,Từ nội dung gốc
+"03. RAG, Tìm kiếm & Knowledge Base",Metadata Filtering,Lọc theo metadata,"Giới hạn kết quả truy xuất theo thuộc tính như ngày, loại tài liệu, quyền truy cập, tác giả hoặc ngôn ngữ.",Trung cấp,Bổ sung
+"03. RAG, Tìm kiếm & Knowledge Base",Multi-query Retrieval,Truy xuất đa truy vấn,Sinh nhiều biến thể truy vấn cho cùng một câu hỏi rồi hợp nhất kết quả để tăng khả năng tìm thấy tài liệu liên quan.,Nâng cao,Bổ sung
+"03. RAG, Tìm kiếm & Knowledge Base",OCR (Optical Character Recognition),Nhận dạng ký tự quang học,Công nghệ chuyển chữ trong hình ảnh hoặc tài liệu quét thành văn bản máy có thể đọc.,Trung cấp,Bổ sung
+"03. RAG, Tìm kiếm & Knowledge Base",Parsing,Phân tích cấu trúc tài liệu,"Chuyển nội dung từ PDF, HTML, Word hoặc định dạng khác thành dữ liệu có cấu trúc để xử lý tiếp.",Trung cấp,Bổ sung
+"03. RAG, Tìm kiếm & Knowledge Base",Query Rewriting,Viết lại truy vấn,Biến đổi câu hỏi người dùng thành truy vấn rõ ràng hoặc phù hợp hơn với hệ thống tìm kiếm.,Trung cấp,Bổ sung
+"03. RAG, Tìm kiếm & Knowledge Base",RAG (Retrieval-Augmented Generation),Sinh tăng cường truy xuất,Kiến trúc truy xuất tài liệu liên quan từ nguồn ngoài rồi cung cấp chúng cho mô hình để tạo câu trả lời có căn cứ.,Cơ bản,Từ nội dung gốc
+"03. RAG, Tìm kiếm & Knowledge Base",Reranking,Xếp hạng lại,Dùng mô hình hoặc quy tắc mạnh hơn để sắp xếp lại tập kết quả truy xuất ban đầu theo mức liên quan.,Trung cấp,Từ nội dung gốc
+"03. RAG, Tìm kiếm & Knowledge Base",Semantic Chunking,Chia đoạn theo ngữ nghĩa,Chia tài liệu dựa trên ranh giới ý nghĩa hoặc chủ đề thay vì chỉ dựa vào số ký tự hoặc token cố định.,Trung cấp,Từ nội dung gốc
+"03. RAG, Tìm kiếm & Knowledge Base",Similarity Search,Tìm kiếm tương đồng,Tìm các vector hoặc tài liệu gần nhất với vector truy vấn theo một thước đo khoảng cách hoặc độ tương đồng.,Trung cấp,Bổ sung
+"03. RAG, Tìm kiếm & Knowledge Base",Top-k Retrieval,Truy xuất top-k,Lấy k tài liệu hoặc chunk có điểm liên quan cao nhất cho một truy vấn.,Trung cấp,Bổ sung
+"03. RAG, Tìm kiếm & Knowledge Base",Vector Database,Cơ sở dữ liệu vector,"Cơ sở dữ liệu tối ưu cho lưu trữ, lập chỉ mục và truy vấn vector ở quy mô lớn.",Trung cấp,Bổ sung
+"03. RAG, Tìm kiếm & Knowledge Base",Vector Database Indexing,Lập chỉ mục cơ sở dữ liệu vector,"Phương pháp tổ chức vector để tăng tốc tìm kiếm gần đúng hoặc chính xác, ví dụ HNSW và Flat.",Nâng cao,Từ nội dung gốc
+"03. RAG, Tìm kiếm & Knowledge Base",Vector Store,Kho vector,Hệ thống lưu embedding và metadata để tìm kiếm theo độ tương đồng; có thể là một chức năng trong cơ sở dữ liệu lớn hơn.,Cơ bản,Từ nội dung gốc
+04. AI Agent & Agentic Systems,A2A (Agent-to-Agent),Giao tiếp agent với agent,"Cơ chế hoặc giao thức để các agent khám phá năng lực, trao đổi nhiệm vụ, trạng thái và kết quả với nhau.",Nâng cao,Từ nội dung gốc
+04. AI Agent & Agentic Systems,Agentic Workflow,Quy trình tác nhân,Quy trình trong đó mô hình có thể quyết định bước tiếp theo dựa trên trạng thái và kết quả công cụ thay vì chỉ chạy một chuỗi cố định.,Trung cấp,Từ nội dung gốc
+04. AI Agent & Agentic Systems,AI Agent,Tác nhân AI,"Hệ thống dùng mô hình để quan sát trạng thái, lập kế hoạch, chọn hành động, gọi công cụ và lặp lại cho đến khi đạt mục tiêu hoặc gặp điều kiện dừng.",Cơ bản,Bổ sung
+04. AI Agent & Agentic Systems,Approval Gate,Cổng phê duyệt,Điểm dừng bắt buộc trong workflow nơi con người hoặc hệ thống kiểm soát phải chấp thuận trước khi tiếp tục.,Trung cấp,Bổ sung
+04. AI Agent & Agentic Systems,Baseline,Mốc chuẩn,"Phiên bản, phương pháp hoặc mức hiệu năng hiện tại dùng làm điểm so sánh khi đánh giá cải tiến.",Cơ bản,Bổ sung
+04. AI Agent & Agentic Systems,Circuit Breaker,Bộ ngắt mạch,Mẫu thiết kế tạm ngừng gọi một dịch vụ đang lỗi liên tục để tránh làm lỗi lan rộng và cho dịch vụ thời gian phục hồi.,Nâng cao,Bổ sung
+04. AI Agent & Agentic Systems,Guardrail,Rào chắn kiểm soát,"Tập quy tắc, bộ lọc và kiểm tra nhằm ngăn đầu vào, đầu ra hoặc hành động không an toàn, sai phạm hoặc ngoài phạm vi.",Cơ bản,Bổ sung
+04. AI Agent & Agentic Systems,HITL (Human-in-the-Loop),Con người trong vòng lặp,"Cơ chế yêu cầu con người xem xét, sửa hoặc phê duyệt tại các bước quan trọng hoặc có rủi ro cao.",Cơ bản,Từ nội dung gốc
+04. AI Agent & Agentic Systems,Idempotency,Tính lũy đẳng,"Thuộc tính bảo đảm thực hiện cùng một yêu cầu nhiều lần vẫn tạo hiệu ứng tương đương thực hiện một lần, giúp tránh ghi hoặc thanh toán trùng.",Trung cấp,Từ nội dung gốc
+04. AI Agent & Agentic Systems,Long-term Memory,Bộ nhớ dài hạn,Thông tin được lưu bền vững để sử dụng ở các phiên hoặc nhiệm vụ sau.,Trung cấp,Bổ sung
+04. AI Agent & Agentic Systems,Memory,Bộ nhớ agent,"Cơ chế lưu và truy xuất thông tin từ các bước trước, phiên trước hoặc nguồn dài hạn để hỗ trợ quyết định hiện tại.",Trung cấp,Bổ sung
+04. AI Agent & Agentic Systems,Model Context Protocol (MCP),Giao thức ngữ cảnh mô hình,"Giao thức chuẩn hóa cách ứng dụng AI kết nối với công cụ, dữ liệu và tài nguyên bên ngoài.",Trung cấp,Từ nội dung gốc
+04. AI Agent & Agentic Systems,Multi-Agent System,Hệ đa tác nhân,"Hệ thống gồm nhiều agent có vai trò khác nhau cùng phối hợp, trao đổi hoặc kiểm tra lẫn nhau để hoàn thành nhiệm vụ.",Trung cấp,Từ nội dung gốc
+04. AI Agent & Agentic Systems,Orchestration,Điều phối,"Cơ chế quản lý thứ tự bước, trạng thái, công cụ, lỗi, agent và luồng dữ liệu trong một workflow.",Trung cấp,Bổ sung
+04. AI Agent & Agentic Systems,Planner-Executor,Lập kế hoạch – thực thi,Kiến trúc tách thành phần tạo kế hoạch khỏi thành phần thực hiện từng bước và cập nhật trạng thái.,Nâng cao,Bổ sung
+04. AI Agent & Agentic Systems,ReAct (Reasoning + Acting),Suy luận kết hợp hành động,"Mẫu thiết kế agent xen kẽ việc suy luận, gọi công cụ và quan sát kết quả để giải quyết nhiệm vụ.",Trung cấp,Từ nội dung gốc
+04. AI Agent & Agentic Systems,Retry,Thử lại,"Thực hiện lại một thao tác thất bại, thường kèm giới hạn số lần và khoảng chờ.",Cơ bản,Bổ sung
+04. AI Agent & Agentic Systems,Rollback,Quay lui phiên bản,"Khôi phục hệ thống, cấu hình, prompt, model hoặc dữ liệu về phiên bản ổn định trước đó khi bản mới gây lỗi.",Cơ bản,Bổ sung
+04. AI Agent & Agentic Systems,Rule,Quy tắc,Điều kiện xác định hệ thống được phép hoặc không được phép làm gì; thường dùng để giới hạn quyết định của agent.,Cơ bản,Bổ sung
+04. AI Agent & Agentic Systems,Sandbox,Môi trường cách ly,Môi trường giới hạn quyền truy cập và tài nguyên để chạy mã hoặc hành động của agent an toàn hơn.,Trung cấp,Bổ sung
+04. AI Agent & Agentic Systems,Short-term Memory,Bộ nhớ ngắn hạn,Thông tin tạm thời trong phiên hoặc trạng thái hiện tại của nhiệm vụ.,Trung cấp,Bổ sung
+04. AI Agent & Agentic Systems,State,Trạng thái,"Tập dữ liệu mô tả tiến độ, đầu vào, kết quả trung gian, lỗi và quyết định hiện tại của workflow hoặc agent.",Trung cấp,Bổ sung
+04. AI Agent & Agentic Systems,Timeout,Giới hạn thời gian,Thời gian tối đa chờ một thao tác hoàn thành trước khi hệ thống hủy hoặc xử lý lỗi.,Cơ bản,Bổ sung
+04. AI Agent & Agentic Systems,Tool,Công cụ,"Khả năng bên ngoài mà agent có thể gọi, ví dụ tìm kiếm, API, cơ sở dữ liệu, tính toán hoặc gửi thông báo.",Cơ bản,Bổ sung
+"05. Evaluation, Metrics & Experimentation",A/B Testing,Thử nghiệm A/B,Chia người dùng hoặc lưu lượng thành các nhóm để so sánh tác động của hai phiên bản trong điều kiện thực tế.,Trung cấp,Bổ sung
+"05. Evaluation, Metrics & Experimentation",Accuracy,Độ chính xác,Tỷ lệ dự đoán đúng trên tổng số trường hợp; phù hợp nhất khi nhãn tương đối cân bằng và khái niệm đúng–sai rõ ràng.,Cơ bản,Bổ sung
+"05. Evaluation, Metrics & Experimentation",Benchmark,Bộ chuẩn đánh giá,"Tập dữ liệu, tác vụ và cách chấm chuẩn hóa dùng để so sánh mô hình hoặc hệ thống.",Cơ bản,Bổ sung
+"05. Evaluation, Metrics & Experimentation",Concept Drift,Trôi khái niệm,Mối quan hệ giữa đầu vào và nhãn hoặc kết quả mong muốn thay đổi theo thời gian.,Nâng cao,Bổ sung
+"05. Evaluation, Metrics & Experimentation",Data Drift,Trôi dữ liệu,Phân phối dữ liệu đầu vào khi vận hành thay đổi so với dữ liệu dùng để xây dựng hoặc đánh giá hệ thống.,Trung cấp,Bổ sung
+"05. Evaluation, Metrics & Experimentation",Drift,Sự trôi thay đổi,"Khái niệm chung chỉ sự thay đổi theo thời gian của dữ liệu, quan hệ đầu vào–đầu ra hoặc hành vi mô hình.",Trung cấp,Từ nội dung gốc
+"05. Evaluation, Metrics & Experimentation",Eval,Đánh giá hệ thống AI,"Quy trình kiểm tra có hệ thống chất lượng, độ an toàn, độ tin cậy, chi phí và hiệu năng của mô hình hoặc ứng dụng AI.",Cơ bản,Từ nội dung gốc
+"05. Evaluation, Metrics & Experimentation",Eval Gate,Cổng đánh giá,Điều kiện tự động chặn việc phát hành nếu các chỉ số đánh giá không đạt ngưỡng đã đặt.,Trung cấp,Bổ sung
+"05. Evaluation, Metrics & Experimentation",F1 Score,Điểm F1,"Trung bình điều hòa của precision và recall, hữu ích khi cần cân bằng hai chỉ số.",Trung cấp,Bổ sung
+"05. Evaluation, Metrics & Experimentation",Golden Dataset,Tập dữ liệu chuẩn vàng,"Tập ví dụ đại diện có đáp án hoặc tiêu chí được kiểm duyệt, dùng để kiểm thử và so sánh các phiên bản.",Trung cấp,Bổ sung
+"05. Evaluation, Metrics & Experimentation",Human Evaluation,Đánh giá bởi con người,"Con người chấm chất lượng theo rubric, thường cần khi tiêu chí mang tính ngữ nghĩa hoặc chủ quan.",Trung cấp,Bổ sung
+"05. Evaluation, Metrics & Experimentation",KPI (Key Performance Indicator),Chỉ số hiệu quả chính,"Chỉ số gắn trực tiếp với mục tiêu sản phẩm hoặc kinh doanh, ví dụ tỷ lệ giải quyết thành công hoặc thời gian tiết kiệm.",Cơ bản,Bổ sung
+"05. Evaluation, Metrics & Experimentation",LLM-as-a-Judge,LLM làm giám khảo,Dùng một mô hình ngôn ngữ để chấm hoặc so sánh đầu ra theo rubric; cần kiểm tra thiên lệch và hiệu chỉnh với đánh giá con người.,Trung cấp,Bổ sung
+"05. Evaluation, Metrics & Experimentation",Metric,Chỉ số đo lường,"Giá trị định lượng dùng để đo một khía cạnh cụ thể như độ chính xác, độ trễ, chi phí, faithfulness hoặc tỷ lệ hoàn thành.",Cơ bản,Bổ sung
+"05. Evaluation, Metrics & Experimentation",Model Drift,Trôi hành vi mô hình,"Hành vi hoặc chất lượng mô hình thay đổi do cập nhật model, nhà cung cấp, cấu hình hoặc môi trường.",Trung cấp,Bổ sung
+"05. Evaluation, Metrics & Experimentation",Offline Eval,Đánh giá ngoại tuyến,Đánh giá trên tập dữ liệu cố định trước khi triển khai hoặc không dùng lưu lượng người dùng thực.,Trung cấp,Bổ sung
+"05. Evaluation, Metrics & Experimentation",Online Eval,Đánh giá trực tuyến,"Đánh giá trên hệ thống đang chạy bằng dữ liệu thực, phản hồi người dùng hoặc thí nghiệm có kiểm soát.",Trung cấp,Bổ sung
+"05. Evaluation, Metrics & Experimentation",Pairwise Evaluation,Đánh giá cặp,So sánh trực tiếp hai đầu ra cho cùng một đầu vào để chọn đầu ra tốt hơn.,Trung cấp,Bổ sung
+"05. Evaluation, Metrics & Experimentation",Pass Rate,Tỷ lệ đạt,Tỷ lệ test case hoặc yêu cầu đạt ngưỡng chất lượng xác định.,Cơ bản,Bổ sung
+"05. Evaluation, Metrics & Experimentation",Precision,Độ chính xác dương,"Trong các trường hợp hệ thống dự đoán dương, tỷ lệ thực sự là dương.",Cơ bản,Bổ sung
+"05. Evaluation, Metrics & Experimentation",Recall,Độ bao phủ,"Trong tất cả trường hợp dương thực tế, tỷ lệ hệ thống tìm hoặc phát hiện được.",Cơ bản,Từ nội dung gốc
+"05. Evaluation, Metrics & Experimentation",Red Teaming,Kiểm thử đối kháng,"Chủ động tìm cách khai thác điểm yếu của hệ thống bằng các tình huống, prompt hoặc hành vi tấn công.",Nâng cao,Bổ sung
+"05. Evaluation, Metrics & Experimentation",Regression Test,Kiểm thử hồi quy,Kiểm tra bản mới có làm giảm chất lượng ở những trường hợp trước đây đã hoạt động đúng hay không.,Cơ bản,Bổ sung
+"05. Evaluation, Metrics & Experimentation",Relevance,Độ liên quan,"Mức độ đầu ra phù hợp trực tiếp với yêu cầu, truy vấn hoặc mục tiêu.",Cơ bản,Bổ sung
+"05. Evaluation, Metrics & Experimentation",Robustness,Độ vững,"Khả năng hệ thống duy trì chất lượng khi đầu vào bị nhiễu, thay đổi cách diễn đạt hoặc xuất hiện trường hợp ngoài dự kiến.",Trung cấp,Bổ sung
+"05. Evaluation, Metrics & Experimentation",Safety Evaluation,Đánh giá an toàn,"Kiểm tra khả năng hệ thống tránh nội dung hoặc hành động có hại, trái phép, vi phạm riêng tư hoặc ngoài thẩm quyền.",Trung cấp,Bổ sung
+"05. Evaluation, Metrics & Experimentation",Test Case,Ca kiểm thử,"Một đầu vào cụ thể kèm kết quả mong đợi, tiêu chí chấm hoặc điều kiện đạt.",Cơ bản,Bổ sung
+"06. Data Engineering, Quality & Governance",Access Control,Kiểm soát truy cập,"Quy định ai hoặc hệ thống nào được phép xem, sửa hoặc sử dụng tài nguyên.",Cơ bản,Bổ sung
+"06. Data Engineering, Quality & Governance",Audit Log,Nhật ký kiểm toán,"Bản ghi có thể truy vết về ai đã thực hiện hành động gì, khi nào và trên tài nguyên nào.",Trung cấp,Bổ sung
+"06. Data Engineering, Quality & Governance",Data Contract,Hợp đồng dữ liệu,"Thỏa thuận giữa bên tạo và bên sử dụng dữ liệu về schema, chất lượng, độ mới, quyền sở hữu và cách xử lý thay đổi.",Trung cấp,Từ nội dung gốc
+"06. Data Engineering, Quality & Governance",Data Lineage,Dòng dõi dữ liệu,"Thông tin cho biết dữ liệu đến từ đâu, đã qua các bước biến đổi nào và được sử dụng ở đâu.",Trung cấp,Bổ sung
+"06. Data Engineering, Quality & Governance",Data Pipeline,Đường ống dữ liệu,"Chuỗi bước tự động đưa dữ liệu từ nguồn đến nơi sử dụng, có thể gồm thu thập, xử lý, kiểm tra và lưu trữ.",Cơ bản,Bổ sung
+"06. Data Engineering, Quality & Governance",Data Quality,Chất lượng dữ liệu,"Mức độ dữ liệu đáp ứng các tiêu chí như đầy đủ, chính xác, nhất quán, hợp lệ, kịp thời và không trùng lặp.",Cơ bản,Từ nội dung gốc
+"06. Data Engineering, Quality & Governance",Data Residency,Nơi cư trú dữ liệu,Yêu cầu dữ liệu phải được lưu trữ hoặc xử lý trong một quốc gia hoặc khu vực pháp lý xác định.,Trung cấp,Bổ sung
+"06. Data Engineering, Quality & Governance",Data Retention,Thời hạn lưu dữ liệu,Quy định dữ liệu được giữ trong bao lâu và khi nào phải xóa hoặc ẩn danh.,Trung cấp,Bổ sung
+"06. Data Engineering, Quality & Governance",Data Validation,Kiểm tra dữ liệu,"Kiểm tra dữ liệu có đúng kiểu, phạm vi, định dạng, quan hệ và quy tắc nghiệp vụ hay không.",Cơ bản,Bổ sung
+"06. Data Engineering, Quality & Governance",ELT (Extract-Load-Transform),Trích xuất – nạp – biến đổi,Quy trình nạp dữ liệu thô vào hệ thống đích trước rồi mới biến đổi bên trong hệ thống đó.,Cơ bản,Từ nội dung gốc
+"06. Data Engineering, Quality & Governance",Encryption,Mã hóa,"Biến dữ liệu thành dạng không thể đọc nếu không có khóa phù hợp, áp dụng khi truyền và khi lưu trữ.",Cơ bản,Bổ sung
+"06. Data Engineering, Quality & Governance",ETL (Extract-Transform-Load),Trích xuất – biến đổi – nạp,"Quy trình lấy dữ liệu, làm sạch hoặc biến đổi rồi mới nạp vào hệ thống đích.",Cơ bản,Từ nội dung gốc
+"06. Data Engineering, Quality & Governance",PII (Personally Identifiable Information),Thông tin nhận dạng cá nhân,"Thông tin có thể nhận diện trực tiếp hoặc gián tiếp một cá nhân và cần được xử lý theo yêu cầu bảo mật, pháp lý và quyền riêng tư.",Cơ bản,Từ nội dung gốc
+"06. Data Engineering, Quality & Governance",RBAC (Role-Based Access Control),Kiểm soát truy cập theo vai trò,"Cấp quyền dựa trên vai trò như quản trị viên, giáo viên, người học hoặc dịch vụ.",Trung cấp,Bổ sung
+"06. Data Engineering, Quality & Governance",Redaction,Che hoặc loại bỏ dữ liệu nhạy cảm,"Ẩn, thay thế hoặc xóa thông tin nhạy cảm trước khi lưu, hiển thị, gửi cho mô hình hoặc ghi log.",Trung cấp,Bổ sung
+"06. Data Engineering, Quality & Governance",Schema,Lược đồ dữ liệu,"Mô tả cấu trúc dữ liệu gồm trường, kiểu dữ liệu, quan hệ và ràng buộc.",Cơ bản,Bổ sung
+"06. Data Engineering, Quality & Governance",Schema Drift,Trôi lược đồ,"Sự thay đổi tên trường, kiểu dữ liệu hoặc cấu trúc nguồn làm hỏng các bước xử lý phía sau.",Trung cấp,Từ nội dung gốc
+"07. MLOps, LLMOps & Observability",Cold Start,Khởi động lạnh,Độ trễ phát sinh khi tài nguyên hoặc dịch vụ phải khởi tạo sau thời gian không hoạt động.,Trung cấp,Từ nội dung gốc
+"07. MLOps, LLMOps & Observability",Cost per Request,Chi phí mỗi yêu cầu,"Tổng chi phí model, retrieval, tool, hạ tầng và dịch vụ cho một yêu cầu.",Cơ bản,Bổ sung
+"07. MLOps, LLMOps & Observability",Exponential Backoff,Lùi thời gian theo cấp số nhân,Chiến lược tăng dần thời gian chờ giữa các lần retry để giảm tải cho dịch vụ đang lỗi hoặc quá tải.,Trung cấp,Bổ sung
+"07. MLOps, LLMOps & Observability",Latency,Độ trễ,Thời gian từ khi gửi yêu cầu đến khi nhận phản hồi hoặc hoàn thành một bước xử lý.,Cơ bản,Từ nội dung gốc
+"07. MLOps, LLMOps & Observability",Liveness Probe,Kiểm tra còn sống,Kiểm tra dịch vụ có đang chạy hay bị treo; thất bại thường dẫn đến khởi động lại.,Trung cấp,Từ nội dung gốc
+"07. MLOps, LLMOps & Observability",LLMOps,Vận hành ứng dụng LLM,"Thực hành vận hành hệ thống LLM gồm prompt, model, RAG, eval, quan sát, chi phí, bảo mật và phát hành.",Trung cấp,Bổ sung
+"07. MLOps, LLMOps & Observability",Log,Nhật ký hệ thống,"Bản ghi sự kiện rời rạc như lỗi, cảnh báo, yêu cầu, phản hồi hoặc hành động của agent.",Cơ bản,Bổ sung
+"07. MLOps, LLMOps & Observability",MLOps,Vận hành Machine Learning,"Thực hành kết hợp phát triển, triển khai, giám sát và quản trị vòng đời mô hình Machine Learning.",Cơ bản,Bổ sung
+"07. MLOps, LLMOps & Observability",Monitoring,Giám sát,"Theo dõi liên tục chỉ số và trạng thái để phát hiện bất thường, suy giảm hoặc vi phạm ngưỡng.",Cơ bản,Bổ sung
+"07. MLOps, LLMOps & Observability",Observability,Khả năng quan sát,"Khả năng hiểu trạng thái và nguyên nhân bên trong hệ thống thông qua metrics, logs, traces và ngữ cảnh thực thi.",Cơ bản,Từ nội dung gốc
+"07. MLOps, LLMOps & Observability",P50/P95/P99 Latency,Phân vị độ trễ,"Các mốc cho biết 50%, 95% hoặc 99% yêu cầu hoàn thành nhanh hơn giá trị tương ứng; phản ánh tốt hơn giá trị trung bình.",Trung cấp,Từ nội dung gốc
+"07. MLOps, LLMOps & Observability",Prompt Cache,Bộ nhớ đệm prompt,Tái sử dụng phần prompt hoặc ngữ cảnh lặp lại để giảm thời gian và chi phí xử lý.,Trung cấp,Từ nội dung gốc
+"07. MLOps, LLMOps & Observability",Rate Limit,Giới hạn tần suất,Giới hạn số yêu cầu hoặc token có thể sử dụng trong một khoảng thời gian.,Cơ bản,Bổ sung
+"07. MLOps, LLMOps & Observability",Readiness Probe,Kiểm tra sẵn sàng,Kiểm tra dịch vụ đã sẵn sàng nhận lưu lượng hay chưa; thất bại thường khiến dịch vụ tạm bị loại khỏi cân bằng tải.,Trung cấp,Từ nội dung gốc
+"07. MLOps, LLMOps & Observability",Semantic Cache,Bộ nhớ đệm ngữ nghĩa,Tái sử dụng kết quả của truy vấn có ý nghĩa tương tự thay vì chỉ khớp chuỗi chính xác.,Trung cấp,Từ nội dung gốc
+"07. MLOps, LLMOps & Observability",SLA (Service Level Agreement),Thỏa thuận mức dịch vụ,Cam kết chính thức với khách hàng về mức dịch vụ và có thể kèm điều khoản bồi thường.,Trung cấp,Bổ sung
+"07. MLOps, LLMOps & Observability",SLI (Service Level Indicator),Chỉ báo mức dịch vụ,"Chỉ số đo thực tế về độ sẵn sàng, độ trễ, tỷ lệ lỗi hoặc chất lượng dịch vụ.",Trung cấp,Bổ sung
+"07. MLOps, LLMOps & Observability",SLO (Service Level Objective),Mục tiêu mức dịch vụ,Mục tiêu nội bộ cho một SLI trong khoảng thời gian xác định.,Trung cấp,Bổ sung
+"07. MLOps, LLMOps & Observability",Telemetry,Dữ liệu đo từ xa,"Dữ liệu hệ thống tự động thu thập như metric, log, trace và sự kiện để phân tích vận hành.",Trung cấp,Từ nội dung gốc
+"07. MLOps, LLMOps & Observability",Throughput,Thông lượng,"Số yêu cầu, token hoặc tác vụ hệ thống có thể xử lý trong một đơn vị thời gian.",Cơ bản,Bổ sung
+"07. MLOps, LLMOps & Observability",Token Budget,Ngân sách token,"Giới hạn token dành cho đầu vào, suy luận, công cụ và đầu ra nhằm kiểm soát chi phí và độ trễ.",Trung cấp,Bổ sung
+"07. MLOps, LLMOps & Observability",Tokens per Second,Số token mỗi giây,Tốc độ sinh token của mô hình trong giai đoạn tạo phản hồi.,Trung cấp,Bổ sung
+"07. MLOps, LLMOps & Observability",Trace,Dấu vết thực thi,"Bản ghi liên kết toàn bộ các bước của một yêu cầu qua model, retriever, tool và dịch vụ để tìm nguyên nhân lỗi hoặc chậm.",Trung cấp,Bổ sung
+"07. MLOps, LLMOps & Observability",TTFT (Time to First Token),Thời gian đến token đầu tiên,Thời gian từ lúc gửi yêu cầu đến khi người dùng nhận token đầu tiên của phản hồi streaming.,Trung cấp,Từ nội dung gốc
+"07. MLOps, LLMOps & Observability",TTLT (Time to Last Token),Thời gian đến token cuối,Tổng thời gian từ lúc gửi yêu cầu đến khi phản hồi được sinh hoàn tất.,Trung cấp,Bổ sung
+"08. API, Hạ tầng & Triển khai",API (Application Programming Interface),Giao diện lập trình ứng dụng,Hợp đồng cho phép các phần mềm trao đổi dữ liệu và gọi chức năng của nhau.,Cơ bản,Từ nội dung gốc
+"08. API, Hạ tầng & Triển khai",API Gateway,Cổng API,"Lớp trung gian quản lý định tuyến, xác thực, quota, rate limit và quan sát cho nhiều API.",Trung cấp,Bổ sung
+"08. API, Hạ tầng & Triển khai",Asynchronous Processing,Xử lý bất đồng bộ,Thực hiện tác vụ mà không giữ người dùng chờ trực tiếp; kết quả được trả hoặc lấy sau.,Trung cấp,Bổ sung
+"08. API, Hạ tầng & Triển khai",Autoscaling,Tự động mở rộng,"Tự động tăng hoặc giảm tài nguyên theo tải, độ trễ, hàng đợi hoặc chỉ số khác.",Trung cấp,Bổ sung
+"08. API, Hạ tầng & Triển khai",Blue-Green Deployment,Triển khai xanh–lam,"Duy trì hai môi trường cũ và mới, sau đó chuyển lưu lượng giữa chúng để phát hành hoặc rollback nhanh.",Nâng cao,Bổ sung
+"08. API, Hạ tầng & Triển khai",Canary Deployment,Triển khai canary,Phát hành phiên bản mới cho một phần nhỏ lưu lượng trước khi mở rộng để giảm rủi ro.,Trung cấp,Bổ sung
+"08. API, Hạ tầng & Triển khai",CI/CD,Tích hợp và triển khai liên tục,"Tự động hóa kiểm tra, tích hợp, đóng gói và phát hành thay đổi; hệ thống AI thường thêm eval gate trước khi triển khai.",Cơ bản,Từ nội dung gốc
+"08. API, Hạ tầng & Triển khai",Container,Container ứng dụng,Đơn vị đóng gói ứng dụng cùng thư viện và cấu hình để chạy nhất quán giữa các môi trường.,Cơ bản,Bổ sung
+"08. API, Hạ tầng & Triển khai",Docker,Nền tảng Docker,"Công cụ phổ biến để xây dựng, phân phối và chạy container.",Cơ bản,Bổ sung
+"08. API, Hạ tầng & Triển khai",GPU,Bộ xử lý đồ họa,Phần cứng xử lý song song được sử dụng rộng rãi để huấn luyện và suy luận mô hình AI.,Cơ bản,Bổ sung
+"08. API, Hạ tầng & Triển khai",GPU Economics,Kinh tế học GPU,"Phân tích chi phí, mức sử dụng, năng lực, điện năng và sự khan hiếm GPU khi xây dựng hoặc vận hành AI.",Trung cấp,Từ nội dung gốc
+"08. API, Hạ tầng & Triển khai",Inference Server,Máy chủ suy luận,"Phần mềm tối ưu việc tải mô hình, lập lịch và xử lý yêu cầu suy luận.",Trung cấp,Bổ sung
+"08. API, Hạ tầng & Triển khai",Kubernetes,Nền tảng điều phối container,"Hệ thống quản lý triển khai, mở rộng, phục hồi và kết nối các container ở quy mô lớn.",Nâng cao,Bổ sung
+"08. API, Hạ tầng & Triển khai",Load Balancer,Bộ cân bằng tải,Phân phối yêu cầu đến nhiều phiên bản dịch vụ để tăng khả năng chịu tải và tính sẵn sàng.,Trung cấp,Bổ sung
+"08. API, Hạ tầng & Triển khai",Message Queue,Hàng đợi thông điệp,Hệ thống đệm và phân phối tác vụ giữa các dịch vụ để xử lý bất đồng bộ và tăng độ bền.,Trung cấp,Bổ sung
+"08. API, Hạ tầng & Triển khai",Model Serving,Phục vụ mô hình,Đưa mô hình vào dịch vụ có thể nhận yêu cầu và trả dự đoán ở môi trường vận hành.,Trung cấp,Bổ sung
+"08. API, Hạ tầng & Triển khai",REST API,API kiểu REST,"API dựa trên tài nguyên và các phương thức HTTP như GET, POST, PUT và DELETE.",Cơ bản,Bổ sung
+"08. API, Hạ tầng & Triển khai",Serverless,Kiến trúc không quản máy chủ,Mô hình triển khai trong đó nhà cung cấp quản lý hạ tầng và tự động cấp tài nguyên theo yêu cầu.,Trung cấp,Bổ sung
+"08. API, Hạ tầng & Triển khai",SSE (Server-Sent Events),Sự kiện gửi từ máy chủ,"Kết nối HTTP một chiều cho phép máy chủ liên tục đẩy dữ liệu đến trình duyệt, thường dùng cho streaming văn bản.",Trung cấp,Từ nội dung gốc
+"08. API, Hạ tầng & Triển khai",Streaming,Truyền dữ liệu theo luồng,Gửi kết quả từng phần ngay khi có thay vì đợi toàn bộ phản hồi hoàn tất.,Cơ bản,Bổ sung
+"08. API, Hạ tầng & Triển khai",Webhook,Thông báo webhook,Cơ chế một hệ thống chủ động gửi yêu cầu HTTP đến hệ thống khác khi một sự kiện xảy ra.,Cơ bản,Bổ sung

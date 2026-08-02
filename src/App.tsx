@@ -23,10 +23,12 @@ import {
 } from "./utils/courseStore";
 import { AuthScreen } from "./components/AuthScreen";
 import { ClassroomOnboarding } from "./components/ClassroomOnboarding";
+import { StudentClassDialog } from "./components/StudentClassDialog";
 import { AdminDashboard } from "./components/AdminDashboard";
 import { useAuth } from "./hooks/useAuth";
 import {
   createClassForCourse,
+  regenerateClassJoinCode,
   createCloudLesson,
   createCourse,
   loadCloudActivities,
@@ -44,7 +46,7 @@ import {
   type CloudCourse,
 } from "./utils/cloudClassroom";
 import { getVisibleLessons } from "./utils/lessonVisibility";
-import { queueLessonSummaryGeneration } from "./utils/lessonSummary";
+import { isExtractiveFallbackSummary, queueLessonSummaryGeneration } from "./utils/lessonSummary";
 import { getLessonSessionKey, resolveRestoredLessonId } from "./utils/lessonSession";
 
 export function App() {
@@ -54,6 +56,7 @@ export function App() {
   const [speedMultiplier, setSpeedMultiplier] = useState(0.16);
   const [savedMaps, setSavedMaps] = useState<Record<string, number>>({});
   const [teacherMode, setTeacherMode] = useState(false);
+  const [showStudentClasses, setShowStudentClasses] = useState(false);
   const [customLessons, setCustomLessons] = useState<TeacherLesson[]>([]);
   const [activities, setActivities] = useState<StudentActivity[]>([]);
   const [activeClassId, setActiveClassId] = useState<string | null>(null);
@@ -208,9 +211,10 @@ export function App() {
   useEffect(() => {
     if (auth.profile?.role !== "teacher") return;
     customLessons.forEach((lesson) => {
-      if (lesson.summary || !lesson.pdfUrl || queuedSummaryLessons.current.has(lesson.id)) return;
+      const obsoleteFallback = isExtractiveFallbackSummary(lesson.summary);
+      if ((lesson.summary && !obsoleteFallback) || !lesson.pdfUrl || queuedSummaryLessons.current.has(lesson.id)) return;
       queuedSummaryLessons.current.add(lesson.id);
-      void queueLessonSummaryGeneration(lesson.id, lesson.pdfUrl)
+      void queueLessonSummaryGeneration(lesson.id, lesson.pdfUrl, obsoleteFallback)
         .catch((error) => {
           queuedSummaryLessons.current.delete(lesson.id);
           console.error("Không thể tự động bổ sung tóm tắt:", error);
@@ -243,6 +247,7 @@ export function App() {
     setCustomLessons((current) => current.map((lesson) =>
       lesson.id === lessonId ? { ...lesson, pdfUrl } : lesson,
     ));
+    return pdfUrl;
   };
 
   const createLesson = async (lesson: TeacherLesson, pdf?: File) => {
@@ -310,6 +315,7 @@ export function App() {
   };
 
   const selectClass = (classId: string) => {
+    setSelectedLessonId(null);
     setActiveClassId(classId);
     setActiveCourseId(
       classes.find((row) => row.id === classId)?.course_id ?? null,
@@ -346,6 +352,7 @@ export function App() {
   };
 
   const handleClassroomReady = async (classId: string) => {
+    setSelectedLessonId(null);
     setActiveClassId(classId);
     const nextClasses = await loadMyClasses();
     setClasses(nextClasses);
@@ -433,6 +440,7 @@ export function App() {
         activities={activities}
         onCreateCourse={createProgram}
         onCreateClass={createClass}
+        onRegenerateJoinCode={regenerateClassJoinCode}
         onCreateLesson={createLesson}
         onUpdateLesson={updateLesson}
         onDeleteLesson={deleteLesson}
@@ -611,19 +619,15 @@ export function App() {
           </b>
         </div>
         <div className="account-actions">
-          {auth.profile.role === "student" && classes.length > 1 && (
-            <select
-              className="class-quick-select"
-              aria-label="Lớp đang học"
-              value={activeClassId ?? ""}
-              onChange={(event) => selectClass(event.target.value)}
-            >
-              {classes.map((row) => (
-                <option key={row.id} value={row.id}>
-                  {row.name}
-                </option>
-              ))}
-            </select>
+          {auth.profile.role === "student" && (
+            <>
+              {classes.length > 1 && (
+                <select className="class-quick-select" aria-label="Lớp đang học" value={activeClassId ?? ""} onChange={(event) => selectClass(event.target.value)}>
+                  {classes.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
+                </select>
+              )}
+              <button className="class-management-button" onClick={() => setShowStudentClasses(true)}>Lớp học</button>
+            </>
           )}
           {auth.profile.role === "teacher" && (
             <>
@@ -751,8 +755,21 @@ export function App() {
         <LearningConsole
           lesson={selectedLesson}
           classId={activeClassId}
+          canManageLesson={auth.profile.role === "teacher"}
           onRefreshPdf={() => refreshLessonPdf(selectedLesson.id)}
           onClose={closeLesson}
+        />
+      )}
+      {showStudentClasses && auth.profile.role === "student" && (
+        <StudentClassDialog
+          classes={classes}
+          activeClassId={activeClassId}
+          onSelectClass={(classId) => {
+            selectClass(classId);
+            setShowStudentClasses(false);
+          }}
+          onJoined={handleClassroomReady}
+          onClose={() => setShowStudentClasses(false)}
         />
       )}
     </main>
