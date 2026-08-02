@@ -349,9 +349,9 @@ async function persistLessonKeywords(database, lessonId, candidates, reusableKey
 
 async function loadLessonKeywords(database, lessonId) {
   if (!database) return [];
-  const result = await database.from('lesson_keywords').select('keyword_definitions!inner(term,definition,definition_version)').eq('lesson_id', lessonId).eq('keyword_definitions.definition_version', 'v2-pedagogical');
-  if (result.error) return [];
-  return (result.data || []).flatMap((row) => row.keyword_definitions ? [row.keyword_definitions] : []);
+  const result = await database.rpc('load_lesson_keywords', { target_lesson_id: lessonId });
+  if (result.error) throw result.error;
+  return result.data || [];
 }
 
 async function createDeckSummary(deckText, reusableKeywords = []) {

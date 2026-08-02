@@ -11,6 +11,7 @@ export function getInitialReleaseLocalValue(existingReleaseAt?: string, now = ne
 }
 
 export function toFutureReleaseIso(value: string, now = new Date()) {
+  if (value === toDateTimeLocalValue(now.toISOString())) return now.toISOString();
   const releaseAt = new Date(value);
   if (!value || Number.isNaN(releaseAt.getTime())) throw new Error('Hãy chọn ngày giờ mở bài hợp lệ.');
   if (releaseAt.getTime() <= now.getTime()) {

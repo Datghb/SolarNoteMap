@@ -755,6 +755,7 @@ export function App() {
         <LearningConsole
           lesson={selectedLesson}
           classId={activeClassId}
+          canManageLesson={auth.profile.role === "teacher"}
           onRefreshPdf={() => refreshLessonPdf(selectedLesson.id)}
           onClose={closeLesson}
         />

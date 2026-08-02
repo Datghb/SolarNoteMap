@@ -79,7 +79,7 @@ function renderSummary(summary: string, keywords: LessonKeyword[]) {
   });
 }
 
-export function LessonSummary({ lesson, onRefreshPdf }: { lesson: Lesson; onRefreshPdf?: () => Promise<string> }) {
+export function LessonSummary({ lesson, onRefreshPdf, canGenerateKeywords = false }: { lesson: Lesson; onRefreshPdf?: () => Promise<string>; canGenerateKeywords?: boolean }) {
   const initialSummary = isExtractiveFallbackSummary(lesson.summary) ? '' : (lesson.summary ?? '');
   const [summary, setSummary] = useState(initialSummary);
   const [keywords, setKeywords] = useState<LessonKeyword[]>(() => mergeKeywords(initialSummary, []));
@@ -120,7 +120,7 @@ export function LessonSummary({ lesson, onRefreshPdf }: { lesson: Lesson; onRefr
     fetchLessonKeywords(lesson.id).then(async (storedKeywords) => {
       if (!active) return;
       setKeywords(mergeKeywords(storedSummary, storedKeywords));
-      if (!storedSummary) return;
+      if (!storedSummary || !canGenerateKeywords) return;
       const generatedKeywords = await generateLessonKeywords(lesson.id, storedSummary);
       if (active) setKeywords(mergeKeywords(storedSummary, generatedKeywords));
     }).catch((reason) => console.error('Không tải được từ điển keyword:', reason));
@@ -129,15 +129,17 @@ export function LessonSummary({ lesson, onRefreshPdf }: { lesson: Lesson; onRefr
       if (!active) return;
       setSummary(result.summary);
       setKeywords(mergeKeywords(result.summary, result.keywords));
-      generateLessonKeywords(lesson.id, result.summary).then((generatedKeywords) => {
-        if (active) setKeywords(mergeKeywords(result.summary, generatedKeywords));
-      }).catch((reason) => console.error('Không tạo được chú giải keyword:', reason));
+      if (canGenerateKeywords) {
+        generateLessonKeywords(lesson.id, result.summary).then((generatedKeywords) => {
+          if (active) setKeywords(mergeKeywords(result.summary, generatedKeywords));
+        }).catch((reason) => console.error('Không tạo được chú giải keyword:', reason));
+      }
       setSource(result.source);
     }).catch((reason) => {
       if (active) setError(reason instanceof Error ? reason.message : 'Không thể tạo bản tóm tắt.');
     }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; chatControllerRef.current?.abort(); };
-  }, [lesson.id, lesson.pdfUrl, lesson.summary, retryPdfUrl, summaryRetryToken]);
+  }, [lesson.id, lesson.pdfUrl, lesson.summary, retryPdfUrl, summaryRetryToken, canGenerateKeywords]);
 
   const retrySummary = async () => {
     setLoading(true);
