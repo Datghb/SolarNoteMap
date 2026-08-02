@@ -16,7 +16,7 @@ import { loadCloudLearningState } from '../utils/cloudClassroom';
 
 const EMPTY_MAP: KnowledgeMap = { nodes: [], edges: [] };
 
-export function LearningConsole({ lesson, classId, onClose, onRefreshPdf }: { lesson: Lesson; classId: string; onClose: () => void; onRefreshPdf: () => Promise<void> }) {
+export function LearningConsole({ lesson, classId, onClose, onRefreshPdf }: { lesson: Lesson; classId: string; onClose: () => void; onRefreshPdf: () => Promise<string> }) {
   const [tab, setTab] = useState<'brief' | 'summary' | 'map' | 'community'>('brief');
   const [map, setMap] = useState<KnowledgeMap>(EMPTY_MAP);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -344,7 +344,7 @@ export function LearningConsole({ lesson, classId, onClose, onRefreshPdf }: { le
           </section>
         )}
 
-        {tab === 'summary' && <LessonSummary lesson={lesson} />}
+        {tab === 'summary' && <LessonSummary lesson={lesson} onRefreshPdf={onRefreshPdf} />}
 
         {tab === 'community' && (
           <CommunityQuestions

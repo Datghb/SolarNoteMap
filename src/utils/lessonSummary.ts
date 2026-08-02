@@ -1,6 +1,13 @@
 export type SummaryChatRole = 'user' | 'assistant';
 export interface SummaryChatMessage { role: SummaryChatRole; content: string }
-export interface LessonSummaryResult { summary: string; source: 'cache' | 'generated' }
+export interface LessonKeyword { term: string; definition: string }
+export interface LessonSummaryResult { summary: string; source: 'cache' | 'generated'; keywords: LessonKeyword[] }
+
+export function isExtractiveFallbackSummary(summary?: string) {
+  if (!summary) return false;
+  return summary.includes('## Nội dung theo từng slide')
+    && /### Trang \d+/.test(summary);
+}
 
 export async function queueLessonSummaryGeneration(lessonId: string, pdfUrl: string, force = false) {
   const response = await fetch('/api/lesson-summary/generate', {
@@ -21,8 +28,20 @@ export async function fetchLessonSummary(lessonId: string, pdfUrl?: string, forc
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(typeof payload.error === 'string' ? payload.error : 'Không thể tạo bản tóm tắt.');
       if (typeof payload.summary !== 'string' || !payload.summary.trim()) throw new Error('AI trả về bản tóm tắt không hợp lệ.');
-      return { summary: payload.summary.trim(), source: payload.source === 'cache' ? 'cache' : 'generated' } as LessonSummaryResult;
+      const keywords = Array.isArray(payload.keywords)
+        ? payload.keywords.filter((item: unknown): item is LessonKeyword => Boolean(item && typeof item === 'object' && typeof (item as LessonKeyword).term === 'string' && typeof (item as LessonKeyword).definition === 'string'))
+        : [];
+      return { summary: payload.summary.trim(), source: payload.source === 'cache' ? 'cache' : 'generated', keywords } as LessonSummaryResult;
     });
+}
+
+export async function fetchLessonKeywords(lessonId: string): Promise<LessonKeyword[]> {
+  const response = await fetch(`/api/lesson-keywords?${new URLSearchParams({ lessonId }).toString()}`, { headers: await getSupabaseAuthHeaders() });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(typeof payload.error === 'string' ? payload.error : 'Không thể tải từ điển keyword.');
+  return Array.isArray(payload.keywords)
+    ? payload.keywords.filter((item: unknown): item is LessonKeyword => Boolean(item && typeof item === 'object' && typeof (item as LessonKeyword).term === 'string' && typeof (item as LessonKeyword).definition === 'string'))
+    : [];
 }
 
 export async function askLessonSummaryAI(lessonId: string, questionValue: string, history: SummaryChatMessage[], signal?: AbortSignal, pdfUrl?: string, summaryValue?: string) {

@@ -44,7 +44,7 @@ import {
   type CloudCourse,
 } from "./utils/cloudClassroom";
 import { getVisibleLessons } from "./utils/lessonVisibility";
-import { queueLessonSummaryGeneration } from "./utils/lessonSummary";
+import { isExtractiveFallbackSummary, queueLessonSummaryGeneration } from "./utils/lessonSummary";
 import { getLessonSessionKey, resolveRestoredLessonId } from "./utils/lessonSession";
 
 export function App() {
@@ -208,9 +208,10 @@ export function App() {
   useEffect(() => {
     if (auth.profile?.role !== "teacher") return;
     customLessons.forEach((lesson) => {
-      if (lesson.summary || !lesson.pdfUrl || queuedSummaryLessons.current.has(lesson.id)) return;
+      const obsoleteFallback = isExtractiveFallbackSummary(lesson.summary);
+      if ((lesson.summary && !obsoleteFallback) || !lesson.pdfUrl || queuedSummaryLessons.current.has(lesson.id)) return;
       queuedSummaryLessons.current.add(lesson.id);
-      void queueLessonSummaryGeneration(lesson.id, lesson.pdfUrl)
+      void queueLessonSummaryGeneration(lesson.id, lesson.pdfUrl, obsoleteFallback)
         .catch((error) => {
           queuedSummaryLessons.current.delete(lesson.id);
           console.error("Không thể tự động bổ sung tóm tắt:", error);
@@ -243,6 +244,7 @@ export function App() {
     setCustomLessons((current) => current.map((lesson) =>
       lesson.id === lessonId ? { ...lesson, pdfUrl } : lesson,
     ));
+    return pdfUrl;
   };
 
   const createLesson = async (lesson: TeacherLesson, pdf?: File) => {
