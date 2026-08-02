@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { askLessonSummaryAI, fetchLessonKeywords, fetchLessonSummary, isExtractiveFallbackSummary, queueLessonSummaryGeneration } from './lessonSummary';
+import { askLessonSummaryAI, fetchLessonKeywords, fetchLessonSummary, generateLessonKeywords, isExtractiveFallbackSummary, queueLessonSummaryGeneration } from './lessonSummary';
 
 vi.mock('../lib/supabase', () => ({
   getSupabaseAuthHeaders: vi.fn().mockResolvedValue({ Authorization: 'Bearer test-access-token' }),
@@ -24,6 +24,12 @@ describe('lesson summary API', () => {
   it('loads persisted keyword definitions for a lesson', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ keywords: [{ term: 'LLM', definition: 'Mô hình ngôn ngữ lớn.' }] }), { status: 200 }));
     await expect(fetchLessonKeywords('ai-foundations')).resolves.toEqual([{ term: 'LLM', definition: 'Mô hình ngôn ngữ lớn.' }]);
+  });
+
+  it('requests pedagogical keyword explanations for an existing summary', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ keywords: [{ term: 'Eval', definition: 'Eval là quy trình kiểm tra có hệ thống chất lượng đầu ra của mô hình AI.' }] }), { status: 200 }));
+    await expect(generateLessonKeywords('day-5', 'Nội dung bài học có **Eval**.')).resolves.toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledWith('/api/lesson-keywords/generate', expect.objectContaining({ method: 'POST' }));
   });
 
   it('passes the uploaded PDF URL when summarizing a custom lesson', async () => {

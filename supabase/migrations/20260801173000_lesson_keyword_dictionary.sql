@@ -5,6 +5,7 @@ create table public.keyword_definitions (
   term text not null check (char_length(trim(term)) between 2 and 80),
   normalized_term text not null check (char_length(trim(normalized_term)) between 2 and 80),
   definition text not null check (char_length(trim(definition)) between 3 and 600),
+  definition_version text not null default 'v2-pedagogical',
   source_lesson_id text references public.lessons(id) on delete set null,
   created_by uuid not null references public.profiles(id) on delete restrict default auth.uid(),
   created_at timestamptz not null default now(),

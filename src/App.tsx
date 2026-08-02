@@ -23,10 +23,12 @@ import {
 } from "./utils/courseStore";
 import { AuthScreen } from "./components/AuthScreen";
 import { ClassroomOnboarding } from "./components/ClassroomOnboarding";
+import { StudentClassDialog } from "./components/StudentClassDialog";
 import { AdminDashboard } from "./components/AdminDashboard";
 import { useAuth } from "./hooks/useAuth";
 import {
   createClassForCourse,
+  regenerateClassJoinCode,
   createCloudLesson,
   createCourse,
   loadCloudActivities,
@@ -54,6 +56,7 @@ export function App() {
   const [speedMultiplier, setSpeedMultiplier] = useState(0.16);
   const [savedMaps, setSavedMaps] = useState<Record<string, number>>({});
   const [teacherMode, setTeacherMode] = useState(false);
+  const [showStudentClasses, setShowStudentClasses] = useState(false);
   const [customLessons, setCustomLessons] = useState<TeacherLesson[]>([]);
   const [activities, setActivities] = useState<StudentActivity[]>([]);
   const [activeClassId, setActiveClassId] = useState<string | null>(null);
@@ -312,6 +315,7 @@ export function App() {
   };
 
   const selectClass = (classId: string) => {
+    setSelectedLessonId(null);
     setActiveClassId(classId);
     setActiveCourseId(
       classes.find((row) => row.id === classId)?.course_id ?? null,
@@ -348,6 +352,7 @@ export function App() {
   };
 
   const handleClassroomReady = async (classId: string) => {
+    setSelectedLessonId(null);
     setActiveClassId(classId);
     const nextClasses = await loadMyClasses();
     setClasses(nextClasses);
@@ -435,6 +440,7 @@ export function App() {
         activities={activities}
         onCreateCourse={createProgram}
         onCreateClass={createClass}
+        onRegenerateJoinCode={regenerateClassJoinCode}
         onCreateLesson={createLesson}
         onUpdateLesson={updateLesson}
         onDeleteLesson={deleteLesson}
@@ -613,19 +619,15 @@ export function App() {
           </b>
         </div>
         <div className="account-actions">
-          {auth.profile.role === "student" && classes.length > 1 && (
-            <select
-              className="class-quick-select"
-              aria-label="Lớp đang học"
-              value={activeClassId ?? ""}
-              onChange={(event) => selectClass(event.target.value)}
-            >
-              {classes.map((row) => (
-                <option key={row.id} value={row.id}>
-                  {row.name}
-                </option>
-              ))}
-            </select>
+          {auth.profile.role === "student" && (
+            <>
+              {classes.length > 1 && (
+                <select className="class-quick-select" aria-label="Lớp đang học" value={activeClassId ?? ""} onChange={(event) => selectClass(event.target.value)}>
+                  {classes.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
+                </select>
+              )}
+              <button className="class-management-button" onClick={() => setShowStudentClasses(true)}>Lớp học</button>
+            </>
           )}
           {auth.profile.role === "teacher" && (
             <>
@@ -755,6 +757,18 @@ export function App() {
           classId={activeClassId}
           onRefreshPdf={() => refreshLessonPdf(selectedLesson.id)}
           onClose={closeLesson}
+        />
+      )}
+      {showStudentClasses && auth.profile.role === "student" && (
+        <StudentClassDialog
+          classes={classes}
+          activeClassId={activeClassId}
+          onSelectClass={(classId) => {
+            selectClass(classId);
+            setShowStudentClasses(false);
+          }}
+          onJoined={handleClassroomReady}
+          onClose={() => setShowStudentClasses(false)}
         />
       )}
     </main>

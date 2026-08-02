@@ -4,6 +4,7 @@ import { askSlideAI } from '../utils/slideAi';
 import { KnowledgeFlow } from './KnowledgeFlow';
 import { SelectablePdfPage } from './SelectablePdfPage';
 import { getPdfLessonLabel } from '../utils/lessonLabels';
+import { shouldSubmitOnEnter } from '../utils/submitOnEnter';
 
 type Understanding = 'understood' | 'question' | null;
 type InteractionMode = 'region' | 'ask' | null;
@@ -22,7 +23,6 @@ export function PdfSlideWorkspace({
   onPageChange,
   onNoteChange,
   onOpenMap,
-  onAskCommunity,
   onUnderstandingChange,
   onDocumentLoad,
   useBundledPdfContext,
@@ -40,11 +40,10 @@ export function PdfSlideWorkspace({
   onPageChange: (page: number) => void;
   onNoteChange: (note: string) => void;
   onOpenMap: () => void;
-  onAskCommunity: () => void;
   onUnderstandingChange: (status: 'understood' | 'question' | 'unmarked') => void;
   onDocumentLoad?: (pageCount: number) => void;
   useBundledPdfContext: boolean;
-  onPdfAccessError?: () => Promise<void>;
+  onPdfAccessError?: () => Promise<string>;
   lessonName: string;
 }) {
   const [interactionMode, setInteractionMode] = useState<InteractionMode>(null);
@@ -222,7 +221,7 @@ export function PdfSlideWorkspace({
       </header>
 
       <div className="pdf-stage" onWheel={handleSlideWheel}>
-        <SelectablePdfPage pageNumber={page} pdfUrl={pdfUrl} onDocumentLoad={onDocumentLoad} onPdfAccessError={onPdfAccessError} />
+        <SelectablePdfPage pageNumber={page} pdfUrl={pdfUrl} onDocumentLoad={onDocumentLoad} onPdfAccessError={onPdfAccessError ? async () => { await onPdfAccessError(); } : undefined} />
         {interactionMode === 'region' && <div className="region-select-layer region" onPointerDown={beginRegion} onPointerMove={updateRegion} onPointerUp={finishRegion}>
           {!regionDraft && !pendingRegion && <span>Kéo một khung quanh nội dung muốn hỏi AI</span>}
           {regionDraft && <i className="slide-region-box draft" style={{ left: `${regionDraft.x}%`, top: `${regionDraft.y}%`, width: `${regionDraft.width}%`, height: `${regionDraft.height}%` }} />}
@@ -231,7 +230,7 @@ export function PdfSlideWorkspace({
         {!interactionMode && <div className="slide-wheel-hint">Cuộn để đổi trang</div>}
         {anchor && <div className={`slide-context-composer ${interactionMode}`} style={{ left: `${anchor.x}%`, top: `${anchor.y}%` }} onPointerDown={(event) => event.stopPropagation()}>
           <header className="composer-drag-handle" onPointerDown={beginComposerDrag} onPointerMove={moveComposer} onPointerUp={endComposerDrag} onPointerCancel={endComposerDrag}><span>✦ Hỏi AI về mục này <small>kéo để di chuyển</small></span><button onPointerDown={(event) => event.stopPropagation()} onClick={() => setAnchor(null)}>×</button></header>
-            <textarea autoFocus value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Ví dụ: Khái niệm này nghĩa là gì?" onKeyDown={(event) => { if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) submitQuestion(); }} />
+            <textarea autoFocus value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Ví dụ: Khái niệm này nghĩa là gì?" onKeyDown={(event) => { if (shouldSubmitOnEnter({ key: event.key, shiftKey: event.shiftKey, isComposing: event.nativeEvent.isComposing }) && question.trim() && !asking) { event.preventDefault(); void submitQuestion(); } }} />
             <button className="context-primary" disabled={!question.trim() || asking} onClick={submitQuestion}>{asking ? 'AI đang đọc slide…' : 'Gửi câu hỏi'}</button>
             {aiError && <p className="slide-ai-error">{aiError}</p>}
             {answer && <div className="slide-ai-answer"><b>AI giải thích</b><p>{answer}</p></div>}
@@ -242,7 +241,7 @@ export function PdfSlideWorkspace({
         <div className="inline-note-card pdf-note-card">
           <div><span><i>✎</i> Ghi chú trang {page}</span><small>{note.trim() ? `${note.trim().split(/\s+/).length} từ` : 'Chưa có ghi chú'}</small></div>
           <textarea value={note} onChange={(event) => onNoteChange(event.target.value)} placeholder="Ghi lại điều bạn hiểu, một ví dụ hoặc phần còn thắc mắc ở trang này…" />
-          <div className="pdf-understanding"><button className={status === 'understood' ? 'active' : ''} onClick={() => changeUnderstanding('understood')}>✓ Đã hiểu</button><button className={status === 'question' ? 'active question' : ''} onClick={() => changeUnderstanding('question')}>? Chưa rõ</button><button onClick={onAskCommunity}>Hỏi cộng đồng →</button></div>
+          <div className="pdf-understanding"><button className={status === 'understood' ? 'active' : ''} onClick={() => changeUnderstanding('understood')}>✓ Đã hiểu</button><button className={status === 'question' ? 'active question' : ''} onClick={() => changeUnderstanding('question')}>? Chưa rõ</button></div>
           <div className="inline-ai-status"><i>{isThinking ? '✦' : mapSource === 'fallback' ? '!' : hasMapContent ? '✓' : '·'}</i><span>{isThinking ? 'AI đang cập nhật sơ đồ…' : mapSource === 'ai' && hasMapContent ? 'Đã đồng bộ vào sơ đồ' : hasMapContent ? 'Sơ đồ cập nhật từ ghi chú' : 'Sơ đồ chờ ghi chú đầu tiên'}</span></div>
         </div>
         <div className="inline-map-card pdf-mini-map"><header><div><span>Mind map đang hình thành</span><small>{map.nodes.length} ý · {map.edges.length} liên kết</small></div><button onClick={onOpenMap}>Mở rộng ↗</button></header><div className="mini-flow">{map.nodes.length ? <KnowledgeFlow compact map={map} accent={accent} onSelect={onOpenMap} /> : <div className="mini-map-empty"><i>✦</i><span>Ghi chú để tạo nhánh đầu tiên</span></div>}</div></div>

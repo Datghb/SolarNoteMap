@@ -44,6 +44,19 @@ export async function fetchLessonKeywords(lessonId: string): Promise<LessonKeywo
     : [];
 }
 
+export async function generateLessonKeywords(lessonId: string, summary: string): Promise<LessonKeyword[]> {
+  const response = await fetch('/api/lesson-keywords/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...await getSupabaseAuthHeaders() },
+    body: JSON.stringify({ lessonId, summary: summary.slice(0, 20_000) }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(typeof payload.error === 'string' ? payload.error : 'Không thể tạo chú giải keyword.');
+  return Array.isArray(payload.keywords)
+    ? payload.keywords.filter((item: unknown): item is LessonKeyword => Boolean(item && typeof item === 'object' && typeof (item as LessonKeyword).term === 'string' && typeof (item as LessonKeyword).definition === 'string'))
+    : [];
+}
+
 export async function askLessonSummaryAI(lessonId: string, questionValue: string, history: SummaryChatMessage[], signal?: AbortSignal, pdfUrl?: string, summaryValue?: string) {
   const question = questionValue.trim();
   if (!question || question.length > 1_000) throw new Error('Câu hỏi phải có từ 1 đến 1.000 ký tự.');
