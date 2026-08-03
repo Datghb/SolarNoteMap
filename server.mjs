@@ -329,7 +329,7 @@ async function persistLessonKeywords(database, lessonId, candidates, reusableKey
     );
     if (inserted.error) {
       console.error('Không thể lưu keyword mới:', inserted.error.message);
-      return [...reusableKeywords.map(({ term, definition }) => ({ term, definition })), ...newCandidates.map(({ term, definition }) => ({ term, definition }))];
+      throw new Error(`Không thể lưu keyword mới: ${inserted.error.message}`);
     }
   }
   const normalizedTerms = [...new Set(candidates.map((item) => item.normalizedTerm))];
@@ -337,12 +337,15 @@ async function persistLessonKeywords(database, lessonId, candidates, reusableKey
   const stored = await database.from('keyword_definitions').select('id,term,normalized_term,definition').eq('definition_version', 'v2-pedagogical').in('normalized_term', normalizedTerms);
   if (stored.error) {
     console.error('Không thể tải keyword đã lưu:', stored.error.message);
-    return [];
+    throw new Error(`Không thể tải keyword đã lưu: ${stored.error.message}`);
   }
   const links = (stored.data || []).map((item) => ({ lesson_id: lessonId, keyword_id: item.id }));
   if (links.length) {
     const linked = await database.from('lesson_keywords').upsert(links, { onConflict: 'lesson_id,keyword_id', ignoreDuplicates: true });
-    if (linked.error) console.error('Không thể liên kết keyword với bài học:', linked.error.message);
+    if (linked.error) {
+      console.error('Không thể liên kết keyword với bài học:', linked.error.message);
+      throw new Error(`Không thể liên kết keyword với bài học: ${linked.error.message}`);
+    }
   }
   return (stored.data || []).map(({ term, definition }) => ({ term, definition }));
 }
@@ -412,7 +415,7 @@ async function getCachedDeckSummary(lessonId, uploadedPdfUrl, database, force = 
   if (database) {
     const stored = await database
       .from('lessons')
-      .select('pdf_path,created_by,summary,summary_model,summary_pdf_path,summarized_at')
+      .select('pdf_path,created_by,course_id,summary,summary_model,summary_pdf_path,summarized_at')
       .eq('id', lessonId)
       .maybeSingle();
     if (stored.error && !isMissingSummarySchema(stored.error)) {
@@ -441,20 +444,29 @@ async function getCachedDeckSummary(lessonId, uploadedPdfUrl, database, force = 
   if (uploadedPdfUrl && (!lessonRow || lessonRow.created_by !== actorId)) {
     throw new Error('Bạn không có quyền tạo lại bản tóm tắt cho bài học này.');
   }
-  if (deckSummaryInFlight.has(cacheKey)) return deckSummaryInFlight.get(cacheKey);
+  const ownership = lessonRow?.course_id && database
+    ? await database.rpc('is_course_owner', { target_course_id: lessonRow.course_id })
+    : { data: false, error: null };
+  if (ownership.error) throw new Error(`Không thể kiểm tra quyền bài học: ${ownership.error.message}`);
+  const canManageKeywords = ownership.data === true;
+  const taskKey = `${cacheKey}:${canManageKeywords ? 'owner' : 'reader'}`;
+  if (deckSummaryInFlight.has(taskKey)) return deckSummaryInFlight.get(taskKey);
   const task = (async () => {
     const deckText = await getDeckText(uploadedPdfUrl);
     if (!deckText) throw new Error('Không đọc được nội dung bài giảng.');
     if (!client) throw new Error('AI provider is not configured.');
     const reusableKeywords = await loadReusableKeywords(database, deckText);
     const summary = await createDeckSummary(deckText, reusableKeywords);
-    const candidateTerms = extractKeywordCandidates(summary);
-    const selectedReusableKeywords = await loadReusableKeywords(database, summary);
-    const generatedKeywords = await createPedagogicalKeywordDefinitions(summary, candidateTerms, selectedReusableKeywords);
-    const keywords = await persistLessonKeywords(database, lessonId, [
-      ...generatedKeywords,
-      ...selectedReusableKeywords.map((item) => ({ term: item.term, normalizedTerm: item.normalized_term, definition: item.definition })),
-    ], selectedReusableKeywords, actorId);
+    let keywords = await loadLessonKeywords(database, lessonId);
+    if (canManageKeywords) {
+      const candidateTerms = extractKeywordCandidates(summary);
+      const selectedReusableKeywords = await loadReusableKeywords(database, summary);
+      const generatedKeywords = await createPedagogicalKeywordDefinitions(summary, candidateTerms, selectedReusableKeywords);
+      keywords = await persistLessonKeywords(database, lessonId, [
+        ...generatedKeywords,
+        ...selectedReusableKeywords.map((item) => ({ term: item.term, normalizedTerm: item.normalized_term, definition: item.definition })),
+      ], selectedReusableKeywords, actorId);
+    }
     const summaryModel = `${provider}:${model}`;
     await persistSummaryEntry(cacheKey, { summary, lessonId, model: summaryModel, provider, createdAt: new Date().toISOString() });
     if (database && lessonRow) {
@@ -472,8 +484,8 @@ async function getCachedDeckSummary(lessonId, uploadedPdfUrl, database, force = 
       }
     }
     return { summary, source: 'generated', keywords };
-  })().finally(() => deckSummaryInFlight.delete(cacheKey));
-  deckSummaryInFlight.set(cacheKey, task);
+  })().finally(() => deckSummaryInFlight.delete(taskKey));
+  deckSummaryInFlight.set(taskKey, task);
   return task;
 }
 
@@ -733,8 +745,11 @@ app.post('/api/lesson-keywords/generate', async (request, response) => {
   if (!/^[a-z0-9-]{2,64}$/.test(lessonId)) return response.status(400).json({ error: 'Bài học không hợp lệ.' });
   if (!summary || summary.length > 20_000) return response.status(400).json({ error: 'Bản tóm tắt không hợp lệ.' });
   const database = createRequestDatabase(request);
-  const lesson = await database?.from('lessons').select('created_by').eq('id', lessonId).maybeSingle();
-  if (lesson?.error || lesson?.data?.created_by !== request.authUser.id) {
+  const lesson = await database?.from('lessons').select('course_id').eq('id', lessonId).maybeSingle();
+  const ownership = lesson?.data?.course_id
+    ? await database.rpc('is_course_owner', { target_course_id: lesson.data.course_id })
+    : { data: false, error: lesson?.error };
+  if (lesson?.error || ownership.error || ownership.data !== true) {
     return response.status(403).json({ error: 'Chỉ giáo viên sở hữu bài học mới có thể tạo chú giải keyword.' });
   }
   try {

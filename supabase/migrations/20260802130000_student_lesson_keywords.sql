@@ -15,15 +15,13 @@ as $$
       exists (
         select 1 from public.lessons lesson
         where lesson.id = target_lesson_id
-          and (lesson.created_by = auth.uid() or public.is_admin())
+          and (public.is_course_owner(lesson.course_id) or public.is_admin())
       )
       or exists (
         select 1
         from public.class_lesson_schedules schedule
         where schedule.lesson_id = target_lesson_id
-          and schedule.release_at is not null
-          and schedule.release_at <= now()
-          and public.is_class_member(schedule.class_id)
+          and public.can_access_class_lesson(schedule.class_id, target_lesson_id)
       )
     )
   order by definitions.term;
