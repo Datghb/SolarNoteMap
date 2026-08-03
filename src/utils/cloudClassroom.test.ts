@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { communitySchemaIsMissing, courseSchemaIsMissing, fromCloudActivityKind, isClassLessonReleased, mapCommunityQuestionRows, parseRegeneratedJoinCode, toCloudActivityKind } from './cloudClassroom';
+import { describe, expect, it, vi } from 'vitest';
+import { communitySchemaIsMissing, courseSchemaIsMissing, fromCloudActivityKind, isClassLessonReleased, mapCommunityQuestionRows, mapLessonRows, parseRegeneratedJoinCode, toCloudActivityKind } from './cloudClassroom';
 
 describe('cloud classroom activity mapping', () => {
   it('preserves slide and understanding interactions as distinct events', () => {
@@ -45,5 +45,24 @@ describe('cloud classroom activity mapping', () => {
     expect(parseRegeneratedJoinCode({ joinCode: 'abc12345' })).toBe('abc12345');
     expect(() => parseRegeneratedJoinCode({ joinCode: '' })).toThrow('mã lớp mới không hợp lệ');
     expect(() => parseRegeneratedJoinCode(null)).toThrow('mã lớp mới không hợp lệ');
+  });
+
+  it('signs all lesson PDFs in one storage request', async () => {
+    const createSignedUrls = vi.fn().mockResolvedValue({
+      data: [
+        { path: 'course/one.pdf', signedUrl: 'https://files.test/one.pdf' },
+        { path: 'course/two.pdf', signedUrl: 'https://files.test/two.pdf' },
+      ],
+      error: null,
+    });
+    const client = { storage: { from: vi.fn(() => ({ createSignedUrls })) } } as never;
+    const lessons = await mapLessonRows(client, [
+      { id: 'one', title: 'One', short_name: 'One', pdf_path: 'course/one.pdf' },
+      { id: 'two', title: 'Two', short_name: 'Two', pdf_path: 'course/two.pdf' },
+    ]);
+
+    expect(createSignedUrls).toHaveBeenCalledOnce();
+    expect(createSignedUrls).toHaveBeenCalledWith(['course/one.pdf', 'course/two.pdf'], 3600);
+    expect(lessons.map((lesson) => lesson.pdfUrl)).toEqual(['https://files.test/one.pdf', 'https://files.test/two.pdf']);
   });
 });
