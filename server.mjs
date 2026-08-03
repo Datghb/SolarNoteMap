@@ -142,9 +142,8 @@ async function getCachedSlideSummary(page) {
 
 async function getDeckText(uploadedPdfUrl) {
   const document = await getDeckDocument(uploadedPdfUrl);
-  const pages = [];
   const pageCharacterBudget = Math.max(100, Math.floor(7_000 / document.numPages));
-  for (let page = 1; page <= document.numPages; page += 1) {
+  const extractPageText = async (page) => {
     const pdfPage = await document.getPage(page);
     const content = await pdfPage.getTextContent();
     const rawText = content.items.map((item) => ('str' in item ? item.str : '')).join(' ').replace(/\s+/g, ' ').trim();
@@ -161,9 +160,18 @@ async function getDeckText(uploadedPdfUrl) {
     // Preserve coverage across the whole deck while staying within free-tier
     // context limits. Slide text is ordered, so the opening portion contains
     // the title and primary teaching points in this deck.
-    if (text) pages.push(`[Trang ${page}]\n${text.slice(0, Math.min(300, pageCharacterBudget))}`);
+    return text ? `[Trang ${page}]\n${text.slice(0, Math.min(300, pageCharacterBudget))}` : '';
+  };
+  const pages = [];
+  const extractionConcurrency = 8;
+  for (let start = 1; start <= document.numPages; start += extractionConcurrency) {
+    const pageNumbers = Array.from(
+      { length: Math.min(extractionConcurrency, document.numPages - start + 1) },
+      (_, index) => start + index,
+    );
+    pages.push(...await Promise.all(pageNumbers.map(extractPageText)));
   }
-  return pages.join('\n\n');
+  return pages.filter(Boolean).join('\n\n');
 }
 
 function validateUploadedPdfUrl(value) {
@@ -449,12 +457,7 @@ async function getCachedDeckSummary(lessonId, uploadedPdfUrl, database, force = 
   if (uploadedPdfUrl && (!lessonRow || lessonRow.created_by !== actorId)) {
     throw new Error('Bạn không có quyền tạo lại bản tóm tắt cho bài học này.');
   }
-  const ownership = lessonRow?.course_id && database
-    ? await database.rpc('is_course_owner', { target_course_id: lessonRow.course_id })
-    : { data: false, error: null };
-  if (ownership.error) throw new Error(`Không thể kiểm tra quyền bài học: ${ownership.error.message}`);
-  const canManageKeywords = ownership.data === true;
-  const taskKey = `${cacheKey}:${canManageKeywords ? 'owner' : 'reader'}`;
+  const taskKey = cacheKey;
   if (deckSummaryInFlight.has(taskKey)) return deckSummaryInFlight.get(taskKey);
   const task = (async () => {
     const deckText = await getDeckText(uploadedPdfUrl);
@@ -462,16 +465,7 @@ async function getCachedDeckSummary(lessonId, uploadedPdfUrl, database, force = 
     if (!client) throw new Error('AI provider is not configured.');
     const reusableKeywords = await loadReusableKeywords(database, deckText);
     const summary = await createDeckSummary(deckText, reusableKeywords);
-    let keywords = await loadLessonKeywords(database, lessonId);
-    if (canManageKeywords) {
-      const candidateTerms = extractKeywordCandidates(summary);
-      const selectedReusableKeywords = await loadReusableKeywords(database, summary);
-      const generatedKeywords = await createPedagogicalKeywordDefinitions(summary, candidateTerms, selectedReusableKeywords);
-      keywords = await persistLessonKeywords(database, lessonId, [
-        ...generatedKeywords,
-        ...selectedReusableKeywords.map((item) => ({ term: item.term, normalizedTerm: item.normalized_term, definition: item.definition })),
-      ], selectedReusableKeywords, actorId);
-    }
+    const keywords = await loadLessonKeywords(database, lessonId);
     const summaryModel = `${provider}:${model}`;
     if (database && lessonRow) {
       const persisted = await database

@@ -288,28 +288,34 @@ export async function refreshCloudLessonPdfUrl(lessonId: string) {
   return signed.data.signedUrl;
 }
 
-async function mapLessonRows(client: ReturnType<typeof requireSupabase>, rows: Record<string, any>[]) {
+export async function mapLessonRows(client: ReturnType<typeof requireSupabase>, rows: Record<string, any>[]) {
   const palettes = resolveLessonPalettes(rows.map((row) => ({
     id: row.id,
     shortName: row.short_name,
     name: row.title,
   })));
-  return Promise.all(rows.map(async (row, index) => {
-    const signed = row.pdf_path
-      ? await client.storage.from('lesson-pdfs').createSignedUrl(row.pdf_path, 3600)
-      : { data: null, error: null };
+  const pdfPaths = [...new Set(rows.flatMap((row) => typeof row.pdf_path === 'string' && row.pdf_path ? [row.pdf_path] : []))];
+  const signedUrlsByPath = new Map<string, string>();
+  if (pdfPaths.length) {
+    const signed = await client.storage.from('lesson-pdfs').createSignedUrls(pdfPaths, 3600);
     if (signed.error) throw signed.error;
+    for (const item of signed.data ?? []) {
+      if (item.error) throw new Error(item.error);
+      if (item.path && item.signedUrl) signedUrlsByPath.set(item.path, item.signedUrl);
+    }
+  }
+  return rows.map((row, index) => {
     const palette = palettes[index];
     return {
     id: row.id, name: row.title, shortName: row.short_name, subtitle: isClassLessonReleased(row.published_at) ? 'Bài giảng đang mở' : row.published_at ? 'Bài giảng đã lên lịch' : 'Bài giảng đang khóa',
     description: row.description, color: palette.color,
     colors: palette.colors, published: isClassLessonReleased(row.published_at), availableAt: row.published_at ?? undefined, pdfName: row.pdf_path?.split('/').pop(),
-    pdfPath: row.pdf_path ?? undefined, pdfUrl: signed.data?.signedUrl,
+    pdfPath: row.pdf_path ?? undefined, pdfUrl: row.pdf_path ? signedUrlsByPath.get(row.pdf_path) : undefined,
     summary: typeof row.summary === 'string' && row.summary.trim() ? row.summary.trim() : undefined,
     summarizedAt: row.summarized_at ?? undefined,
     createdAt: row.created_at, updatedAt: row.updated_at,
     };
-  }));
+  });
 }
 
 function safeSlug(value: string) {
