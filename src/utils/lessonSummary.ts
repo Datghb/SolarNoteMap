@@ -3,6 +3,48 @@ export interface SummaryChatMessage { role: SummaryChatRole; content: string }
 export interface LessonKeyword { term: string; definition: string }
 export interface LessonSummaryResult { summary: string; source: 'cache' | 'generated'; keywords: LessonKeyword[] }
 
+const summaryMemoryCache = new Map<string, LessonSummaryResult>();
+const summarySessionPrefix = 'solar-lesson-summary:';
+
+function getSummaryCacheKey(lessonId: string, pdfIdentity = '') {
+  return `${lessonId}:${pdfIdentity || 'current'}`;
+}
+
+export function cacheLessonSummary(lessonId: string, result: LessonSummaryResult, pdfIdentity = '') {
+  const cached = { ...result, source: 'cache' as const };
+  const key = getSummaryCacheKey(lessonId, pdfIdentity);
+  summaryMemoryCache.set(key, cached);
+  try {
+    globalThis.sessionStorage?.setItem(`${summarySessionPrefix}${key}`, JSON.stringify(cached));
+  } catch {
+    // Memory cache remains available when session storage is blocked.
+  }
+  return cached;
+}
+
+export function getCachedLessonSummary(lessonId: string, pdfIdentity = ''): LessonSummaryResult | null {
+  const key = getSummaryCacheKey(lessonId, pdfIdentity);
+  const inMemory = summaryMemoryCache.get(key);
+  if (inMemory) return inMemory;
+  try {
+    const storageKey = `${summarySessionPrefix}${key}`;
+    const stored = globalThis.sessionStorage?.getItem(storageKey);
+    if (!stored) return null;
+    const parsed = JSON.parse(stored) as Partial<LessonSummaryResult>;
+    if (typeof parsed.summary !== 'string' || !parsed.summary.trim()) return null;
+    const cached: LessonSummaryResult = {
+      summary: parsed.summary.trim(),
+      source: 'cache',
+      keywords: Array.isArray(parsed.keywords) ? parsed.keywords.filter((item): item is LessonKeyword => Boolean(item && typeof item.term === 'string' && typeof item.definition === 'string')) : [],
+    };
+    summaryMemoryCache.set(key, cached);
+    return cached;
+  } catch {
+    try { globalThis.sessionStorage?.removeItem(`${summarySessionPrefix}${key}`); } catch { /* Storage is unavailable. */ }
+    return null;
+  }
+}
+
 export function isExtractiveFallbackSummary(summary?: string) {
   if (!summary) return false;
   return summary.includes('## Nội dung theo từng slide')
@@ -19,7 +61,11 @@ export async function queueLessonSummaryGeneration(lessonId: string, pdfUrl: str
   if (!response.ok) throw new Error(typeof payload.error === 'string' ? payload.error : 'Không thể bắt đầu tạo bản tóm tắt.');
 }
 
-export async function fetchLessonSummary(lessonId: string, pdfUrl?: string, force = false): Promise<LessonSummaryResult> {
+export async function fetchLessonSummary(lessonId: string, pdfUrl?: string, force = false, pdfIdentity = ''): Promise<LessonSummaryResult> {
+  if (!force) {
+    const cached = getCachedLessonSummary(lessonId, pdfIdentity);
+    if (cached) return cached;
+  }
   const query = new URLSearchParams({ lessonId });
   if (pdfUrl) query.set('pdfUrl', pdfUrl);
   if (force) query.set('force', 'true');
@@ -31,7 +77,9 @@ export async function fetchLessonSummary(lessonId: string, pdfUrl?: string, forc
       const keywords = Array.isArray(payload.keywords)
         ? payload.keywords.filter((item: unknown): item is LessonKeyword => Boolean(item && typeof item === 'object' && typeof (item as LessonKeyword).term === 'string' && typeof (item as LessonKeyword).definition === 'string'))
         : [];
-      return { summary: payload.summary.trim(), source: payload.source === 'cache' ? 'cache' : 'generated', keywords } as LessonSummaryResult;
+      const result = { summary: payload.summary.trim(), source: payload.source === 'cache' ? 'cache' : 'generated', keywords } as LessonSummaryResult;
+      cacheLessonSummary(lessonId, result, pdfIdentity);
+      return result;
     });
 }
 

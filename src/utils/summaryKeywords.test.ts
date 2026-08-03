@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { isTechnicalKeywordDefinition, splitLinesWithFirstKeywordOccurrences, splitTextWithKeywords } from './summaryKeywords';
+import { extractSummaryKeywordDefinitions, isTechnicalKeywordDefinition, splitLinesWithFirstKeywordOccurrences, splitTextWithKeywords } from './summaryKeywords';
 
 describe('summary keyword helpers', () => {
+  it('extracts technical definitions from the summary glossary', () => {
+    expect(extractSummaryKeywordDefinitions([
+      '## Thuật ngữ chuyên ngành',
+      '- **Evaluation**: Quy trình đo lường có hệ thống chất lượng đầu ra của mô hình AI.',
+      '- **DAY 08**: Nhãn của buổi học và không phải thuật ngữ kỹ thuật.',
+    ].join('\n'))).toEqual([
+      { term: 'Evaluation', definition: 'Quy trình đo lường có hệ thống chất lượng đầu ra của mô hình AI.' },
+    ]);
+  });
+
   it('rejects course titles even when a stored explanation exists', () => {
     expect(isTechnicalKeywordDefinition({ term: 'AIINACTION · DAY05 BATCH02', definition: 'Một phần giải thích đủ dài để vượt qua giới hạn tối thiểu.' })).toBe(false);
     expect(isTechnicalKeywordDefinition({ term: 'Uncertainty', definition: 'Uncertainty mô tả mức độ không chắc chắn vốn có trong đầu ra của một hệ thống AI.' })).toBe(true);

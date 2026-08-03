@@ -29,6 +29,17 @@ export function isTechnicalKeywordDefinition(item: KeywordDefinition) {
     && /^[\p{L}\p{N}+#&()./_\-\s]+$/u.test(term);
 }
 
+export function extractSummaryKeywordDefinitions(summary: string): KeywordDefinition[] {
+  const definitions = new Map<string, KeywordDefinition>();
+  for (const line of summary.split('\n')) {
+    const match = line.match(/^\s*[-*]\s+\*\*([^*]+)\*\*\s*[:–—-]\s*(.+?)\s*$/u);
+    if (!match) continue;
+    const item = { term: match[1].trim(), definition: match[2].trim() };
+    if (isTechnicalKeywordDefinition(item)) definitions.set(normalizeKeywordTerm(item.term), item);
+  }
+  return [...definitions.values()];
+}
+
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

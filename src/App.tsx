@@ -48,6 +48,8 @@ import {
 import { getVisibleLessons } from "./utils/lessonVisibility";
 import { isExtractiveFallbackSummary, queueLessonSummaryGeneration } from "./utils/lessonSummary";
 import { getLessonSessionKey, resolveRestoredLessonId } from "./utils/lessonSession";
+import { builtInSlidePdfUrl, prefetchPdfPage } from "./components/SelectablePdfPage";
+import { createPdfPreloadPlan } from "./utils/pdfLoading";
 
 export function App() {
   const auth = useAuth();
@@ -57,6 +59,7 @@ export function App() {
   const [savedMaps, setSavedMaps] = useState<Record<string, number>>({});
   const [teacherMode, setTeacherMode] = useState(false);
   const [showStudentClasses, setShowStudentClasses] = useState(false);
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [customLessons, setCustomLessons] = useState<TeacherLesson[]>([]);
   const [activities, setActivities] = useState<StudentActivity[]>([]);
   const [activeClassId, setActiveClassId] = useState<string | null>(null);
@@ -67,6 +70,8 @@ export function App() {
   const [cloudError, setCloudError] = useState("");
   const [loadedLessonsClassId, setLoadedLessonsClassId] = useState<string | null>(null);
   const queuedSummaryLessons = useRef(new Set<string>());
+  const accountMenuRef = useRef<HTMLDivElement>(null);
+  const profileButtonRef = useRef<HTMLButtonElement>(null);
   const lessons = getVisibleLessons(customLessons, auth.profile?.role);
   const publishedLessonCount = customLessons.filter(
     (lesson) => lesson.published,
@@ -222,9 +227,92 @@ export function App() {
     });
   }, [auth.profile?.role, customLessons]);
 
+  useEffect(() => {
+    if (!showAccountMenu) return;
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!accountMenuRef.current?.contains(event.target as Node)) setShowAccountMenu(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowAccountMenu(false);
+        profileButtonRef.current?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [showAccountMenu]);
+
+  useEffect(() => {
+    if (auth.profile?.role !== "student" || !activeClassId || loadedLessonsClassId !== activeClassId) return;
+    const pdfUrls = lessons.flatMap((lesson) => {
+      if (lesson.pdfUrl) return [lesson.pdfUrl];
+      return lesson.id === "ai-foundations" ? [builtInSlidePdfUrl] : [];
+    });
+    const { immediate } = createPdfPreloadPlan(pdfUrls);
+    if (!immediate.length) return;
+
+    let cancelled = false;
+    let nextIndex = 0;
+    const runWorker = async () => {
+      while (!cancelled && nextIndex < immediate.length) {
+        const item = immediate[nextIndex];
+        nextIndex += 1;
+        await prefetchPdfPage(item.pdfUrl, item.pageNumber).catch(() => undefined);
+      }
+    };
+    void Promise.all([runWorker(), runWorker()]);
+    return () => { cancelled = true; };
+  }, [activeClassId, auth.profile?.role, customLessons, loadedLessonsClassId]);
+
+  useEffect(() => {
+    if (auth.profile?.role !== "student" || !activeClassId || loadedLessonsClassId !== activeClassId || selectedLessonId) return;
+    const pdfUrls = lessons.flatMap((lesson) => {
+      if (lesson.pdfUrl) return [lesson.pdfUrl];
+      return lesson.id === "ai-foundations" ? [builtInSlidePdfUrl] : [];
+    });
+    const { deferred: queue } = createPdfPreloadPlan(pdfUrls);
+    if (!queue.length) return;
+
+    let cancelled = false;
+    let idleHandle: number | null = null;
+    let timerHandle: number | null = null;
+    const idleWindow = window as Window & {
+      requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+    const schedule = (index: number) => {
+      if (cancelled || index >= queue.length) return;
+      const warmNextPage = () => {
+        if (cancelled) return;
+        const item = queue[index];
+        void prefetchPdfPage(item.pdfUrl, item.pageNumber)
+          .catch(() => undefined)
+          .finally(() => schedule(index + 1));
+      };
+      if (idleWindow.requestIdleCallback) {
+        idleHandle = idleWindow.requestIdleCallback(warmNextPage, { timeout: 1200 });
+      } else {
+        timerHandle = window.setTimeout(warmNextPage, 450);
+      }
+    };
+    schedule(0);
+    return () => {
+      cancelled = true;
+      if (idleHandle !== null) idleWindow.cancelIdleCallback?.(idleHandle);
+      if (timerHandle !== null) window.clearTimeout(timerHandle);
+    };
+  }, [activeClassId, auth.profile?.role, customLessons, loadedLessonsClassId, selectedLessonId]);
+
   const selectByPlanetName = (shortName: string) => {
     const lesson = lessons.find((item) => item.shortName === shortName);
     if (lesson) {
+      if (lesson.pdfUrl || lesson.id === "ai-foundations") {
+        void prefetchPdfPage(lesson.pdfUrl ?? builtInSlidePdfUrl).catch(() => undefined);
+      }
       setSelectedLessonId(lesson.id);
       if (activeClassId) localStorage.setItem(getLessonSessionKey(activeClassId), lesson.id);
       recordStudentActivity({ lessonId: lesson.id, type: "lesson_opened" });
@@ -232,6 +320,10 @@ export function App() {
   };
 
   const openLesson = (lessonId: string) => {
+    const lesson = lessons.find((item) => item.id === lessonId);
+    if (lesson && (lesson.pdfUrl || lesson.id === "ai-foundations")) {
+      void prefetchPdfPage(lesson.pdfUrl ?? builtInSlidePdfUrl).catch(() => undefined);
+    }
     setSelectedLessonId(lessonId);
     if (activeClassId) localStorage.setItem(getLessonSessionKey(activeClassId), lessonId);
     recordStudentActivity({ lessonId, type: "lesson_opened" });
@@ -618,7 +710,7 @@ export function App() {
             {publishedLessonCount} / {customLessons.length || 0}
           </b>
         </div>
-        <div className="account-actions">
+        <div ref={accountMenuRef} className="account-actions">
           {auth.profile.role === "student" && (
             <>
               {classes.length > 1 && (
@@ -663,17 +755,12 @@ export function App() {
             </>
           )}
           <button
+            ref={profileButtonRef}
             className="profile-button"
-            onClick={() =>
-              auth.profile?.role === "teacher"
-                ? setTeacherMode(true)
-                : void auth.signOut()
-            }
-            title={
-              auth.profile?.role === "teacher"
-                ? "Mở trang giáo viên"
-                : "Đăng xuất"
-            }
+            onClick={() => setShowAccountMenu((visible) => !visible)}
+            aria-haspopup="dialog"
+            aria-expanded={showAccountMenu}
+            title="Mở thông tin tài khoản"
           >
             <span>{auth.profile?.display_name.charAt(0).toUpperCase()}</span>
             <div>
@@ -681,11 +768,24 @@ export function App() {
               <small>
                 {auth.profile?.role === "teacher"
                   ? "Giáo viên"
-                  : "Học sinh · Đăng xuất"}
+                  : "Học sinh"}
               </small>
             </div>
-            <i>→</i>
+            <i>{showAccountMenu ? "⌃" : "⌄"}</i>
           </button>
+          {showAccountMenu && (
+            <aside className="teacher-account-menu" role="dialog" aria-label="Thông tin tài khoản">
+              <header>
+                <span>{auth.profile.display_name.charAt(0).toUpperCase() || (auth.profile.role === "teacher" ? "GV" : "HS")}</span>
+                <div><b>{auth.profile.display_name}</b><small>{auth.profile.role === "teacher" ? "Giáo viên" : "Học sinh"}</small></div>
+              </header>
+              <dl>
+                <div><dt>Email</dt><dd>{auth.user?.email ?? "Chưa có email"}</dd></div>
+                <div><dt>Lớp đang xem</dt><dd>{activeClass?.name ?? "Chưa chọn lớp"}</dd></div>
+              </dl>
+              <button className="teacher-sign-out" onClick={() => void auth.signOut()}>Đăng xuất <span>→</span></button>
+            </aside>
+          )}
         </div>
       </header>
 
@@ -720,6 +820,16 @@ export function App() {
             key={lesson.id}
             className={selectedLessonId === lesson.id ? "active" : ""}
             onClick={() => openLesson(lesson.id)}
+            onPointerEnter={() => {
+              if (lesson.pdfUrl || lesson.id === "ai-foundations") {
+                void prefetchPdfPage(lesson.pdfUrl ?? builtInSlidePdfUrl).catch(() => undefined);
+              }
+            }}
+            onFocus={() => {
+              if (lesson.pdfUrl || lesson.id === "ai-foundations") {
+                void prefetchPdfPage(lesson.pdfUrl ?? builtInSlidePdfUrl).catch(() => undefined);
+              }
+            }}
             style={{ "--planet-color": lesson.color } as React.CSSProperties}
           >
             <span className="dock-number">0{index + 1}</span>
@@ -755,6 +865,7 @@ export function App() {
         <LearningConsole
           lesson={selectedLesson}
           classId={activeClassId}
+          summaryCacheScope={`${auth.profile.id}:${activeClassId}`}
           canManageLesson={auth.profile.role === "teacher"}
           onRefreshPdf={() => refreshLessonPdf(selectedLesson.id)}
           onClose={closeLesson}

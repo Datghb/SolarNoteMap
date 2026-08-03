@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { askLessonSummaryAI, fetchLessonKeywords, fetchLessonSummary, generateLessonKeywords, isExtractiveFallbackSummary, queueLessonSummaryGeneration } from './lessonSummary';
+import { askLessonSummaryAI, fetchLessonKeywords, fetchLessonSummary, generateLessonKeywords, getCachedLessonSummary, isExtractiveFallbackSummary, queueLessonSummaryGeneration } from './lessonSummary';
 
 vi.mock('../lib/supabase', () => ({
   getSupabaseAuthHeaders: vi.fn().mockResolvedValue({ Authorization: 'Bearer test-access-token' }),
@@ -19,6 +19,19 @@ describe('lesson summary API', () => {
     expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledWith('/api/lesson-summary?lessonId=ai-foundations', {
       headers: { Authorization: 'Bearer test-access-token' },
     });
+  });
+
+  it('reuses a successfully loaded summary without requesting it again', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ summary: 'Nội dung đã lưu', source: 'generated' }), { status: 200 }));
+    await fetchLessonSummary('cached-summary-lesson', undefined, false, 'pdf/path.pdf');
+
+    expect(getCachedLessonSummary('cached-summary-lesson', 'pdf/path.pdf')).toEqual({
+      summary: 'Nội dung đã lưu',
+      source: 'cache',
+      keywords: [],
+    });
+    await expect(fetchLessonSummary('cached-summary-lesson', undefined, false, 'pdf/path.pdf')).resolves.toMatchObject({ summary: 'Nội dung đã lưu' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('loads persisted keyword definitions for a lesson', async () => {

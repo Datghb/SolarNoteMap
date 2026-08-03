@@ -1,7 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { addAnswer, createQuestion, orderSlidesByQuestionPresence, questionsForSlide, toggleQuestionVote } from './communityQuestions';
+import { addAnswer, createQuestion, discussionsForFilter, orderSlidesByQuestionPresence, questionsForSlide, resolveDiscussionSlideId, toggleQuestionVote } from './communityQuestions';
 
 describe('community questions', () => {
+  it('stores the all filter as a lesson-wide discussion', () => {
+    expect(resolveDiscussionSlideId('general')).toBeNull();
+    expect(resolveDiscussionSlideId('pdf-page-2')).toBe('pdf-page-2');
+  });
+
+  it('keeps lesson-wide discussion separate from slide discussions', () => {
+    const discussions = [
+      { id: 'general', slideId: '' },
+      { id: 'general-null', slideId: null },
+      { id: 'slide-1', slideId: 'pdf-page-1' },
+    ];
+    expect(discussionsForFilter(discussions, 'general').map((item) => item.id)).toEqual(['general', 'general-null']);
+    expect(discussionsForFilter(discussions, 'pdf-page-1').map((item) => item.id)).toEqual(['slide-1']);
+  });
+
   it('creates a question linked to a lesson slide', () => {
     const question = createQuestion('ai-foundations', 'learning-loop', 'Vì sao dữ liệu lệch làm AI sai?', 'Anh Nguyen');
 

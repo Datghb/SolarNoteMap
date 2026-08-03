@@ -321,7 +321,7 @@ async function loadReusableKeywords(database, deckText) {
 async function persistLessonKeywords(database, lessonId, candidates, reusableKeywords = [], actorId = '') {
   if (!database) return [];
   const reusableByTerm = new Map(reusableKeywords.map((item) => [item.normalized_term, item]));
-  const newCandidates = candidates.filter((item) => !reusableByTerm.has(item.normalizedTerm) || reusableByTerm.get(item.normalizedTerm)?.source === 'curated-file');
+  const newCandidates = candidates.filter((item) => !reusableByTerm.has(item.normalizedTerm));
   if (newCandidates.length) {
     const inserted = await database.from('keyword_definitions').upsert(
       newCandidates.map((item) => ({ term: item.term, normalized_term: item.normalizedTerm, definition: item.definition, definition_version: 'v2-pedagogical', source_lesson_id: lessonId, created_by: actorId })),
@@ -410,7 +410,12 @@ Yêu cầu bắt buộc:
   return result.output_text.trim().slice(0, 15_000);
 }
 
-async function getCachedDeckSummary(lessonId, uploadedPdfUrl, database, force = false, actorId = '') {
+async function getCachedDeckSummary(lessonId, uploadedPdfUrl, database, force = false, actorId = '', waitForBackground = true) {
+  const backgroundJob = waitForBackground ? backgroundSummaryJobs.get(lessonId) : null;
+  if (backgroundJob) {
+    await backgroundJob;
+    return getCachedDeckSummary(lessonId, uploadedPdfUrl, database, false, actorId, false);
+  }
   let lessonRow = null;
   if (database) {
     const stored = await database
@@ -468,7 +473,6 @@ async function getCachedDeckSummary(lessonId, uploadedPdfUrl, database, force = 
       ], selectedReusableKeywords, actorId);
     }
     const summaryModel = `${provider}:${model}`;
-    await persistSummaryEntry(cacheKey, { summary, lessonId, model: summaryModel, provider, createdAt: new Date().toISOString() });
     if (database && lessonRow) {
       const persisted = await database
         .from('lessons')
@@ -481,8 +485,10 @@ async function getCachedDeckSummary(lessonId, uploadedPdfUrl, database, force = 
         .eq('id', lessonId);
       if (persisted.error) {
         console.error('Không thể lưu bản tóm tắt lên Supabase:', persisted.error.message);
+        throw new Error(`Không thể lưu bản tóm tắt lên Supabase: ${persisted.error.message}`);
       }
     }
+    await persistSummaryEntry(cacheKey, { summary, lessonId, model: summaryModel, provider, createdAt: new Date().toISOString() });
     return { summary, source: 'generated', keywords };
   })().finally(() => deckSummaryInFlight.delete(taskKey));
   deckSummaryInFlight.set(taskKey, task);
@@ -492,17 +498,21 @@ async function getCachedDeckSummary(lessonId, uploadedPdfUrl, database, force = 
 function startBackgroundSummaryJob(lessonId, uploadedPdfUrl, database, force, actorId) {
   if (backgroundSummaryJobs.has(lessonId)) return;
   const job = (async () => {
+    let lastError = null;
     for (let attempt = 1; attempt <= 3; attempt += 1) {
       try {
-        await getCachedDeckSummary(lessonId, uploadedPdfUrl, database, force, actorId);
+        await getCachedDeckSummary(lessonId, uploadedPdfUrl, database, force, actorId, false);
         return;
       } catch (error) {
+        lastError = error;
         console.error(`Background lesson summary attempt ${attempt} failed:`, error instanceof Error ? error.message : 'Unknown error');
         if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, attempt * 2_000));
       }
     }
+    throw lastError ?? new Error('Không thể tạo bản tóm tắt nền.');
   })().finally(() => backgroundSummaryJobs.delete(lessonId));
   backgroundSummaryJobs.set(lessonId, job);
+  void job.catch(() => undefined);
 }
 
 app.disable('x-powered-by');

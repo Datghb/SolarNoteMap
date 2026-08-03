@@ -5,13 +5,14 @@ import * as THREE from 'three';
 import { Planet } from './Planet';
 import { Sun } from './Sun';
 import type { Lesson } from '../data/lessons';
+import { getSolarOrbit } from '../utils/solarOrbit';
 
 const createPlanetsData = (lessons: Lesson[]) => lessons.map((lesson, index) => ({
   id: lesson.id,
   name: lesson.shortName,
   radius: 1.8 + index * 0.32,
   distance: 18 + index * 14,
-  orbitalPeriod: 300 + index * 180,
+  orbitalPeriod: getSolarOrbit(index).orbitalPeriodDays,
   rotationPeriod: 1.2 + index * 0.3,
   colors: lesson.colors,
   tilt: 8 + index * 6,

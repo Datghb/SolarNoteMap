@@ -20,13 +20,17 @@ body { margin: 0; overflow: hidden; }
 .course-progress i { display: block; height: 100%; background: #9aa6ff; box-shadow: 0 0 8px #8190ff; }
 .course-progress b { color: #d9dded; font-weight: 500; }
 .profile-button { justify-self: end; gap: 10px; text-align: left; }
-.account-actions { justify-self:end; display:flex; align-items:center; gap:16px; }
+.account-actions { position:relative; justify-self:end; display:flex; align-items:center; gap:16px; }
 .class-quick-select { max-width:180px; border:1px solid #7587ff55; border-radius:10px; background:#0d1222; color:#dce3ff; padding:9px 12px; }
 .class-management-button, .hero-class-button { border:1px solid #7587ff66; border-radius:12px; background:#536dff22; color:#dce3ff; padding:11px 16px; font-weight:700; cursor:pointer; }
 .class-management-button:hover, .hero-class-button:hover { background:#536dff3d; border-color:#8fa0ff; }
 .hero-class-button { margin-top:20px; pointer-events:auto; }
 .profile-button > span { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; background: linear-gradient(135deg, #8798ff, #394170); font-size: 11px; font-weight: 700; }
 .profile-button div { font-size: 12px; }.profile-button i { color: #6d7286; font-style: normal; }
+.teacher-account-menu { position:absolute; z-index:20; top:52px; right:0; width:290px; padding:15px; border:1px solid #7587ff55; border-radius:15px; background:#090c18f5; box-shadow:0 22px 60px #000c,0 0 32px #536dff18; backdrop-filter:blur(22px); }
+.teacher-account-menu header { display:flex; align-items:center; gap:11px; padding-bottom:13px; border-bottom:1px solid #252a3d; }.teacher-account-menu header > span { display:grid; place-items:center; width:42px; height:42px; border-radius:50%; background:linear-gradient(135deg,#8798ff,#394170); font-weight:800; }.teacher-account-menu header b,.teacher-account-menu header small { display:block; }.teacher-account-menu header b { color:#f2f4ff; font-size:13px; }.teacher-account-menu header small { margin-top:3px; color:#8690ad; font-size:8px; letter-spacing:.12em; text-transform:uppercase; }
+.teacher-account-menu dl { display:grid; gap:10px; margin:14px 0; }.teacher-account-menu dl > div { display:grid; gap:3px; }.teacher-account-menu dt { color:#69718a; font-size:8px; text-transform:uppercase; letter-spacing:.1em; }.teacher-account-menu dd { margin:0; overflow:hidden; color:#cdd2e3; font-size:10px; text-overflow:ellipsis; white-space:nowrap; }
+.teacher-sign-out { width:100%; display:flex; justify-content:space-between; padding:10px 11px; border:1px solid #b55e7055; border-radius:9px; background:#8d354522; color:#f1a8b5; font-size:10px; font-weight:700; cursor:pointer; }.teacher-sign-out:hover { border-color:#d47689; background:#9e3d5138; }
 
 .hero-copy { position: absolute; z-index: 2; top: 126px; left: 42px; pointer-events: none; }
 .eyebrow { color: #8089bd; letter-spacing: .2em; font: 600 9px 'Manrope'; text-transform: uppercase; }
@@ -109,6 +113,10 @@ body { margin: 0; overflow: hidden; }
 .selectable-pdf-page { position:absolute; inset:0; display:grid; place-items:center; overflow:hidden; background:#111; user-select:none; }
 .pdf-page-surface { position:relative; line-height:1; box-shadow:0 8px 35px #0009; }
 .pdf-page-surface canvas { display:block; }
+.pdf-render-loading { position:absolute; z-index:3; inset:0; display:flex; align-items:center; justify-content:center; gap:9px; background:radial-gradient(circle at 50% 45%,#17203a,#090b13 58%); color:#aeb8d6; font-size:10px; letter-spacing:.04em; }
+.pdf-render-loading i { width:18px; height:18px; border:2px solid #53648c; border-top-color:var(--lesson-color); border-radius:50%; animation:pdf-loading-spin .8s linear infinite; }
+@keyframes pdf-loading-spin { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion:reduce) { .pdf-render-loading i { animation:none; } }
 .pdf-text-host { position:absolute; inset:0; z-index:2; }
 .pdf-page-surface .textLayer { position:absolute; inset:0; z-index:2; overflow:hidden; opacity:1; line-height:1; text-size-adjust:none; forced-color-adjust:none; transform-origin:0 0; }
 .pdf-page-surface .textLayer span { color:transparent; cursor:default; user-select:none; }
@@ -395,3 +403,10 @@ body { margin: 0; overflow: hidden; }
 .lesson-delete-dialog > p { margin:0; color:#989fb0; font-size:11px; line-height:1.7; }
 .lesson-delete-dialog > p b { color:#f1f3f8; }
 .lesson-creator footer button.danger-confirm { border-color:#c9536b; background:#5a2030; color:#ffdce3; }
+
+/* Align voting controls with the discussion text instead of the card edge. */
+.question-vote { padding-top:9px; }
+.question-thread:has(.slide-reference) .question-vote { padding-top:31px; }
+.feed-slide-link { padding:0; border:0; background:transparent; color:#eef1fa; font:inherit; font-weight:700; text-decoration:underline; text-decoration-color:color-mix(in srgb,var(--lesson-color),transparent 30%); text-underline-offset:4px; cursor:pointer; }
+.feed-slide-link:hover { color:var(--lesson-color); }
+.feed-slide-link:focus-visible { outline:1px solid var(--lesson-color); outline-offset:4px; border-radius:3px; }
