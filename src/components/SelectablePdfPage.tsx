@@ -4,20 +4,17 @@ import { TextLayerBuilder } from 'pdfjs-dist/legacy/web/pdf_viewer.mjs';
 import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 import 'pdfjs-dist/legacy/web/pdf_viewer.css';
 import { getSafePdfErrorMessage, isExpiredPdfAccessError, isPdfPasswordError } from '../utils/pdfAccess';
+import { createPdfLoadingOptions } from '../utils/pdfLoading';
 
 GlobalWorkerOptions.workerSrc = workerUrl;
 export const builtInSlidePdfUrl = new URL('../../day01-llm-foundation.pdf', import.meta.url).href;
 
 const documentPromises = new Map<string, Promise<PDFDocumentProxy>>();
+const pageWarmupPromises = new Map<string, Promise<void>>();
 function loadSlides(pdfUrl: string) {
   const cached = documentPromises.get(pdfUrl);
   if (cached) return cached;
-  const promise = getDocument({
-    url: pdfUrl,
-    disableAutoFetch: false,
-    disableStream: false,
-    disableRange: false,
-  }).promise
+  const promise = getDocument(createPdfLoadingOptions(pdfUrl)).promise
     .catch((error) => {
       documentPromises.delete(pdfUrl);
       throw error;
@@ -26,11 +23,30 @@ function loadSlides(pdfUrl: string) {
   return promise;
 }
 
+export function prefetchPdfPage(pdfUrl: string, pageNumber = 1) {
+  const cacheKey = `${pdfUrl}#${pageNumber}`;
+  const cached = pageWarmupPromises.get(cacheKey);
+  if (cached) return cached;
+  const promise = loadSlides(pdfUrl)
+    .then(async (document) => {
+      if (pageNumber < 1 || pageNumber > document.numPages) return;
+      const page = await document.getPage(pageNumber);
+      await page.getOperatorList();
+    })
+    .catch((error) => {
+      pageWarmupPromises.delete(cacheKey);
+      throw error;
+    });
+  pageWarmupPromises.set(cacheKey, promise);
+  return promise;
+}
+
 export function SelectablePdfPage({ pageNumber, pdfUrl, onDocumentLoad, onPdfAccessError }: { pageNumber: number; pdfUrl: string; onDocumentLoad?: (pageCount: number) => void; onPdfAccessError?: () => Promise<void> }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
   const [retryToken, setRetryToken] = useState(0);
   const onDocumentLoadRef = useRef(onDocumentLoad);
   const refreshAttemptedUrlRef = useRef<string | null>(null);
@@ -52,6 +68,8 @@ export function SelectablePdfPage({ pageNumber, pdfUrl, onDocumentLoad, onPdfAcc
 
     const render = async (currentGeneration: number) => {
       try {
+        setLoading(true);
+        setError('');
         const document = await loadSlides(pdfUrl);
         if (cancelled || currentGeneration !== generation) return;
         onDocumentLoadRef.current?.(document.numPages);
@@ -70,12 +88,15 @@ export function SelectablePdfPage({ pageNumber, pdfUrl, onDocumentLoad, onPdfAcc
         if (!context) throw new Error('Không thể khởi tạo trình hiển thị slide.');
         renderTask = page.render({ canvasContext: context, viewport, transform: pixelRatio === 1 ? undefined : [pixelRatio, 0, 0, pixelRatio, 0, 0] });
         textLayer = new TextLayerBuilder({ pdfPage: page, onAppend: ((layer: HTMLDivElement) => textHost.append(layer)) as never });
-        await Promise.all([renderTask.promise, textLayer.render(viewport)]);
+        await renderTask.promise;
         if (!cancelled && currentGeneration === generation) {
           setError('');
+          setLoading(false);
         }
+        await textLayer.render(viewport);
       } catch (renderError) {
         if (!cancelled && currentGeneration === generation && !(renderError instanceof Error && renderError.name === 'RenderingCancelledException')) {
+          setLoading(false);
           console.error('PDF slide rendering failed:', renderError);
           if (isPdfPasswordError(renderError)) {
             setError('PDF này có mật khẩu. Giáo viên cần thay bằng bản PDF không đặt mật khẩu.');
@@ -121,8 +142,9 @@ export function SelectablePdfPage({ pageNumber, pdfUrl, onDocumentLoad, onPdfAcc
     };
   }, [pageNumber, pdfUrl, retryToken]);
 
-  return <div ref={hostRef} className="selectable-pdf-page">
+  return <div ref={hostRef} className="selectable-pdf-page" aria-busy={loading}>
     <div className="pdf-page-surface"><canvas ref={canvasRef} /><div ref={textRef} className="pdf-text-host" /></div>
-    {error && <div className="pdf-render-error"><b>Không thể hiển thị nội dung slide</b><small>{error}</small><button onClick={() => { refreshAttemptedUrlRef.current = null; setRetryToken((value) => value + 1); }}>Thử lại</button></div>}
+    {loading && !error && <div className="pdf-render-loading" role="status"><i /><span>Đang tải slide…</span></div>}
+    {error && <div className="pdf-render-error"><b>Không thể hiển thị nội dung slide</b><small>{error}</small><button onClick={() => { refreshAttemptedUrlRef.current = null; setError(''); setRetryToken((value) => value + 1); }}>Thử lại</button></div>}
   </div>;
 }

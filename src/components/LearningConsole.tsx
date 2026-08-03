@@ -16,7 +16,7 @@ import { loadCloudLearningState } from '../utils/cloudClassroom';
 
 const EMPTY_MAP: KnowledgeMap = { nodes: [], edges: [] };
 
-export function LearningConsole({ lesson, classId, onClose, onRefreshPdf, canManageLesson = false }: { lesson: Lesson; classId: string; onClose: () => void; onRefreshPdf: () => Promise<string>; canManageLesson?: boolean }) {
+export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, onRefreshPdf, canManageLesson = false }: { lesson: Lesson; classId: string; summaryCacheScope: string; onClose: () => void; onRefreshPdf: () => Promise<string>; canManageLesson?: boolean }) {
   const [tab, setTab] = useState<'brief' | 'summary' | 'map' | 'community'>('brief');
   const [map, setMap] = useState<KnowledgeMap>(EMPTY_MAP);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -258,7 +258,7 @@ export function LearningConsole({ lesson, classId, onClose, onRefreshPdf, canMan
         <button className={tab === 'brief' ? 'active' : ''} onClick={() => setTab('brief')}>Bài giảng</button>
         {usesDay01Pdf && <button className={tab === 'summary' ? 'active' : ''} onClick={() => setTab('summary')}>Tóm tắt</button>}
         <button className={tab === 'map' ? 'active' : ''} onClick={() => setTab('map')}>Sơ đồ <span>{map.nodes.length}</span></button>
-        <button className={tab === 'community' ? 'active' : ''} onClick={() => setTab('community')}>Cộng đồng</button>
+        <button className={tab === 'community' ? 'active' : ''} onClick={() => setTab('community')}>Thảo luận</button>
       </nav>
 
       <div className="console-content">
@@ -334,7 +334,7 @@ export function LearningConsole({ lesson, classId, onClose, onRefreshPdf, canMan
           </section>
         )}
 
-        {tab === 'summary' && <LessonSummary lesson={lesson} onRefreshPdf={onRefreshPdf} canGenerateKeywords={canManageLesson} />}
+        {tab === 'summary' && <LessonSummary lesson={lesson} cacheScope={summaryCacheScope} onRefreshPdf={onRefreshPdf} canGenerateKeywords={canManageLesson} />}
 
         {tab === 'community' && <CommunityQuestions
           lesson={lesson}

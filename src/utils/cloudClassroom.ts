@@ -75,12 +75,12 @@ export async function loadCommunityQuestions(classId: string, lessonId: string) 
   return mapCommunityQuestionRows((data ?? []) as Record<string, any>[], auth.user.id);
 }
 
-export async function createCommunityQuestion(classId: string, lessonId: string, slideId: string, content: string) {
+export async function createCommunityQuestion(classId: string, lessonId: string, slideId: string | null, content: string) {
   const client = requireSupabase();
   const { data: auth } = await client.auth.getUser();
   const body = content.trim();
-  if (!auth.user) throw new Error('Bạn cần đăng nhập để đăng câu hỏi.');
-  if (!body || body.length > 20_000) throw new Error('Câu hỏi phải có từ 1 đến 20.000 ký tự.');
+  if (!auth.user) throw new Error('Bạn cần đăng nhập để tham gia thảo luận.');
+  if (!body || body.length > 20_000) throw new Error('Nội dung thảo luận phải có từ 1 đến 20.000 ký tự.');
   const { error } = await client.from('community_questions').insert({
     class_id: classId,
     lesson_id: lessonId,
@@ -89,7 +89,7 @@ export async function createCommunityQuestion(classId: string, lessonId: string,
     title: body.slice(0, 240),
     body,
   });
-  if (error) throw asError(error, 'Không thể đăng câu hỏi.');
+  if (error) throw asError(error, 'Không thể đăng thảo luận.');
 }
 
 export async function createCommunityAnswer(questionId: string, content: string) {

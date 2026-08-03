@@ -1,17 +1,14 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { Lesson } from '../data/lessons';
-import { askLessonSummaryAI, fetchLessonKeywords, fetchLessonSummary, generateLessonKeywords, isExtractiveFallbackSummary, type LessonKeyword, type SummaryChatMessage } from '../utils/lessonSummary';
-import { isTechnicalKeywordDefinition, normalizeKeywordTerm, splitLinesWithFirstKeywordOccurrences, type SummaryTextPart } from '../utils/summaryKeywords';
+import { askLessonSummaryAI, cacheLessonSummary, fetchLessonKeywords, fetchLessonSummary, generateLessonKeywords, getCachedLessonSummary, isExtractiveFallbackSummary, type LessonKeyword, type SummaryChatMessage } from '../utils/lessonSummary';
+import { splitLinesWithFirstKeywordOccurrences, type SummaryTextPart } from '../utils/summaryKeywords';
 import { loadSummaryChat, saveSummaryChat } from '../utils/summaryChatStore';
 import { shouldSubmitOnEnter } from '../utils/submitOnEnter';
+import { resolveSummaryKeywordDefinitions } from '../utils/curatedKeywords';
 
-function mergeKeywords(_summary: string, stored: LessonKeyword[]) {
-  const merged = new Map<string, LessonKeyword>();
-  for (const item of stored) {
-    if (isTechnicalKeywordDefinition(item)) merged.set(normalizeKeywordTerm(item.term), item);
-  }
-  return [...merged.values()];
+function mergeKeywords(summary: string, stored: LessonKeyword[]) {
+  return resolveSummaryKeywordDefinitions(summary, stored);
 }
 
 function KeywordTerm({ text, keyword }: { text: string; keyword: LessonKeyword }) {
@@ -79,11 +76,13 @@ function renderSummary(summary: string, keywords: LessonKeyword[]) {
   });
 }
 
-export function LessonSummary({ lesson, onRefreshPdf, canGenerateKeywords = false }: { lesson: Lesson; onRefreshPdf?: () => Promise<string>; canGenerateKeywords?: boolean }) {
-  const initialSummary = isExtractiveFallbackSummary(lesson.summary) ? '' : (lesson.summary ?? '');
+export function LessonSummary({ lesson, cacheScope, onRefreshPdf, canGenerateKeywords = false }: { lesson: Lesson; cacheScope: string; onRefreshPdf?: () => Promise<string>; canGenerateKeywords?: boolean }) {
+  const cacheIdentity = `${cacheScope}:${lesson.pdfPath ?? 'built-in'}:${lesson.updatedAt ?? 'initial'}`;
+  const initialCachedSummary = getCachedLessonSummary(lesson.id, cacheIdentity);
+  const initialSummary = isExtractiveFallbackSummary(lesson.summary) ? '' : (lesson.summary ?? initialCachedSummary?.summary ?? '');
   const [summary, setSummary] = useState(initialSummary);
-  const [keywords, setKeywords] = useState<LessonKeyword[]>(() => mergeKeywords(initialSummary, []));
-  const [source, setSource] = useState<'cache' | 'generated' | null>(null);
+  const [keywords, setKeywords] = useState<LessonKeyword[]>(() => mergeKeywords(initialSummary, initialCachedSummary?.keywords ?? []));
+  const [source, setSource] = useState<'cache' | 'generated' | null>(initialSummary ? 'cache' : null);
   const [loading, setLoading] = useState(!initialSummary);
   const [error, setError] = useState('');
   const [question, setQuestion] = useState('');
@@ -105,9 +104,10 @@ export function LessonSummary({ lesson, onRefreshPdf, canGenerateKeywords = fals
   useEffect(() => {
     let active = true;
     chatControllerRef.current?.abort();
-    const storedSummary = isExtractiveFallbackSummary(lesson.summary) ? '' : (lesson.summary ?? '');
+    const cachedSummary = getCachedLessonSummary(lesson.id, cacheIdentity);
+    const storedSummary = isExtractiveFallbackSummary(lesson.summary) ? '' : (lesson.summary ?? cachedSummary?.summary ?? '');
     setSummary(storedSummary);
-    setKeywords(mergeKeywords(storedSummary, []));
+    setKeywords(mergeKeywords(storedSummary, cachedSummary?.keywords ?? []));
     setSource(storedSummary ? 'cache' : null);
     setMessages([]);
     setQuestion('');
@@ -119,19 +119,32 @@ export function LessonSummary({ lesson, onRefreshPdf, canGenerateKeywords = fals
     }).catch((reason) => console.error('Không tải được lịch sử hỏi đáp:', reason));
     fetchLessonKeywords(lesson.id).then(async (storedKeywords) => {
       if (!active) return;
-      setKeywords(mergeKeywords(storedSummary, storedKeywords));
+      const mergedStoredKeywords = mergeKeywords(storedSummary, storedKeywords);
+      setKeywords(mergedStoredKeywords);
+      if (storedSummary) cacheLessonSummary(lesson.id, { summary: storedSummary, source: 'cache', keywords: mergedStoredKeywords }, cacheIdentity);
       if (!storedSummary || !canGenerateKeywords) return;
       const generatedKeywords = await generateLessonKeywords(lesson.id, storedSummary);
-      if (active) setKeywords(mergeKeywords(storedSummary, generatedKeywords));
+      if (active) {
+        const mergedGeneratedKeywords = mergeKeywords(storedSummary, generatedKeywords);
+        setKeywords(mergedGeneratedKeywords);
+        cacheLessonSummary(lesson.id, { summary: storedSummary, source: 'cache', keywords: mergedGeneratedKeywords }, cacheIdentity);
+      }
     }).catch((reason) => console.error('Không tải được từ điển keyword:', reason));
-    if (storedSummary) return () => { active = false; chatControllerRef.current?.abort(); };
-    fetchLessonSummary(lesson.id, retryPdfUrl || lesson.pdfUrl, summaryRetryToken > 0 || isExtractiveFallbackSummary(lesson.summary)).then((result) => {
+    if (storedSummary && summaryRetryToken === 0) {
+      cacheLessonSummary(lesson.id, { summary: storedSummary, source: 'cache', keywords: cachedSummary?.keywords ?? [] }, cacheIdentity);
+      return () => { active = false; chatControllerRef.current?.abort(); };
+    }
+    fetchLessonSummary(lesson.id, retryPdfUrl || lesson.pdfUrl, summaryRetryToken > 0 || isExtractiveFallbackSummary(lesson.summary), cacheIdentity).then((result) => {
       if (!active) return;
       setSummary(result.summary);
       setKeywords(mergeKeywords(result.summary, result.keywords));
       if (canGenerateKeywords) {
         generateLessonKeywords(lesson.id, result.summary).then((generatedKeywords) => {
-          if (active) setKeywords(mergeKeywords(result.summary, generatedKeywords));
+          if (active) {
+            const mergedGeneratedKeywords = mergeKeywords(result.summary, generatedKeywords);
+            setKeywords(mergedGeneratedKeywords);
+            cacheLessonSummary(lesson.id, { summary: result.summary, source: 'cache', keywords: mergedGeneratedKeywords }, cacheIdentity);
+          }
         }).catch((reason) => console.error('Không tạo được chú giải keyword:', reason));
       }
       setSource(result.source);
@@ -139,7 +152,7 @@ export function LessonSummary({ lesson, onRefreshPdf, canGenerateKeywords = fals
       if (active) setError(reason instanceof Error ? reason.message : 'Không thể tạo bản tóm tắt.');
     }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; chatControllerRef.current?.abort(); };
-  }, [lesson.id, lesson.pdfUrl, lesson.summary, retryPdfUrl, summaryRetryToken, canGenerateKeywords]);
+  }, [cacheIdentity, lesson.id, lesson.pdfUrl, lesson.summary, retryPdfUrl, summaryRetryToken, canGenerateKeywords]);
 
   const retrySummary = async () => {
     setLoading(true);

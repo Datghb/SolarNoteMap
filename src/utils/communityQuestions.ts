@@ -17,6 +17,14 @@ export interface CommunityQuestion {
   answers: CommunityAnswer[];
 }
 
+export function resolveDiscussionSlideId(filter: string) {
+  return filter === 'general' ? null : filter;
+}
+
+export function discussionsForFilter<T extends { slideId: string | null }>(discussions: T[], filter: string) {
+  return discussions.filter((discussion) => filter === 'general' ? !discussion.slideId : discussion.slideId === filter);
+}
+
 export function createQuestion(lessonId: string, slideId: string, content: string, author: string): CommunityQuestion {
   return {
     id: crypto.randomUUID(),
