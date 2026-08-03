@@ -202,6 +202,22 @@ Fork the repository, create a branch for your changes, verify the production bui
 npm run build
 ```
 
+## Free deployment on Render
+
+This repository includes a `render.yaml` Blueprint for a free Render web service.
+
+1. Push the repository to GitHub or GitLab.
+2. In Render, choose **New > Blueprint** and connect the repository.
+3. Enter the requested secret environment variables:
+   - `GROQ_API_KEY`
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_PUBLISHABLE_KEY`
+4. Create the Blueprint and wait for the build to finish.
+
+Do not commit `.env.local` or API keys. Free Render services sleep after a period
+without traffic, so the first request after sleeping can take longer. Their local
+filesystem is ephemeral; durable application data should remain in Supabase.
+
 When reporting a bug, include your browser, operating system, and reproduction steps. For 3D interface changes, a short before-and-after recording or screenshot will make the review process easier.
 
 ## License

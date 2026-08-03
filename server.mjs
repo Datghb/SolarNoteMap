@@ -12,7 +12,7 @@ import { findGlossaryMatches, parseKeywordGlossaryCsv, selectFirstGlossaryMatche
 dotenv.config({ path: '.env.local', override: false });
 
 const app = express();
-const port = Number(process.env.API_PORT || (process.env.NODE_ENV === 'production' ? 4173 : 8787));
+const port = Number(process.env.PORT || process.env.API_PORT || (process.env.NODE_ENV === 'production' ? 4173 : 8787));
 const provider = process.env.AI_PROVIDER === 'groq' ? 'groq' : 'openai';
 const model = process.env.AI_MODEL || process.env.OPENAI_MODEL || (provider === 'groq' ? 'qwen/qwen3.6-27b' : 'gpt-5.6-sol');
 const apiKey = provider === 'groq' ? process.env.GROQ_API_KEY : process.env.OPENAI_API_KEY;
@@ -824,4 +824,4 @@ if (process.env.NODE_ENV === 'production') {
   app.get('/*splat', (_request, response) => response.sendFile(path.join(rootDirectory, 'dist', 'index.html')));
 }
 
-app.listen(port, () => console.log(`Solar Note Map server listening on http://localhost:${port}`));
+app.listen(port, '0.0.0.0', () => console.log(`Solar Note Map server listening on port ${port}`));
