@@ -1,225 +1,411 @@
 # Solar Note Map
 
-> Turn your AI learning journey into a 3D universe where every lesson is a planet and every note is a connectable knowledge node.
+> Một nền tảng học tập tương tác với hệ thống hành tinh 3D, bản đồ tri thức AI và lớp học đám mây.
 
 ![Solar Note Map interface](./image.png)
 
-## Overview
+## Tổng quan
 
-Solar Note Map is an interactive learning application built with React, TypeScript, and Three.js. Instead of organizing notes as a list, learners explore a beginner AI course through a 3D planetary system and build a visual knowledge map for each lesson.
+Solar Note Map là ứng dụng học tập trực tuyến được xây dựng bằng React, TypeScript và Three.js. Thay vì tổ chức ghi chú dạng danh sách, người học khám phá khóa học AI qua hệ thống hành tinh 3D và xây dựng bản đồ tri thức trực quan cho từng bài học.
 
-The application uses a small Node server to protect the OpenAI API key. Live map generation calls the OpenAI Responses API and falls back to browser-based concept detection when the API is unavailable. Knowledge maps and review comments are stored locally using `localStorage`.
+Ứng dụng sử dụng Node.js server để bảo vệ API key, tích hợp AI (OpenAI/Groq) để tạo bản đồ tri thức và tóm tắt bài học, đồng thời lưu trữ dữ liệu qua Supabase với hệ thống phân quyền đầy đủ (Admin, Teacher, Student).
 
-## Features
+## Tính năng
 
-### Explore a Learning Universe
+### Hệ thống phân quyền 3 cấp
 
-- A 3D planetary system with orbits, an asteroid belt, satellites, stars, nebulae, and comets.
-- Drag to rotate, scroll to zoom, and select a planet to open its lesson.
-- Show or hide orbital paths and pause or resume planetary motion.
-- Display a knowledge satellite after the learner saves a map.
+**Admin** - Quản trị viên hệ thống:
+- Xem tổng quan tất cả tài khoản, khóa học và lớp học
+- Chuyển đổi vai trò giữa Student và Teacher
+- Khóa/mở khóa tài khoản
+- Không có quyền truy cập vào ghi chú và bản đồ riêng tư của học viên
 
-### Follow Lesson Missions
+**Teacher** - Giáo viên:
+- Tạo và quản lý Course Program (chương trình khóa học)
+- Tạo bài học từ file PDF
+- Tạo và quản lý nhiều lớp học (Class)
+- Mỗi lớp có mã tham gia riêng (join code)
+- Lên lịch phát hành bài học cho từng lớp
+- Xem hoạt động học tập của học viên trong lớp
 
-Each lesson includes a description, a guiding question, and a suggested learning process. The current course contains five topics:
+**Student** - Học viên:
+- Tham gia lớp học bằng mã lớp
+- Chuyển đổi giữa các lớp đã tham gia
+- Chỉ thấy bài học đã được phát hành cho lớp hiện tại
+- Ghi chú, bản đồ tri thức và hoạt động được cách ly theo lớp
 
-1. AI Foundations
-2. Machine Learning
-3. Data & Features
-4. Learning Types
-5. Neural Networks
+### Khám phá vũ trụ học tập 3D
 
-Each lesson opens as an interactive slide workspace. Learners can select concepts, mark a slide as understood or unclear, write slide-specific notes, and watch a compact knowledge map grow beside the lecture.
+- Hệ thống hành tinh 3D với quỹ đạo, vành đai tiểu hành tinh, vệ tinh, sao, tinh vân và sao chổi
+- Kéo để xoay, cuộn để phóng to/thu nhỏ, chọn hành tinh để mở bài học
+- Hiện/ẩn quỹ đạo và tạm dừng/tiếp tục chuyển động hành tinh
+- Hiển thị vệ tinh tri thức sau khi học viên lưu bản đồ
 
-The first lesson uses the bundled `day01-llm-foundation.pdf` as its 42-page lecture deck. The PDF remains selectable and sharp in the browser. Learners can navigate pages, place contextual pins directly over a page, write page-specific notes, and open a community question linked to that exact PDF page.
+### Học với PDF tương tác
 
-### Build Knowledge Maps
+- Giáo viên tải PDF lên làm tài liệu bài học (được lưu trữ riêng tư trong Supabase)
+- PDF được render sắc nét ngay trong trình duyệt
+- Điều hướng trang, đánh dấu ghim trực tiếp lên trang PDF
+- Viết ghi chú riêng cho từng trang
+- Mở câu hỏi cộng đồng liên kết đến chính xác trang PDF đó
 
-- Capture an explanation naturally in the learner's own words while the map updates in real time.
-- Store notes separately for each slide and combine them with slide context for AI analysis.
-- Preview the evolving map without leaving the lecture, then open the full graph when needed.
-- Generate concepts and semantic relationships through OpenAI Structured Outputs after a short typing debounce.
-- Fall back to local concept detection when OpenAI is unavailable.
-- Render an interactive radial knowledge constellation with React Flow.
-- Focus one branch at a time while unrelated concepts fade into the background.
-- Review, edit, confirm, drag, and delete suggested knowledge nodes.
-- Use an AI-style reflection review to identify strengths and a question worth exploring next.
-- Zoom in, zoom out, or reset the workspace.
-- Save a separate map for each lesson.
+### Xây dựng bản đồ tri thức AI
 
-### Ask the Learning Community
+- Ghi chú tự nhiên bằng ngôn ngữ của người học, bản đồ cập nhật real-time
+- Lưu ghi chú riêng cho từng slide, kết hợp với ngữ cảnh slide để phân tích AI
+- Xem trước bản đồ đang phát triển ngay bên slide, mở đồ họa đầy đủ khi cần
+- Tạo khái niệm và mối quan hệ ngữ nghĩa qua OpenAI/Groq Structured Outputs
+- Fallback về phát hiện khái niệm cục bộ khi AI không khả dụng
+- Render chòm sao tri thức hình tròn tương tác với React Flow
+- Focus một nhánh, các khái niệm không liên quan sẽ mờ đi
+- Xem, chỉnh sửa, xác nhận, kéo thả và xóa các node tri thức
+- Dùng AI reflection review để xác định điểm mạnh và câu hỏi đáng khám phá tiếp
+- Zoom in, zoom out hoặc reset workspace
+- Lưu bản đồ riêng cho từng bài học
 
-- Ask questions that are linked to the exact lecture slide where confusion appears.
-- Filter discussions by slide, vote for questions, and reply with another explanation.
-- Jump from a discussion back to its source slide.
-- Start a contextual question directly from the lecture workspace.
+### Tóm tắt bài học tự động
 
-> [!NOTE]
-> Community questions currently contain demonstration data and are stored in the browser. The application does not yet synchronize discussions between real users or devices.
+- AI tự động tạo tóm tắt cho bài học từ nội dung PDF
+- Lưu cache tóm tắt để tăng tốc độ load
+- Hỗ trợ nhiều AI provider (OpenAI, Groq)
+- Từ điển thuật ngữ AI được quản lý (CSV glossary)
 
-## Tech Stack
+### Cộng đồng học tập
 
-| Area | Technology |
+- Đặt câu hỏi liên kết đến slide cụ thể nơi xuất hiện khó khăn
+- Lọc thảo luận theo slide, vote câu hỏi và trả lời
+- Nhảy từ thảo luận về đúng slide nguồn
+- Bắt đầu câu hỏi có ngữ cảnh trực tiếp từ workspace bài học
+- Dữ liệu thảo luận được lưu trữ trong Supabase, cách ly theo lớp học
+
+## Công nghệ sử dụng
+
+| Lĩnh vực | Công nghệ |
 | --- | --- |
-| Interface | React 19, TypeScript, React Flow |
-| 3D graphics | Three.js, React Three Fiber, Drei |
-| AI | OpenAI Responses API, Structured Outputs |
+| Frontend | React 19, TypeScript, React Flow |
+| Đồ họa 3D | Three.js, React Three Fiber, Drei |
+| AI | OpenAI API / Groq API, Structured Outputs |
+| Backend | Node.js, Express |
+| Database & Auth | Supabase (PostgreSQL, Row Level Security, Auth) |
+| File storage | Supabase Storage (PDFs) |
 | Graph layout | Custom deterministic radial constellation |
 | Styling | Tailwind CSS 4, CSS |
 | Build tool | Vite 7 |
 | Bundling | vite-plugin-singlefile |
-| Storage | Web Storage API (`localStorage`) |
+| PDF rendering | PDF.js |
 
-## Getting Started
+## Bắt đầu
 
-### Requirements
+### Yêu cầu
 
-- Node.js `20.19+` or `22.12+`
+- Node.js `20.19+` hoặc `22.12+`
 - npm
-- A modern browser with WebGL support
+- Trình duyệt hiện đại hỗ trợ WebGL
+- Tài khoản Supabase (miễn phí)
+- API key từ OpenAI hoặc Groq (miễn phí với Groq)
 
-### Installation
+### Cài đặt
+
+**1. Clone repository:**
+```bash
+git clone https://github.com/Datghb/SolarNoteMap.git
+cd SolarNoteMap
+npm install
+```
+
+**2. Thiết lập Supabase:**
+
+- Tạo project mới tại [supabase.com](https://supabase.com)
+- Mở **SQL Editor** và chạy từng migration theo thứ tự timestamp trong thư mục `supabase/migrations/`
+- Chạy tất cả file từ `20260729103000_initial_auth_classroom.sql` đến `20260802140000_backfill_lesson_keyword_links.sql`
+
+**3. Tạo file `.env.local`:**
+
+```env
+# AI Provider (chọn 'openai' hoặc 'groq')
+AI_PROVIDER=groq
+AI_MODEL=qwen/qwen3.6-27b
+
+# Groq API (miễn phí tại https://console.groq.com)
+GROQ_API_KEY=gsk_your_key_here
+
+# Hoặc dùng OpenAI
+OPENAI_API_KEY=sk-your-key-here
+
+# Supabase (lấy từ project settings)
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your_key_here
+```
+
+> **Lưu ý:** Không bao giờ thêm prefix `VITE_` vào API key của AI provider. Chỉ Supabase credentials mới có prefix `VITE_`.
+
+**4. Chạy ứng dụng:**
 
 ```bash
-git clone https://github.com/Datghb/SolarNoteMap2.git
-cd SolarNoteMap2
-npm install
 npm run dev
 ```
 
-Create `.env.local` before running the application:
+Mở địa chỉ hiển thị trong terminal (mặc định: [http://localhost:5173](http://localhost:5173))
 
-```env
-OPENAI_API_KEY=sk-your-key-here
-OPENAI_MODEL=gpt-5.6-sol
+**5. Thiết lập tài khoản đầu tiên:**
+
+- Đăng ký tài khoản đầu tiên qua giao diện web
+- Vào **SQL Editor** của Supabase, chạy lệnh sau để gán quyền admin:
+
+```sql
+UPDATE public.profiles
+SET role = 'admin'
+WHERE id = (SELECT id FROM auth.users WHERE email = 'your-email@example.com');
 ```
 
-Never prefix the key with `VITE_`; the browser must not receive it. `npm run dev` starts Vite and the protected API server together.
+- Đăng xuất và đăng nhập lại
+- Admin có thể tạo thêm Teacher và quản lý hệ thống
 
-Open the address shown by Vite in your terminal. The default is [http://localhost:5173](http://localhost:5173).
+**6. Thiết lập giáo viên:**
 
-### Production Build
+Admin có thể chuyển tài khoản thường thành Teacher từ Admin Dashboard, hoặc chạy SQL:
+
+```sql
+UPDATE public.profiles
+SET role = 'teacher'
+WHERE id = (SELECT id FROM auth.users WHERE email = 'teacher@example.com');
+```
+
+### Build Production
 
 ```bash
 npm run build
 npm start
 ```
 
-Running `npm run build` creates a static production bundle in `dist/`. The current configuration uses `vite-plugin-singlefile`, which embeds the JavaScript and CSS in `dist/index.html` for convenient deployment to static hosting services.
+Build sẽ tạo bundle tĩnh trong thư mục `dist/`. Cấu hình hiện tại sử dụng `vite-plugin-singlefile` để embed JavaScript và CSS vào `dist/index.html` cho deployment dễ dàng.
 
-## Controls
+## Điều khiển
 
-| Action | Control |
+| Hành động | Cách thao tác |
 | --- | --- |
-| Rotate the view | Drag over the 3D scene |
-| Zoom | Scroll the mouse wheel |
-| Move the camera | Right-click and drag |
-| Open a lesson | Select a planet or use the lesson dock at the bottom |
-| Show or hide orbits | Select the `◎` button |
-| Pause or resume motion | Select the `Ⅱ` or `▶` button |
-| Create a live map | Write in the notes panel and watch the map update automatically |
-| Save a map | Select **Save Map** in the toolbar |
+| Xoay góc nhìn | Kéo chuột trên cảnh 3D |
+| Phóng to/thu nhỏ | Cuộn chuột |
+| Di chuyển camera | Nhấn chuột phải và kéo |
+| Mở bài học | Chọn hành tinh hoặc dùng thanh điều hướng dưới cùng |
+| Hiện/ẩn quỹ đạo | Chọn nút `◎` |
+| Tạm dừng/tiếp tục chuyển động | Chọn nút `Ⅱ` hoặc `▶` |
+| Tạo bản đồ trực tiếp | Viết trong panel ghi chú, xem bản đồ tự động cập nhật |
+| Lưu bản đồ | Chọn **Save Map** trong toolbar |
+| Chuyển lớp học (Student) | Chọn avatar > chọn lớp khác |
+| Quản lý khóa học (Teacher) | Vào Teacher Dashboard |
+| Quản lý hệ thống (Admin) | Vào Admin Dashboard |
 
-## Project Structure
+## Cấu trúc dự án
 
 ```text
-SolarNoteMap2/
+SolarNoteMap/
 ├── src/
 │   ├── components/
-│   │   ├── LearningConsole.tsx  # Lessons, knowledge maps, and community space
-│   │   ├── Planet.tsx           # Planet geometry, effects, and interactions
-│   │   ├── SolarSystem.tsx      # Planetary system, orbits, and satellites
-│   │   ├── SpaceObjects.tsx     # Deep-space visual effects
-│   │   └── Sun.tsx              # Sun and glow effects
+│   │   ├── AdminDashboard.tsx       # Quản trị hệ thống
+│   │   ├── AuthScreen.tsx           # Màn hình đăng nhập/đăng ký
+│   │   ├── ClassroomOnboarding.tsx  # Hướng dẫn tham gia lớp
+│   │   ├── CommunityQuestions.tsx   # Hệ thống hỏi đáp
+│   │   ├── KnowledgeFlow.tsx        # Bản đồ tri thức React Flow
+│   │   ├── LearningConsole.tsx      # Console bài học chính
+│   │   ├── LessonSummary.tsx        # Tóm tắt bài học AI
+│   │   ├── PdfSlideWorkspace.tsx    # Workspace PDF tương tác
+│   │   ├── Planet.tsx               # Hình học và tương tác hành tinh
+│   │   ├── SelectablePdfPage.tsx    # Render PDF page
+│   │   ├── SlideDiscussion.tsx      # Thảo luận theo slide
+│   │   ├── SlideLearningWorkspace.tsx # Workspace slide cơ bản
+│   │   ├── SolarSystem.tsx          # Hệ thống hành tinh và quỹ đạo
+│   │   ├── SpaceObjects.tsx         # Hiệu ứng không gian sâu
+│   │   ├── StudentClassDialog.tsx   # Dialog chuyển lớp
+│   │   ├── Sun.tsx                  # Mặt trời và hiệu ứng ánh sáng
+│   │   └── TeacherDashboard.tsx     # Dashboard giáo viên
 │   ├── data/
-│   │   └── lessons.ts           # Lesson content and color palettes
+│   │   └── lessons.ts               # Dữ liệu bài học mặc định
+│   ├── hooks/
+│   │   └── useAuth.ts               # Hook xác thực
+│   ├── lib/
+│   │   └── supabaseClient.ts        # Supabase client config
 │   ├── utils/
-│   │   └── cn.ts                # CSS class-name utility
-│   ├── App.tsx                  # Application layout and top-level state
-│   ├── index.css                # Global and responsive styles
-│   └── main.tsx                 # React entry point
-├── image.png                    # Preview image
-├── index.html
+│   │   ├── cn.ts                    # Utility merge CSS classes
+│   │   ├── cloudClassroom.ts        # API lớp học và khóa học
+│   │   ├── courseStore.ts           # Quản lý state khóa học
+│   │   ├── keywordGlossary.ts       # Xử lý từ điển thuật ngữ
+│   │   ├── lessonSession.ts         # Session bài học
+│   │   ├── lessonSummary.ts         # Tạo tóm tắt bài học
+│   │   ├── lessonVisibility.ts      # Logic hiển thị bài học
+│   │   └── pdfLoading.ts            # Preload PDF
+│   ├── App.tsx                      # Layout ứng dụng và state cấp cao
+│   ├── auth.css                     # Styles đăng nhập
+│   ├── index.css                    # Global và responsive styles
+│   └── main.tsx                     # React entry point
+├── supabase/
+│   ├── migrations/                  # Database migrations
+│   └── README.md                    # Hướng dẫn setup Supabase
+├── shared/
+│   └── keywordGlossary.mjs         # Shared glossary logic
+├── public/                          # Static assets
+├── day01-llm-foundation.pdf        # PDF mẫu bài học 1
+├── tu_khoa_AI_LLM_RAG_Agent_MLOps.csv # Từ điển thuật ngữ AI
+├── server.mjs                      # Node.js Express server
+├── render.yaml                     # Render deployment config
 ├── package.json
 ├── tsconfig.json
 └── vite.config.ts
 ```
 
-## Browser Storage
+## Lưu trữ dữ liệu
 
-The application uses two groups of storage keys:
+Ứng dụng sử dụng Supabase PostgreSQL với Row Level Security để lưu trữ:
 
-```text
-solar-note-map:<lesson-id>
-solar-note-reviews:<lesson-id>:<student-name>
-solar-slide-notes:<lesson-id>
-solar-slide-pins:<lesson-id>
-solar-community-questions:<lesson-id>
-```
+**Bảng chính:**
+- `profiles` - Thông tin người dùng (role: admin/teacher/student)
+- `courses` - Chương trình khóa học
+- `lessons` - Bài học và PDF
+- `classrooms` - Lớp học với mã tham gia
+- `classroom_lessons` - Lịch phát hành bài học theo lớp
+- `classroom_members` - Thành viên lớp học
+- `student_activities` - Hoạt động học tập
+- `knowledge_maps` - Bản đồ tri thức
+- `community_questions` - Hệ thống hỏi đáp
+- `lesson_keywords` - Từ điển thuật ngữ bài học
+- `student_keyword_access` - Quyền truy cập thuật ngữ
 
-Clearing the browser's site data or `localStorage` removes all saved maps and reviews. The current storage mechanism should not be treated as a long-term backup.
+**Storage:**
+- Lesson PDFs được lưu trong Supabase Storage bucket `lesson-pdfs`
+- PDF URLs có thời hạn (signed URLs) để bảo mật
 
-## Customizing Lessons
+**Security:**
+- Tất cả bảng đều bật Row Level Security (RLS)
+- Mã tham gia lớp được hash trước khi lưu
+- Failed join attempts bị rate-limit theo tài khoản
+- PDFs riêng tư được phân phối qua signed URLs có thời hạn
 
-To add or edit a lesson, update the `LESSONS` array in `src/data/lessons.ts`. Each entry defines the lesson content, primary color, and planet palette:
+## Quy trình sử dụng
+
+### Dành cho Admin
+1. Đăng nhập với tài khoản admin đã được thiết lập
+2. Quản lý tài khoản: chuyển đổi role Student/Teacher, khóa/mở khóa
+3. Xem tổng quan courses và classes của toàn hệ thống
+4. Admin không thể truy cập ghi chú và bản đồ riêng tư của học viên
+
+### Dành cho Teacher
+1. Đăng nhập và vào Teacher Dashboard
+2. Tạo Course Program (chương trình khóa học)
+3. Thêm bài học:
+   - Upload PDF làm tài liệu
+   - Hệ thống tự động tạo tóm tắt bằng AI
+   - Quản lý từ điển thuật ngữ cho bài học
+4. Tạo Class (lớp học):
+   - Hệ thống tự động tạo mã tham gia
+   - Lên lịch phát hành từng bài học cho lớp
+5. Chia sẻ mã lớp với học viên
+6. Theo dõi hoạt động học tập trong lớp
+
+### Dành cho Student
+1. Đăng ký tài khoản mới
+2. Nhập mã lớp để tham gia
+3. Chọn lớp đang học (nếu tham gia nhiều lớp)
+4. Khám phá hệ thống hành tinh 3D
+5. Chọn hành tinh để mở bài học đã phát hành
+6. Học với PDF tương tác:
+   - Đọc tài liệu, điều hướng trang
+   - Viết ghi chú cho từng slide/trang
+   - Đánh dấu ghim trên PDF
+7. Xây dựng bản đồ tri thức:
+   - Ghi chú bằng ngôn ngữ tự nhiên
+   - AI tự động tạo khái niệm và mối liên hệ
+   - Chỉnh sửa, xác nhận hoặc xóa node
+   - Lưu bản đồ khi hoàn thành
+8. Tham gia cộng đồng:
+   - Đặt câu hỏi liên kết đến slide cụ thể
+   - Vote và trả lời câu hỏi của bạn học
+   - Xem từ điển thuật ngữ của bài học
+
+## Tùy chỉnh bài học
+
+Để thêm hoặc chỉnh sửa bài học mặc định, cập nhật mảng `LESSONS` trong [src/data/lessons.ts](src/data/lessons.ts):
 
 ```ts
 {
   id: 'prompt-engineering',
   name: 'Prompt Engineering',
   shortName: 'Prompt Design',
-  subtitle: 'Lesson 06 · Navigation Signals',
-  description: 'Learn how to write clear instructions for an AI model.',
-  prompt: 'What context and constraints should an effective prompt provide?',
+  subtitle: 'Buổi 06 · Tín hiệu điều hướng',
+  description: 'Học cách viết hướng dẫn rõ ràng cho mô hình AI.',
   color: '#7dd3fc',
   colors: ['#dbeafe', '#38bdf8', '#164e63'],
 }
 ```
 
-`SolarSystem` generates planets from this list, so new lessons automatically appear in both the 3D scene and the navigation dock.
+`SolarSystem` tự động tạo hành tinh từ danh sách này, nên bài học mới sẽ tự động xuất hiện trong cả cảnh 3D và thanh điều hướng.
 
-## Current Limitations
+## Hạn chế hiện tại
 
-- The included Node server has basic in-memory rate limiting but no user authentication or cloud synchronization.
-- Community content and the user profile contain sample data.
-- The `1 / 5` progress indicator in the header is currently static.
-- Performance depends on the device's WebGL and GPU capabilities.
-- The repository does not currently declare a license.
+- Node server có rate limiting cơ bản nhưng chưa có authentication nâng cao cho API endpoints
+- Chỉ hỗ trợ định dạng PDF cho tài liệu bài học
+- Thanh tiến độ `1 / 5` trong header hiện đang tĩnh
+- Hiệu năng phụ thuộc vào khả năng WebGL và GPU của thiết bị
+- Chưa có automated tests
+- Chưa có chế độ reduced-effects cho thiết bị yếu
 
 ## Roadmap
 
-- Synchronize maps across user accounts and devices.
-- Support real map sharing, collaboration, and peer review.
-- Calculate course progress from lesson completion data.
-- Add quizzes, flashcards, and more learning paths.
-- Add automated tests and a reduced-effects mode for lower-powered devices.
+- [ ] Tính toán tiến độ khóa học từ dữ liệu hoàn thành bài học
+- [ ] Thêm quiz, flashcard và nhiều learning path
+- [ ] Hỗ trợ thêm định dạng tài liệu (video, slides interactives)
+- [ ] Notification realtime khi có câu hỏi mới
+- [ ] Mobile responsive improvements
+- [ ] Export bản đồ tri thức dạng PNG/SVG
+- [ ] Chế độ offline với service worker
+- [ ] Analytics chi tiết cho giáo viên
+- [ ] Automated tests (unit, integration, e2e)
+- [ ] Chế độ reduced-effects cho thiết bị yếu
+- [ ] Hỗ trợ đa ngôn ngữ (i18n)
 
-## Contributing
+## Đóng góp
 
-Fork the repository, create a branch for your changes, verify the production build, and open a pull request:
+Fork repository, tạo branch cho thay đổi của bạn, kiểm tra production build và mở pull request:
 
 ```bash
+git checkout -b feature/ten-tinh-nang
+# ... thực hiện thay đổi ...
 npm run build
+npm start
+# Kiểm tra build hoạt động tốt
+git commit -m "feat: mô tả tính năng"
+git push origin feature/ten-tinh-nang
 ```
 
-## Free deployment on Render
+Khi báo cáo bug, vui lòng bao gồm:
+- Trình duyệt và phiên bản
+- Hệ điều hành
+- Các bước tái hiện lỗi
+- Screenshot hoặc video (đặc biệt cho UI/3D issues)
 
-This repository includes a `render.yaml` Blueprint for a free Render web service.
+## Deployment miễn phí trên Render
 
-1. Push the repository to GitHub or GitLab.
-2. In Render, choose **New > Blueprint** and connect the repository.
-3. Enter the requested secret environment variables:
-   - `GROQ_API_KEY`
-   - `VITE_SUPABASE_URL`
-   - `VITE_SUPABASE_PUBLISHABLE_KEY`
-4. Create the Blueprint and wait for the build to finish.
+Repository này bao gồm `render.yaml` Blueprint cho Render free web service.
 
-Do not commit `.env.local` or API keys. Free Render services sleep after a period
-without traffic, so the first request after sleeping can take longer. Their local
-filesystem is ephemeral; durable application data should remain in Supabase.
+**Bước 1:** Push repository lên GitHub hoặc GitLab
 
-When reporting a bug, include your browser, operating system, and reproduction steps. For 3D interface changes, a short before-and-after recording or screenshot will make the review process easier.
+**Bước 2:** Tại Render, chọn **New > Blueprint** và kết nối repository
+
+**Bước 3:** Nhập các biến môi trường bí mật:
+- `AI_PROVIDER` = `groq` hoặc `openai`
+- `AI_MODEL` = `qwen/qwen3.6-27b` (cho Groq) hoặc model OpenAI
+- `GROQ_API_KEY` hoặc `OPENAI_API_KEY`
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
+
+**Bước 4:** Tạo Blueprint và đợi build hoàn tất
+
+**Lưu ý:**
+- **Không bao giờ** commit file `.env.local` hoặc API keys vào git
+- Free Render services sẽ sleep sau một thời gian không có traffic
+- Request đầu tiên sau khi sleep có thể mất thời gian khởi động
+- Filesystem của free tier là tạm thời; dữ liệu quan trọng phải lưu trong Supabase
+- Thiết lập Supabase migrations sau khi deploy bằng cách chạy SQL Editor
 
 ## License
 
-This project does not currently include a `LICENSE` file. All rights remain with the repository owner until a license is added.
+Dự án này hiện chưa bao gồm file `LICENSE`. Mọi quyền thuộc về chủ sở hữu repository cho đến khi license được thêm vào.
