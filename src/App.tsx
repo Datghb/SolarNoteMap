@@ -1,6 +1,6 @@
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Stars } from "@react-three/drei";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { SolarSystem } from "./components/SolarSystem";
 import {
@@ -13,7 +13,6 @@ import {
   StarCluster,
 } from "./components/SpaceObjects";
 import { LearningConsole } from "./components/LearningConsole";
-import { TeacherDashboard } from "./components/TeacherDashboard";
 import {
   recordStudentActivity,
   setActiveCloudClass,
@@ -24,8 +23,12 @@ import {
 import { AuthScreen } from "./components/AuthScreen";
 import { ClassroomOnboarding } from "./components/ClassroomOnboarding";
 import { StudentClassDialog } from "./components/StudentClassDialog";
-import { AdminDashboard } from "./components/AdminDashboard";
 import { useAuth } from "./hooks/useAuth";
+
+// Lazy load heavy dashboards
+const TeacherDashboard = lazy(() => import("./components/TeacherDashboard").then(m => ({ default: m.TeacherDashboard })));
+const AdminDashboard = lazy(() => import("./components/AdminDashboard").then(m => ({ default: m.AdminDashboard })));
+
 import {
   createClassForCourse,
   regenerateClassJoinCode,
@@ -50,6 +53,15 @@ import { isExtractiveFallbackSummary, queueLessonSummaryGeneration } from "./uti
 import { getLessonSessionKey, resolveRestoredLessonId } from "./utils/lessonSession";
 import { builtInSlidePdfUrl, prefetchPdfPage } from "./components/SelectablePdfPage";
 import { createPdfPreloadPlan } from "./utils/pdfLoading";
+
+// Loading fallback for lazy components
+function DashboardLoadingFallback() {
+  return (
+    <main className="auth-screen">
+      <div className="auth-message">Đang tải bảng điều khiển…</div>
+    </main>
+  );
+}
 
 export function App() {
   const auth = useAuth();
@@ -479,10 +491,12 @@ export function App() {
     );
   if (auth.profile.role === "admin")
     return (
-      <AdminDashboard
-        currentUserId={auth.profile.id}
-        onSignOut={() => void auth.signOut()}
-      />
+      <Suspense fallback={<DashboardLoadingFallback />}>
+        <AdminDashboard
+          currentUserId={auth.profile.id}
+          onSignOut={() => void auth.signOut()}
+        />
+      </Suspense>
     );
   if (cloudLoading)
     return (
@@ -519,29 +533,31 @@ export function App() {
     );
   if (auth.profile.role === "teacher" && teacherMode)
     return (
-      <TeacherDashboard
-        courses={courses}
-        classes={classes}
-        activeCourseId={activeCourseId}
-        activeClassId={activeClassId}
-        onSelectCourse={selectCourse}
-        onSelectClass={selectClass}
-        hasActiveClass={Boolean(activeClassId)}
-        lessons={customLessons}
-        customLessons={customLessons}
-        activities={activities}
-        onCreateCourse={createProgram}
-        onCreateClass={createClass}
-        onRegenerateJoinCode={regenerateClassJoinCode}
-        onCreateLesson={createLesson}
-        onUpdateLesson={updateLesson}
-        onDeleteLesson={deleteLesson}
-        onTogglePublish={toggleLessonPublish}
-        onScheduleLesson={scheduleLesson}
-        onRefreshActivities={refreshActivities}
-        onClose={() => setTeacherMode(false)}
-        onSignOut={() => void auth.signOut()}
-      />
+      <Suspense fallback={<DashboardLoadingFallback />}>
+        <TeacherDashboard
+          courses={courses}
+          classes={classes}
+          activeCourseId={activeCourseId}
+          activeClassId={activeClassId}
+          onSelectCourse={selectCourse}
+          onSelectClass={selectClass}
+          hasActiveClass={Boolean(activeClassId)}
+          lessons={customLessons}
+          customLessons={customLessons}
+          activities={activities}
+          onCreateCourse={createProgram}
+          onCreateClass={createClass}
+          onRegenerateJoinCode={regenerateClassJoinCode}
+          onCreateLesson={createLesson}
+          onUpdateLesson={updateLesson}
+          onDeleteLesson={deleteLesson}
+          onTogglePublish={toggleLessonPublish}
+          onScheduleLesson={scheduleLesson}
+          onRefreshActivities={refreshActivities}
+          onClose={() => setTeacherMode(false)}
+          onSignOut={() => void auth.signOut()}
+        />
+      </Suspense>
     );
 
   return (
