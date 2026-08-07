@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useRef, useState } from 'react';
+import { useMemo, useEffect, useRef, useState, Suspense, lazy } from 'react';
 import type { Lesson } from '../data/lessons';
 import { getLessonSlides, getPdfPageSlides } from '../data/slides';
 import { createRealtimeMap } from '../utils/smartMap';
@@ -8,11 +8,15 @@ import { KnowledgeFlow } from './KnowledgeFlow';
 import { SlideLearningWorkspace } from './SlideLearningWorkspace';
 import { combineSlideNotes, restoreSlideThoughts, updateSlideNote } from '../utils/slideNotes';
 import { CommunityQuestions } from './CommunityQuestions';
-import { PdfSlideWorkspace } from './PdfSlideWorkspace';
 import { LessonSummary } from './LessonSummary';
 import { persistCloudMap, persistCloudNote, recordStudentActivity } from '../utils/courseStore';
-import { builtInSlidePdfUrl } from './SelectablePdfPage';
+import { builtInSlidePdfUrl } from './pdfUrls';
 import { loadCloudLearningState } from '../utils/cloudClassroom';
+
+// pdfjs-dist (~1.4MB worker + parser code) is only needed once a lesson that
+// actually uses the PDF slide deck is opened, so keep it out of the initial
+// bundle and load it on demand.
+const PdfSlideWorkspace = lazy(() => import('./PdfSlideWorkspace').then((m) => ({ default: m.PdfSlideWorkspace })));
 
 const EMPTY_MAP: KnowledgeMap = { nodes: [], edges: [] };
 
@@ -263,24 +267,26 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
 
       <div className="console-content">
         {tab === 'brief' && (
-          usesDay01Pdf ? <PdfSlideWorkspace
-            page={slideIndex + 1}
-            pageCount={slides.length}
-            pdfUrl={lesson.pdfUrl ?? builtInSlidePdfUrl}
-            onDocumentLoad={(pageCount) => { setPdfPageCount(pageCount); setPdfLoadedLessonId(lesson.id); }}
-            useBundledPdfContext={lesson.id === 'ai-foundations'}
-            onPdfAccessError={onRefreshPdf}
-            lessonName={lesson.name}
-            note={slideNotes[slides[slideIndex].id] ?? ''}
-            map={map}
-            accent={lesson.color}
-            isThinking={isThinking}
-            mapSource={mapSource}
-            onPageChange={(page) => setSlideIndex(page - 1)}
-            onNoteChange={changeSlideNote}
-            onOpenMap={() => setTab('map')}
-            onUnderstandingChange={(status) => recordStudentActivity({ lessonId: lesson.id, slideId: slides[slideIndex].id, type: 'understanding_updated', metadata: { status } })}
-          /> : <SlideLearningWorkspace
+          usesDay01Pdf ? <Suspense fallback={<div className="pdf-render-loading" role="status"><i /><span>Đang tải slide…</span></div>}>
+            <PdfSlideWorkspace
+              page={slideIndex + 1}
+              pageCount={slides.length}
+              pdfUrl={lesson.pdfUrl ?? builtInSlidePdfUrl}
+              onDocumentLoad={(pageCount) => { setPdfPageCount(pageCount); setPdfLoadedLessonId(lesson.id); }}
+              useBundledPdfContext={lesson.id === 'ai-foundations'}
+              onPdfAccessError={onRefreshPdf}
+              lessonName={lesson.name}
+              note={slideNotes[slides[slideIndex].id] ?? ''}
+              map={map}
+              accent={lesson.color}
+              isThinking={isThinking}
+              mapSource={mapSource}
+              onPageChange={(page) => setSlideIndex(page - 1)}
+              onNoteChange={changeSlideNote}
+              onOpenMap={() => setTab('map')}
+              onUnderstandingChange={(status) => recordStudentActivity({ lessonId: lesson.id, slideId: slides[slideIndex].id, type: 'understanding_updated', metadata: { status } })}
+            />
+          </Suspense> : <SlideLearningWorkspace
             slides={slides}
             index={slideIndex}
             note={slideNotes[slides[slideIndex].id] ?? ''}

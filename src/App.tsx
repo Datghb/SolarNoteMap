@@ -51,8 +51,17 @@ import {
 import { getVisibleLessons } from "./utils/lessonVisibility";
 import { isExtractiveFallbackSummary, queueLessonSummaryGeneration } from "./utils/lessonSummary";
 import { getLessonSessionKey, resolveRestoredLessonId } from "./utils/lessonSession";
-import { builtInSlidePdfUrl, prefetchPdfPage } from "./components/SelectablePdfPage";
+import { builtInSlidePdfUrl } from "./components/pdfUrls";
 import { createPdfPreloadPlan } from "./utils/pdfLoading";
+
+// pdfjs-dist is heavy, so only pull SelectablePdfPage's module (and thus
+// pdfjs-dist) in when a prefetch is actually requested, instead of at
+// App.tsx's top level where it would block the initial bundle.
+function prefetchPdfPage(pdfUrl: string, pageNumber?: number) {
+  return import("./components/SelectablePdfPage").then((module) =>
+    module.prefetchPdfPage(pdfUrl, pageNumber),
+  );
+}
 
 // Loading fallback for lazy components
 function DashboardLoadingFallback() {

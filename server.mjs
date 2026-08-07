@@ -814,7 +814,18 @@ app.post('/api/lesson-summary-chat', async (request, response) => {
 });
 
 if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(rootDirectory, 'dist')));
+  app.use(express.static(path.join(rootDirectory, 'dist'), {
+    // Vite emits content-hashed filenames for everything under /assets, so those
+    // files are safe to cache "forever". index.html (and anything without a
+    // hash) must stay revalidated so deploys take effect immediately.
+    setHeaders: (response, filePath) => {
+      if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+        response.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      } else {
+        response.setHeader('Cache-Control', 'no-cache');
+      }
+    },
+  }));
   app.get('/*splat', (_request, response) => response.sendFile(path.join(rootDirectory, 'dist', 'index.html')));
 }
 

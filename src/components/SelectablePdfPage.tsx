@@ -5,9 +5,10 @@ import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 import 'pdfjs-dist/legacy/web/pdf_viewer.css';
 import { getSafePdfErrorMessage, isExpiredPdfAccessError, isPdfPasswordError } from '../utils/pdfAccess';
 import { createPdfLoadingOptions } from '../utils/pdfLoading';
+import { builtInSlidePdfUrl } from './pdfUrls';
 
 GlobalWorkerOptions.workerSrc = workerUrl;
-export const builtInSlidePdfUrl = new URL('../../day01-llm-foundation.pdf', import.meta.url).href;
+export { builtInSlidePdfUrl };
 
 const documentPromises = new Map<string, Promise<PDFDocumentProxy>>();
 const pageWarmupPromises = new Map<string, Promise<void>>();
