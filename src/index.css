@@ -410,3 +410,5 @@ body { margin: 0; overflow: hidden; }
 .feed-slide-link { padding:0; border:0; background:transparent; color:#eef1fa; font:inherit; font-weight:700; text-decoration:underline; text-decoration-color:color-mix(in srgb,var(--lesson-color),transparent 30%); text-underline-offset:4px; cursor:pointer; }
 .feed-slide-link:hover { color:var(--lesson-color); }
 .feed-slide-link:focus-visible { outline:1px solid var(--lesson-color); outline-offset:4px; border-radius:3px; }
+.concept-slide-source { display:block; margin-top:5px; color:var(--concept-color); font-size:8px; font-weight:700; }
+.node-slide-link { width:100%; margin-top:8px; padding:9px; border:1px solid color-mix(in srgb,var(--lesson-color),transparent 55%); border-radius:7px; background:color-mix(in srgb,var(--lesson-color),transparent 91%); color:var(--lesson-color); cursor:pointer; }

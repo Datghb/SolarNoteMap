@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createRealtimeMap, createSmartDraft, reviewKnowledgeMap } from './smartMap';
+import { createRealtimeMap, createSmartDraft, createSummaryFallbackMap, reviewKnowledgeMap } from './smartMap';
 
 describe('createSmartDraft', () => {
   it('creates a structured draft with semantic relationships', () => {
@@ -28,6 +28,16 @@ describe('createRealtimeMap', () => {
 
   it('returns an empty diagram when the note has no meaningful content', () => {
     expect(createRealtimeMap('ai-foundations', '  ').nodes).toHaveLength(0);
+  });
+});
+
+describe('createSummaryFallbackMap', () => {
+  it('records summary provenance without treating it as a learner note', () => {
+    const summary = 'AI học từ dữ liệu và tạo ra mô hình.';
+    const map = createSummaryFallbackMap('ai-foundations', summary);
+
+    expect(map.sourceSummary).toBe(summary);
+    expect(map.sourceNote).toBeUndefined();
   });
 });
 

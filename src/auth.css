@@ -13,6 +13,11 @@
 .auth-primary { min-height:45px; border:1px solid #8390ff99; border-radius:10px; background:linear-gradient(135deg,#6675ed,#424ba0); color:#fff; font-weight:700; cursor:pointer; }
 .auth-primary:disabled { opacity:.45; cursor:not-allowed; }
 .auth-card > .auth-primary { width:100%; margin-top:14px; }
+.auth-divider { display:flex; align-items:center; gap:10px; margin-top:20px; color:#5c6280; font-size:11px; }
+.auth-divider::before, .auth-divider::after { content:''; flex:1; height:1px; background:#ffffff1a; }
+.auth-google { display:flex; align-items:center; justify-content:center; gap:10px; width:100%; min-height:45px; margin-top:14px; border:1px solid #2b3046; border-radius:10px; background:#0d101e; color:#f4f6ff; font-weight:600; font-size:13px; cursor:pointer; }
+.auth-google:hover { border-color:#4a5170; }
+.auth-google:disabled { opacity:.45; cursor:not-allowed; }
 .auth-switch { width:100%; margin-top:18px; border:0; background:none; color:#9ca6f7; font-size:12px; cursor:pointer; }
 .auth-message { margin-top:15px; padding:10px 12px; border-radius:9px; font-size:11px; line-height:1.5; }
 .auth-message.error { border:1px solid #ef718155; background:#43172480; color:#ffafba; }

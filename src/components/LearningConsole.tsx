@@ -1,12 +1,11 @@
 import { useMemo, useEffect, useRef, useState, Suspense, lazy } from 'react';
 import type { Lesson } from '../data/lessons';
 import { getLessonSlides, getPdfPageSlides } from '../data/slides';
-import { createRealtimeMap } from '../utils/smartMap';
 import type { KnowledgeMap, KnowledgeNode } from '../utils/smartMap';
-import { requestAiMap } from '../utils/aiMap';
+import { fetchLessonKnowledgeMap, generateLessonKnowledgeMap, KnowledgeMapApiError, type SlideSummary } from '../utils/lessonKnowledgeMap';
 import { KnowledgeFlow } from './KnowledgeFlow';
 import { SlideLearningWorkspace } from './SlideLearningWorkspace';
-import { combineSlideNotes, restoreSlideThoughts, updateSlideNote } from '../utils/slideNotes';
+import { updateSlideNote } from '../utils/slideNotes';
 import { CommunityQuestions } from './CommunityQuestions';
 import { LessonSummary } from './LessonSummary';
 import { persistCloudMap, persistCloudNote, recordStudentActivity } from '../utils/courseStore';
@@ -25,18 +24,21 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
   const [map, setMap] = useState<KnowledgeMap>(EMPTY_MAP);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-  const [thoughts, setThoughts] = useState('');
-  const [thoughtsLessonId, setThoughtsLessonId] = useState<string | null>(null);
   const [slideIndex, setSlideIndex] = useState(0);
   const [slideNotes, setSlideNotes] = useState<Record<string, string>>({});
   const [isThinking, setIsThinking] = useState(false);
   const [mapSource, setMapSource] = useState<'local' | 'ai' | 'fallback'>('local');
   const [analysisError, setAnalysisError] = useState('');
+  const [mapHydratedLessonId, setMapHydratedLessonId] = useState<string | null>(null);
+  const [mapGenerationRevision, setMapGenerationRevision] = useState(0);
+  const [slideSummaries, setSlideSummaries] = useState<SlideSummary[]>([]);
   const noteActivityTimer = useRef<number | null>(null);
   const cloudNoteTimer = useRef<number | null>(null);
   const cloudNoteSaveChain = useRef(Promise.resolve());
   const pendingCloudNote = useRef<{ lessonId: string; slideNumber: number; content: string } | null>(null);
-  const skipNextMapGeneration = useRef(false);
+  const personalMap = useRef<KnowledgeMap | null>(null);
+  const forceMapGeneration = useRef(false);
+  const mapRetryCount = useRef(0);
   const learningStateDirty = useRef(false);
   const learningStateLessonId = useRef<string | null>(null);
   const mapStorageKey = useMemo(() => `solar-note-map:${classId}:${lesson.id}`, [classId, lesson.id]);
@@ -72,12 +74,22 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
       learningStateDirty.current = false;
     }
     const stored = localStorage.getItem(mapStorageKey);
-    const parsed = stored ? JSON.parse(stored) as KnowledgeMap : EMPTY_MAP;
+    let parsed = EMPTY_MAP;
+    try {
+      parsed = stored ? JSON.parse(stored) as KnowledgeMap : EMPTY_MAP;
+      if (!Array.isArray(parsed.nodes) || !Array.isArray(parsed.edges)) throw new Error('Invalid map');
+    } catch {
+      localStorage.removeItem(mapStorageKey);
+      parsed = EMPTY_MAP;
+    }
     const normalized = {
       ...parsed,
       nodes: parsed.nodes.map((node) => ({ ...node, status: node.status ?? 'confirmed' })),
       edges: parsed.edges.map((edge) => ({ ...edge, label: edge.label ?? 'liên quan đến' })),
     };
+    personalMap.current = parsed.nodes.length ? normalized : null;
+    mapRetryCount.current = 0;
+    setMapHydratedLessonId(null);
     const storedNotes = localStorage.getItem(notesStorageKey);
     let nextSlideNotes: Record<string, string> = {};
     try {
@@ -85,13 +97,9 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
     } catch {
       localStorage.removeItem(notesStorageKey);
     }
-    const restoredThoughts = restoreSlideThoughts(slides, nextSlideNotes, normalized.sourceNote);
     setSlideNotes(nextSlideNotes);
-    // Only real slide notes may trigger map generation. A saved map's sourceNote
-    // can be stale/demo data and must not recreate a map for an empty notebook.
-    setMap(restoredThoughts ? normalized : EMPTY_MAP);
-    setThoughts(restoredThoughts);
-    setThoughtsLessonId(lesson.id);
+    setMap(personalMap.current ?? EMPTY_MAP);
+    setSlideSummaries([]);
     setSlideIndex(0);
     setSelectedId(null);
     setTab('brief');
@@ -102,61 +110,68 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
         const slide = slides[note.slide_number - 1];
         return slide ? [[slide.id, note.content]] : [];
       }));
-      if (Object.keys(cloudNotes).length) {
-        setSlideNotes(cloudNotes);
-        if (cloud.map && typeof cloud.map === 'object') skipNextMapGeneration.current = true;
-        setThoughts(combineSlideNotes(slides, cloudNotes));
+      if (Object.keys(cloudNotes).length) setSlideNotes(cloudNotes);
+      const cloudMap = cloud.map && typeof cloud.map === 'object' ? cloud.map as KnowledgeMap : null;
+      if (cloudMap?.nodes?.length) {
+        personalMap.current = cloudMap;
+        setMap(cloudMap);
       }
-      if (cloud.map && typeof cloud.map === 'object') setMap(cloud.map as KnowledgeMap);
-    }).catch((error) => console.error('Không tải được dữ liệu học từ Supabase:', error));
+    }).catch((error) => console.error('Không tải được dữ liệu học từ Supabase:', error))
+      .finally(() => { if (active) setMapHydratedLessonId(lesson.id); });
     return () => { active = false; };
   }, [classId, lesson.id, lesson.pdfUrl, pdfLoadedLessonId, pdfPageCount, mapStorageKey, notesStorageKey]);
 
   useEffect(() => {
-    if (thoughtsLessonId !== lesson.id) return;
-    if (skipNextMapGeneration.current) {
-      skipNextMapGeneration.current = false;
-      return;
-    }
-    const note = thoughts.trim();
+    if (mapHydratedLessonId !== lesson.id) return;
     const controller = new AbortController();
-    if (!note) {
-      setMap(EMPTY_MAP);
-      setIsThinking(false);
-      setMapSource('local');
-      setAnalysisError('');
-      return () => controller.abort();
-    }
-
-    const localMap = createRealtimeMap(lesson.id, thoughts);
-    setMap((current) => ({ ...localMap, nodes: localMap.nodes.map((node) => {
-      const existing = current.nodes.find((item) => item.id === node.id);
-      return existing ? { ...node, x: existing.x, y: existing.y, status: existing.status } : node;
-    }) }));
-    setMapSource('local');
     setIsThinking(true);
     setAnalysisError('');
-    const timer = window.setTimeout(async () => {
+    const load = async () => {
       try {
-        const result = await requestAiMap(thoughts, { name: lesson.name }, map, controller.signal);
-        setMap(result);
+        const shouldForce = forceMapGeneration.current;
+        forceMapGeneration.current = false;
+        const artifact = shouldForce && canManageLesson && lesson.pdfUrl
+          ? await generateLessonKnowledgeMap(lesson.id, lesson.pdfUrl, true, controller.signal)
+          : await fetchLessonKnowledgeMap(lesson.id, lesson.pdfUrl, controller.signal);
+        const restored = personalMap.current?.sourceVersion === artifact.generatedAt
+          ? personalMap.current
+          : artifact.graph;
+        setMap(restored);
+        setSlideSummaries(artifact.slideSummaries);
         setSelectedId(null);
         setMapSource('ai');
+        mapRetryCount.current = 0;
       } catch (error) {
         if (controller.signal.aborted) return;
         setMapSource('fallback');
-        setAnalysisError(error instanceof Error ? error.message : 'AI tạm thời không khả dụng.');
+        if (error instanceof KnowledgeMapApiError && error.status === 404) {
+          setMap(EMPTY_MAP);
+          setAnalysisError(canManageLesson
+            ? 'Sơ đồ đang được tạo từ nội dung từng slide.'
+            : 'Giáo viên chưa tạo sơ đồ cho bài học này.');
+          if (mapRetryCount.current < 12) {
+            mapRetryCount.current += 1;
+            forceMapGeneration.current = canManageLesson && Boolean(lesson.pdfUrl);
+            window.setTimeout(() => {
+              if (!controller.signal.aborted) setMapGenerationRevision((current) => current + 1);
+            }, canManageLesson ? 1_000 : 5_000);
+          }
+        } else {
+          setAnalysisError(error instanceof Error ? error.message : 'Không thể tải sơ đồ bài học.');
+        }
       } finally {
         if (!controller.signal.aborted) setIsThinking(false);
       }
-    }, 900);
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
     };
-  }, [lesson.id, thoughts, thoughtsLessonId]);
+    void load();
+    return () => controller.abort();
+  }, [lesson.id, lesson.pdfUrl, mapHydratedLessonId, mapGenerationRevision, canManageLesson]);
 
   const selected = map.nodes.find((node) => node.id === selectedId);
+  const summaryText = useMemo(
+    () => slideSummaries.map((slide) => `Slide ${slide.page} — ${slide.title}\n${slide.summary}`).join('\n\n'),
+    [slideSummaries],
+  );
 
   const addNode = () => {
     learningStateDirty.current = true;
@@ -186,6 +201,7 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
     if (!selectedId) return;
     learningStateDirty.current = true;
     setMap((current) => ({
+      ...current,
       nodes: current.nodes.filter((node) => node.id !== selectedId),
       edges: current.edges.filter((edge) => edge.from !== selectedId && edge.to !== selectedId),
     }));
@@ -213,23 +229,22 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
 
   const resetSmartMap = () => {
     learningStateDirty.current = true;
-    setThoughts('');
-    setSlideNotes({});
-    localStorage.removeItem(notesStorageKey);
+    personalMap.current = null;
+    forceMapGeneration.current = canManageLesson;
+    mapRetryCount.current = 0;
     localStorage.removeItem(mapStorageKey);
     window.dispatchEvent(new CustomEvent('solar-note-map:saved', {
       detail: { classId, lessonId: lesson.id, nodeCount: 0 },
     }));
     setMap(EMPTY_MAP);
     setSelectedId(null);
+    setMapGenerationRevision((current) => current + 1);
   };
 
   const changeSlideNote = (content: string) => {
     learningStateDirty.current = true;
     const next = updateSlideNote(slideNotes, slides[slideIndex].id, content);
     setSlideNotes(next);
-    setThoughts(combineSlideNotes(slides, next));
-    setThoughtsLessonId(lesson.id);
     localStorage.setItem(notesStorageKey, JSON.stringify(next));
     if (cloudNoteTimer.current !== null) window.clearTimeout(cloudNoteTimer.current);
     const savedSlideNumber = slideIndex + 1;
@@ -304,7 +319,7 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
         {tab === 'map' && (
           <section className="live-map-workspace">
             <header className="live-map-header">
-              <div><span className="live-indicator"><i /> Sơ đồ trực tiếp</span><b>Ghi chú của bạn đang trở thành bản đồ kiến thức</b></div>
+              <div><span className="live-indicator"><i /> Sơ đồ AI</span><b>Bản tóm tắt slide đang trở thành bản đồ kiến thức</b></div>
               <div className="live-actions">
                 <button onClick={addNode}>＋ Thêm ý</button>
                 <button disabled={isThinking} onClick={saveMap}>{saved ? '✓ Đã lưu' : isThinking ? 'Đang đồng bộ…' : 'Lưu sơ đồ'}</button>
@@ -313,25 +328,26 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
             </header>
 
             <aside className="live-note-panel">
-              <div className="note-panel-heading"><span className="ai-kicker"><i>✦</i> Ghi chú tổng hợp</span><small>{thoughts.trim() ? `${thoughts.trim().split(/\s+/).length} từ` : 'Chưa có nội dung'}</small></div>
-              <h3>Ghi chú từ các slide</h3>
-              <p>Nội dung này được tổng hợp tự động. Quay lại bài giảng để viết hoặc chỉnh sửa ghi chú theo từng slide.</p>
-              <textarea readOnly value={thoughts} placeholder="Ghi chú từ các slide sẽ xuất hiện tại đây." />
-              <div className={`analysis-status ${isThinking ? 'thinking' : ''} ${mapSource === 'fallback' ? 'fallback' : ''}`} title={analysisError}><i>{isThinking ? '✦' : mapSource === 'fallback' ? '!' : '✓'}</i><span><b>{isThinking ? 'AI đang hiểu ghi chú…' : mapSource === 'ai' ? 'Đã đồng bộ bằng OpenAI' : mapSource === 'fallback' ? 'Đang dùng phân tích cục bộ' : thoughts.trim() ? 'Bản xem trước tức thì' : 'Sẵn sàng khi bạn bắt đầu viết'}</b><small>{analysisError || (map.nodes.length ? `${map.nodes.length} khái niệm · ${map.edges.length} mối quan hệ` : 'AI chỉ sử dụng nội dung trong ghi chú của bạn')}</small></span></div>
+              <div className="note-panel-heading"><span className="ai-kicker"><i>✦</i> Nguồn sơ đồ</span><small>{slideSummaries.length ? `${slideSummaries.length} slide` : 'Chưa có tóm tắt'}</small></div>
+              <h3>Tóm tắt theo từng slide</h3>
+              <p>Sơ đồ được tạo từ bản tóm tắt các slide. Ghi chú cá nhân không làm thay đổi sơ đồ.</p>
+              <textarea readOnly value={summaryText} placeholder="Sơ đồ sẽ xuất hiện sau khi bản tóm tắt slide được tạo." />
+              <div className={`analysis-status ${isThinking ? 'thinking' : ''} ${mapSource === 'fallback' ? 'fallback' : ''}`} title={analysisError}><i>{isThinking ? '✦' : mapSource === 'fallback' ? '!' : '✓'}</i><span><b>{isThinking ? 'Đang tải sơ đồ từ tóm tắt…' : mapSource === 'ai' ? 'Đã tải sơ đồ bài học' : mapSource === 'fallback' ? 'Chưa có sơ đồ dùng chung' : 'Đang chờ bản tóm tắt slide'}</b><small>{analysisError || (map.nodes.length ? `${map.nodes.length} khái niệm · ${map.edges.length} mối quan hệ` : 'AI chỉ sử dụng nội dung trong bản tóm tắt bài giảng')}</small></span></div>
             </aside>
 
             <div className="live-canvas-area">
-              <div className="canvas-caption"><div><span>Mind map bài học</span><small>{map.nodes.length ? 'Các nhánh tự động hình thành từ ghi chú' : 'Các ý tưởng sẽ xuất hiện tại đây'}</small></div>{map.nodes.length > 0 && <button onClick={() => setSelectedId(null)}>Toàn cảnh</button>}</div>
+              <div className="canvas-caption"><div><span>Mind map bài học</span><small>{map.nodes.length ? 'Các nhánh được hình thành từ bản tóm tắt slide' : 'Các khái niệm sẽ xuất hiện tại đây'}</small></div>{map.nodes.length > 0 && <button onClick={() => setSelectedId(null)}>Toàn cảnh</button>}</div>
               <div className="knowledge-board">
                 {map.nodes.length > 0 && <KnowledgeFlow map={map} accent={lesson.color} selectedId={selectedId} onSelect={chooseNode} />}
-              {map.nodes.length === 0 && <div className="live-empty-state"><div className="orbit-loader"><i /><i /><span>✦</span></div><b>Sơ đồ sẽ lớn lên cùng ghi chú</b><p>Hãy viết một vài câu ở khung bên trái. Những khái niệm và mối quan hệ đầu tiên sẽ tự xuất hiện.</p></div>}
+              {map.nodes.length === 0 && <div className="live-empty-state"><div className="orbit-loader"><i /><i /><span>✦</span></div><b>Chưa có dữ liệu để tạo sơ đồ</b><p>Sơ đồ sẽ tự động xuất hiện sau khi bản tóm tắt bài giảng được tạo.</p></div>}
             </div>
             {selected && (
               <aside className="live-node-editor">
               <div className="node-editor">
-                <div className="editor-heading"><span>✦ Nhận diện từ ghi chú</span><button onClick={() => setSelectedId(null)}>×</button></div>
+                <div className="editor-heading"><span>✦ Nhận diện từ tóm tắt</span><button onClick={() => setSelectedId(null)}>×</button></div>
                 <input value={selected.title} onChange={(event) => updateNode({ title: event.target.value })} placeholder="Tên kiến thức" />
                 <textarea value={selected.note} onChange={(event) => updateNode({ note: event.target.value })} placeholder="Giải thích bằng lời của bạn…" />
+                {selected.slideNumbers?.length ? <button className="node-slide-link" onClick={() => { setSlideIndex(selected.slideNumbers![0] - 1); setTab('brief'); }}>Mở slide {selected.slideNumbers[0]} →</button> : null}
                 <div className="node-editor-actions"><button onClick={() => updateNode({ status: 'confirmed' })}>✓ Xác nhận ý này</button><button onClick={removeNode}>Xóa khỏi sơ đồ</button></div>
               </div>
               </aside>

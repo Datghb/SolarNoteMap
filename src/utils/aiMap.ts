@@ -8,6 +8,7 @@ interface AiNode {
   title: string;
   description: string;
   importance: Importance;
+  slideNumbers?: number[];
 }
 
 interface AiEdge {
@@ -32,7 +33,8 @@ function parseGraph(value: unknown): AiGraph {
   const nodes = value.nodes.map((node) => {
     if (!isRecord(node) || typeof node.id !== 'string' || typeof node.title !== 'string' ||
       typeof node.description !== 'string' || typeof node.importance !== 'string' ||
-      !IMPORTANCE.has(node.importance as Importance)) {
+      !IMPORTANCE.has(node.importance as Importance) ||
+      (node.slideNumbers !== undefined && (!Array.isArray(node.slideNumbers) || node.slideNumbers.some((page) => !Number.isInteger(page) || page < 1 || page > 500)))) {
       throw new Error('AI returned an invalid node.');
     }
     return node as unknown as AiNode;
@@ -49,10 +51,10 @@ function parseGraph(value: unknown): AiGraph {
   return { nodes, edges };
 }
 
-export function normalizeAiMap(value: unknown, sourceNote: string, previous: KnowledgeMap): KnowledgeMap {
+export function normalizeAiMap(value: unknown, sourceSummary: string, previous: KnowledgeMap): KnowledgeMap {
   const graph = parseGraph(value);
   return {
-    sourceNote,
+    sourceSummary,
     nodes: graph.nodes.map((node, index) => {
       const existing = previous.nodes.find((item) => item.id === node.id);
       const angle = (index / Math.max(1, graph.nodes.length)) * Math.PI * 2;
@@ -61,6 +63,7 @@ export function normalizeAiMap(value: unknown, sourceNote: string, previous: Kno
         title: node.title,
         note: node.description,
         importance: node.importance,
+        slideNumbers: [...new Set(node.slideNumbers ?? [])].sort((a, b) => a - b),
         status: existing?.status ?? 'suggested',
         x: existing?.x ?? 50 + Math.cos(angle) * 28,
         y: existing?.y ?? 50 + Math.sin(angle) * 28,
@@ -70,19 +73,23 @@ export function normalizeAiMap(value: unknown, sourceNote: string, previous: Kno
   };
 }
 
+export function createKnowledgeMapRequestBody(summary: string, lesson: { id: string; name: string }) {
+  return { summary, lesson };
+}
+
 export async function requestAiMap(
-  note: string,
-  lesson: { name: string },
+  summary: string,
+  lesson: { id: string; name: string },
   previous: KnowledgeMap,
   signal: AbortSignal,
 ) {
   const response = await fetch('/api/knowledge-map', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...await getSupabaseAuthHeaders() },
-    body: JSON.stringify({ note, lesson }),
+    body: JSON.stringify(createKnowledgeMapRequestBody(summary, lesson)),
     signal,
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(typeof payload.error === 'string' ? payload.error : 'Không thể kết nối dịch vụ AI.');
-  return normalizeAiMap(payload.graph, note, previous);
+  return normalizeAiMap(payload.graph, summary, previous);
 }

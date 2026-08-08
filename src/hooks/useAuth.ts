@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { requireSupabase, supabase, supabaseConfigError } from '../lib/supabase';
+import { createGoogleOAuthCredentials } from '../lib/googleOAuth';
 
 export type UserRole = 'student' | 'teacher' | 'admin';
 
@@ -125,6 +126,19 @@ export function useAuth() {
     }
   }, []);
 
+  const signInWithGoogle = useCallback(async () => {
+    setState((current) => ({ ...current, loading: true, error: null }));
+    try {
+      const credentials = createGoogleOAuthCredentials(window.location.origin);
+      const { data, error } = await requireSupabase().auth.signInWithOAuth(credentials);
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      setState((current) => ({ ...current, loading: false, error: errorMessage(error) }));
+      throw error;
+    }
+  }, []);
+
   const signOut = useCallback(async () => {
     try {
       const { error } = await requireSupabase().auth.signOut();
@@ -136,5 +150,5 @@ export function useAuth() {
     }
   }, []);
 
-  return { ...state, signIn, signUp, signOut };
+  return { ...state, signIn, signUp, signOut, signInWithGoogle };
 }
