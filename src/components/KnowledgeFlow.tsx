@@ -37,6 +37,7 @@ interface ConceptData extends Record<string, unknown> {
   compact: boolean;
   onToggle: (id: string) => void;
   side: -1 | 0 | 1;
+  slideNumbers: number[];
 }
 
 function ConceptNode({ id, data, selected }: NodeProps<Node<ConceptData>>) {
@@ -52,6 +53,7 @@ function ConceptNode({ id, data, selected }: NodeProps<Node<ConceptData>>) {
         {data.suggested && <small>AI</small>}
       </div>
       <strong>{data.title}</strong>
+      {data.slideNumbers.length > 0 && <small className="concept-slide-source">Slide {data.slideNumbers.join(', ')}</small>}
       {!data.compact && <p>{selected ? data.note || 'Chưa có giải thích cho ý này.' : data.note}</p>}
       {data.childCount > 0 && !data.compact && (
         <button
@@ -113,6 +115,7 @@ function buildFlow(
           compact,
           onToggle,
           side: position.side,
+          slideNumbers: node.slideNumbers ?? [],
         },
       };
     }),

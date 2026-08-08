@@ -51,8 +51,10 @@ Solar Note Map là ứng dụng học tập trực tuyến được xây dựng 
 
 ### Xây dựng bản đồ tri thức AI
 
-- Ghi chú tự nhiên bằng ngôn ngữ của người học, bản đồ cập nhật real-time
-- Lưu ghi chú riêng cho từng slide, kết hợp với ngữ cảnh slide để phân tích AI
+- Tự động tạo bản đồ kiến thức từ bản tóm tắt nội dung slide
+- Lưu ghi chú riêng cho từng slide; ghi chú hoạt động độc lập và không làm thay đổi sơ đồ
+- Lưu một sơ đồ nền dùng chung cho bài học để học viên không phải gọi AI lại
+- Mỗi khái niệm lưu các slide nguồn và hỗ trợ mở lại đúng trang liên quan
 - Xem trước bản đồ đang phát triển ngay bên slide, mở đồ họa đầy đủ khi cần
 - Tạo khái niệm và mối quan hệ ngữ nghĩa qua OpenAI/Groq Structured Outputs
 - Fallback về phát hiện khái niệm cục bộ khi AI không khả dụng
@@ -117,7 +119,16 @@ npm install
 
 - Tạo project mới tại [supabase.com](https://supabase.com)
 - Mở **SQL Editor** và chạy từng migration theo thứ tự timestamp trong thư mục `supabase/migrations/`
-- Chạy tất cả file từ `20260729103000_initial_auth_classroom.sql` đến `20260802140000_backfill_lesson_keyword_links.sql`
+- Chạy tất cả file từ `20260729103000_initial_auth_classroom.sql` đến migration mới nhất
+
+**Bật đăng nhập nhanh bằng Google:**
+
+1. Trong Google Auth Platform, tạo OAuth client loại **Web application**.
+2. Thêm Authorized redirect URI do trang **Supabase Dashboard → Authentication → Providers → Google** cung cấp. URI có dạng `https://<project-ref>.supabase.co/auth/v1/callback`.
+3. Điền Google Client ID và Client Secret vào provider Google trên Supabase rồi bật provider.
+4. Trong **Supabase Dashboard → Authentication → URL Configuration**, đặt Site URL của ứng dụng và thêm các Redirect URLs được dùng, ví dụ `http://localhost:5173/**` khi phát triển và URL HTTPS của bản production.
+
+Client Secret chỉ được lưu trong Google/Supabase Dashboard, không thêm vào `.env.local` hay source code.
 
 **3. Tạo file `.env.local`:**
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeAiMap } from './aiMap';
+import { createKnowledgeMapRequestBody, normalizeAiMap } from './aiMap';
 import type { KnowledgeMap } from './smartMap';
 
 describe('normalizeAiMap', () => {
@@ -19,10 +19,22 @@ describe('normalizeAiMap', () => {
     expect(result.nodes).toHaveLength(2);
     expect(result.nodes[0]).toMatchObject({ id: 'data', x: 18, y: 24 });
     expect(result.edges[0]).toEqual({ from: 'data', to: 'model', label: 'huấn luyện' });
-    expect(result.sourceNote).toContain('Dữ liệu');
+    expect(result.sourceSummary).toContain('Dữ liệu');
   });
 
   it('rejects malformed or dangling graph data', () => {
     expect(() => normalizeAiMap({ nodes: [], edges: [{ source: 'a', target: 'b', relation: '' }] }, '', { nodes: [], edges: [] })).toThrow();
+  });
+});
+
+describe('createKnowledgeMapRequestBody', () => {
+  it('uses the lesson summary instead of student notes', () => {
+    expect(createKnowledgeMapRequestBody(
+      '## Trang 1\nTrí tuệ nhân tạo là khái niệm chính.',
+      { id: 'ai-foundations', name: 'AI Foundations' },
+    )).toEqual({
+      summary: '## Trang 1\nTrí tuệ nhân tạo là khái niệm chính.',
+      lesson: { id: 'ai-foundations', name: 'AI Foundations' },
+    });
   });
 });

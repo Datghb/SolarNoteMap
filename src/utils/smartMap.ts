@@ -9,6 +9,7 @@ export interface KnowledgeNode {
   status: NodeStatus;
   x: number;
   y: number;
+  slideNumbers?: number[];
 }
 
 export interface KnowledgeEdge {
@@ -21,6 +22,8 @@ export interface KnowledgeMap {
   nodes: KnowledgeNode[];
   edges: KnowledgeEdge[];
   sourceNote?: string;
+  sourceSummary?: string;
+  sourceVersion?: string;
 }
 
 interface DraftIdea {
@@ -118,6 +121,12 @@ export function createRealtimeMap(lessonId: string, sourceNote: string): Knowled
   }));
 
   return { nodes, edges, sourceNote };
+}
+
+export function createSummaryFallbackMap(lessonId: string, sourceSummary: string): KnowledgeMap {
+  const map = createRealtimeMap(lessonId, sourceSummary);
+  const { sourceNote: _sourceNote, ...graph } = map;
+  return { ...graph, sourceSummary };
 }
 
 export function createSmartDraft(lessonId: string, sourceNote: string): KnowledgeMap {
