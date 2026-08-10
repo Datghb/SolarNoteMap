@@ -1,3 +1,4 @@
+import dagre from '@dagrejs/dagre';
 import type { KnowledgeMap, KnowledgeNode } from './smartMap';
 
 export type KnowledgeKind = 'concept' | 'support' | 'example' | 'process' | 'question';
@@ -8,6 +9,24 @@ export interface HierarchicalPosition {
   y: number;
   depth: number;
   side: -1 | 0 | 1;
+}
+
+export const FULL_NODE_DIMENSIONS = {
+  root: { width: 260, height: 176 },
+  node: { width: 242, height: 164 },
+} as const;
+
+export const COMPACT_NODE_DIMENSIONS = {
+  root: { width: 190, height: 76 },
+  node: { width: 180, height: 72 },
+} as const;
+
+export interface KnowledgeHierarchy {
+  coreId: string;
+  parentById: Map<string, string>;
+  depthById: Map<string, number>;
+  treeEdgeIndexes: Set<number>;
+  crossEdgeIndexes: Set<number>;
 }
 
 export const KNOWLEDGE_COLORS: Record<KnowledgeKind, string> = {
@@ -49,61 +68,139 @@ export function getConnectedNodeIds(map: KnowledgeMap, focusedId: string) {
 }
 
 export function getDescendantNodeIds(map: KnowledgeMap, parentId: string) {
+  const hierarchy = classifyKnowledgeEdges(map);
+  const children = new Map<string, string[]>();
+  hierarchy.parentById.forEach((parent, child) => children.set(parent, [...(children.get(parent) ?? []), child]));
   const descendants = new Set<string>();
   const queue = [parentId];
   while (queue.length) {
     const current = queue.shift()!;
-    map.edges.forEach((edge) => {
-      if (edge.from === current && edge.to !== parentId && !descendants.has(edge.to)) {
-        descendants.add(edge.to);
-        queue.push(edge.to);
+    (children.get(current) ?? []).forEach((childId) => {
+      if (!descendants.has(childId)) {
+        descendants.add(childId);
+        queue.push(childId);
       }
     });
   }
   return descendants;
 }
 
-export function createMindMapLayout(map: KnowledgeMap): HierarchicalPosition[] {
-  if (!map.nodes.length) return [];
-  const core = map.nodes.find((node) => node.importance === 'core') ?? map.nodes[0];
+export function classifyKnowledgeEdges(map: KnowledgeMap): KnowledgeHierarchy {
+  if (!map.nodes.length) {
+    return { coreId: '', parentById: new Map(), depthById: new Map(), treeEdgeIndexes: new Set(), crossEdgeIndexes: new Set() };
+  }
+  const orderedNodes = [...map.nodes].sort((a, b) => a.id.localeCompare(b.id));
+  const core = orderedNodes.find((node) => node.importance === 'core') ?? orderedNodes[0];
   const validIds = new Set(map.nodes.map((node) => node.id));
+  const outgoing = new Map<string, { nodeId: string; edgeIndex: number }[]>();
+  map.edges.forEach((edge, edgeIndex) => {
+    if (!validIds.has(edge.from) || !validIds.has(edge.to) || edge.from === edge.to) return;
+    outgoing.set(edge.from, [...(outgoing.get(edge.from) ?? []), { nodeId: edge.to, edgeIndex }]);
+  });
+  outgoing.forEach((neighbors) => neighbors.sort((a, b) => a.nodeId.localeCompare(b.nodeId) || a.edgeIndex - b.edgeIndex));
+
+  const parentById = new Map<string, string>();
+  const depthById = new Map<string, number>();
+  const treeEdgeIndexes = new Set<number>();
+  const visited = new Set<string>();
+  const roots = [core.id, ...orderedNodes.map((node) => node.id).filter((id) => id !== core.id)];
+
+  roots.forEach((rootId) => {
+    if (visited.has(rootId)) return;
+    visited.add(rootId);
+    depthById.set(rootId, rootId === core.id ? 0 : 1);
+    const queue = [rootId];
+    while (queue.length) {
+      const current = queue.shift()!;
+      (outgoing.get(current) ?? []).forEach(({ nodeId, edgeIndex }) => {
+        if (visited.has(nodeId)) return;
+        visited.add(nodeId);
+        parentById.set(nodeId, current);
+        depthById.set(nodeId, (depthById.get(current) ?? 0) + 1);
+        treeEdgeIndexes.add(edgeIndex);
+        queue.push(nodeId);
+      });
+    }
+  });
+
+  const crossEdgeIndexes = new Set<number>();
+  map.edges.forEach((edge, edgeIndex) => {
+    if (validIds.has(edge.from) && validIds.has(edge.to) && !treeEdgeIndexes.has(edgeIndex)) crossEdgeIndexes.add(edgeIndex);
+  });
+  return { coreId: core.id, parentById, depthById, treeEdgeIndexes, crossEdgeIndexes };
+}
+
+export function createMindMapLayout(map: KnowledgeMap, options: { compact?: boolean } = {}): HierarchicalPosition[] {
+  if (!map.nodes.length) return [];
+  const hierarchy = classifyKnowledgeEdges(map);
+  const dimensions = options.compact ? COMPACT_NODE_DIMENSIONS : FULL_NODE_DIMENSIONS;
+  const nodeById = new Map(map.nodes.map((node) => [node.id, node]));
   const children = new Map<string, string[]>();
-  map.edges.forEach((edge) => {
-    if (!validIds.has(edge.from) || !validIds.has(edge.to) || edge.to === core.id) return;
-    children.set(edge.from, [...(children.get(edge.from) ?? []), edge.to]);
-  });
-  const mainBranches = [...new Set(children.get(core.id) ?? [])];
-  map.nodes.forEach((node) => {
-    const isLinked = node.id === core.id || map.edges.some((edge) => edge.to === node.id || edge.from === node.id);
-    if (!isLinked) mainBranches.push(node.id);
+  hierarchy.parentById.forEach((parent, child) => children.set(parent, [...(children.get(parent) ?? []), child]));
+  children.forEach((ids) => ids.sort((a, b) => a.localeCompare(b)));
+
+  const subtreeWeight = (id: string): number => 1 + (children.get(id) ?? []).reduce((sum, child) => sum + subtreeWeight(child), 0);
+  const disconnectedRoots = map.nodes
+    .map((node) => node.id)
+    .filter((id) => id !== hierarchy.coreId && !hierarchy.parentById.has(id));
+  const mainBranches = [...(children.get(hierarchy.coreId) ?? []), ...disconnectedRoots]
+    .sort((a, b) => subtreeWeight(b) - subtreeWeight(a) || a.localeCompare(b));
+  const branchesBySide: Record<-1 | 1, string[]> = { [-1]: [], [1]: [] };
+  const weights: Record<-1 | 1, number> = { [-1]: 0, [1]: 0 };
+  mainBranches.forEach((id) => {
+    const side: -1 | 1 = weights[-1] <= weights[1] ? -1 : 1;
+    branchesBySide[side].push(id);
+    weights[side] += subtreeWeight(id);
   });
 
-  const positions: HierarchicalPosition[] = [{ id: core.id, x: 0, y: 0, depth: 0, side: 0 }];
-  const visited = new Set([core.id]);
-  const branchesBySide = {
-    [-1]: mainBranches.filter((_id, index) => index % 2 === 0),
-    [1]: mainBranches.filter((_id, index) => index % 2 === 1),
-  } as Record<-1 | 1, string[]>;
-
-  const placeBranch = (id: string, side: -1 | 1, depth: number, y: number) => {
-    if (visited.has(id)) return;
-    visited.add(id);
-    positions.push({ id, depth, side, x: side * depth * 330, y });
-    const branchChildren = [...new Set(children.get(id) ?? [])].filter((childId) => !visited.has(childId));
-    branchChildren.forEach((childId, index) => {
-      const offset = (index - (branchChildren.length - 1) / 2) * 125;
-      placeBranch(childId, side, depth + 1, y + offset);
-    });
-  };
+  const positions = new Map<string, HierarchicalPosition>();
+  const rootSize = dimensions.root;
+  positions.set(hierarchy.coreId, { id: hierarchy.coreId, x: 0, y: 0, depth: 0, side: 0 });
 
   ([-1, 1] as const).forEach((side) => {
-    const branches = branchesBySide[side];
-    branches.forEach((id, index) => {
-      placeBranch(id, side, 1, (index - (branches.length - 1) / 2) * 230);
+    if (!branchesBySide[side].length) return;
+    const graph = new dagre.graphlib.Graph();
+    graph.setGraph({
+      rankdir: side === -1 ? 'RL' : 'LR',
+      ranker: 'network-simplex',
+      acyclicer: 'greedy',
+      nodesep: options.compact ? 30 : 72,
+      ranksep: options.compact ? 76 : 140,
+      edgesep: options.compact ? 16 : 28,
+      marginx: 24,
+      marginy: 24,
+    });
+    graph.setDefaultEdgeLabel(() => ({}));
+    graph.setNode(hierarchy.coreId, { width: rootSize.width, height: rootSize.height });
+    const addBranch = (id: string) => {
+      const size = dimensions.node;
+      graph.setNode(id, { width: size.width, height: size.height });
+      (children.get(id) ?? []).forEach((child) => {
+        addBranch(child);
+        graph.setEdge(id, child);
+      });
+    };
+    branchesBySide[side].forEach((id) => {
+      addBranch(id);
+      graph.setEdge(hierarchy.coreId, id);
+    });
+    dagre.layout(graph);
+    const rootCenter = graph.node(hierarchy.coreId) as { x: number; y: number };
+    graph.nodes().forEach((id: string) => {
+      if (id === hierarchy.coreId) return;
+      const center = graph.node(id) as { x: number; y: number };
+      const size = dimensions.node;
+      positions.set(id, {
+        id,
+        x: center.x - rootCenter.x - size.width / 2 + rootSize.width / 2,
+        y: center.y - rootCenter.y - size.height / 2 + rootSize.height / 2,
+        depth: hierarchy.depthById.get(id) ?? 1,
+        side,
+      });
     });
   });
-  map.nodes.filter((node) => !visited.has(node.id)).forEach((node, index) => placeBranch(node.id, index % 2 ? 1 : -1, 1, 280 + index * 135));
-  return positions;
+
+  return [...nodeById.keys()].sort().map((id) => positions.get(id)!).filter(Boolean);
 }
 
 // Compatibility aliases for older imports.
