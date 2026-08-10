@@ -2,12 +2,14 @@ import { useMemo, useEffect, useRef, useState, Suspense, lazy } from 'react';
 import type { Lesson } from '../data/lessons';
 import { getLessonSlides, getPdfPageSlides } from '../data/slides';
 import type { KnowledgeMap, KnowledgeNode } from '../utils/smartMap';
-import { fetchLessonKnowledgeMap, generateLessonKnowledgeMap, KnowledgeMapApiError, type SlideSummary } from '../utils/lessonKnowledgeMap';
+import { requestAiMap } from '../utils/aiMap';
+import { fetchLessonKnowledgeMap, generateLessonKnowledgeMap, KnowledgeMapApiError } from '../utils/lessonKnowledgeMap';
 import { KnowledgeFlow } from './KnowledgeFlow';
 import { SlideLearningWorkspace } from './SlideLearningWorkspace';
 import { updateSlideNote } from '../utils/slideNotes';
 import { CommunityQuestions } from './CommunityQuestions';
 import { LessonSummary } from './LessonSummary';
+import { fetchLessonSummary, isExtractiveFallbackSummary } from '../utils/lessonSummary';
 import { persistCloudMap, persistCloudNote, recordStudentActivity } from '../utils/courseStore';
 import { builtInSlidePdfUrl } from './pdfUrls';
 import { loadCloudLearningState } from '../utils/cloudClassroom';
@@ -31,7 +33,7 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
   const [analysisError, setAnalysisError] = useState('');
   const [mapHydratedLessonId, setMapHydratedLessonId] = useState<string | null>(null);
   const [mapGenerationRevision, setMapGenerationRevision] = useState(0);
-  const [slideSummaries, setSlideSummaries] = useState<SlideSummary[]>([]);
+  const [availableSummary, setAvailableSummary] = useState(isExtractiveFallbackSummary(lesson.summary) ? '' : (lesson.summary?.trim() ?? ''));
   const noteActivityTimer = useRef<number | null>(null);
   const cloudNoteTimer = useRef<number | null>(null);
   const cloudNoteSaveChain = useRef(Promise.resolve());
@@ -48,6 +50,10 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
   const [pdfPageCount, setPdfPageCount] = useState(42);
   const [pdfLoadedLessonId, setPdfLoadedLessonId] = useState<string | null>(null);
   const slides = usesDay01Pdf ? getPdfPageSlides(pdfPageCount) : getLessonSlides(lesson.id, lesson.name);
+
+  useEffect(() => {
+    setAvailableSummary(isExtractiveFallbackSummary(lesson.summary) ? '' : (lesson.summary?.trim() ?? ''));
+  }, [lesson.id, lesson.summary]);
 
   useEffect(() => {
     recordStudentActivity({ lessonId: lesson.id, slideId: slides[slideIndex]?.id, type: 'slide_viewed' });
@@ -99,7 +105,6 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
     }
     setSlideNotes(nextSlideNotes);
     setMap(personalMap.current ?? EMPTY_MAP);
-    setSlideSummaries([]);
     setSlideIndex(0);
     setSelectedId(null);
     setTab('brief');
@@ -137,12 +142,51 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
           ? personalMap.current
           : artifact.graph;
         setMap(restored);
-        setSlideSummaries(artifact.slideSummaries);
         setSelectedId(null);
         setMapSource('ai');
         mapRetryCount.current = 0;
       } catch (error) {
         if (controller.signal.aborted) return;
+        if (error instanceof KnowledgeMapApiError && error.status === 404 && canManageLesson && lesson.pdfUrl) {
+          try {
+            const artifact = await generateLessonKnowledgeMap(lesson.id, lesson.pdfUrl, false, controller.signal);
+            setMap(artifact.graph);
+            setSelectedId(null);
+            setMapSource('ai');
+            setAnalysisError('');
+            return;
+          } catch (generationError) {
+            if (controller.signal.aborted) return;
+            console.error('Không tạo được sơ đồ dùng chung, chuyển sang fallback:', generationError);
+          }
+        }
+        let fallbackSummary = availableSummary;
+        if (error instanceof KnowledgeMapApiError && [404, 502].includes(error.status) && !fallbackSummary) {
+          try {
+            fallbackSummary = (await fetchLessonSummary(lesson.id, lesson.pdfUrl)).summary;
+          } catch (summaryError) {
+            if (controller.signal.aborted) return;
+            console.error('Không tải được bản tóm tắt để tạo sơ đồ:', summaryError);
+          }
+        }
+        if (error instanceof KnowledgeMapApiError && [404, 502].includes(error.status) && fallbackSummary) {
+          try {
+            const fallbackMap = await requestAiMap(
+              fallbackSummary,
+              { id: lesson.id, name: lesson.name },
+              personalMap.current ?? EMPTY_MAP,
+              controller.signal,
+            );
+            setMap(fallbackMap);
+            setSelectedId(null);
+            setMapSource('ai');
+            setAnalysisError('');
+            return;
+          } catch (fallbackError) {
+            if (controller.signal.aborted) return;
+            setAnalysisError(fallbackError instanceof Error ? fallbackError.message : 'Không thể tạo sơ đồ từ bản tóm tắt.');
+          }
+        }
         setMapSource('fallback');
         if (error instanceof KnowledgeMapApiError && error.status === 404) {
           setMap(EMPTY_MAP);
@@ -165,14 +209,9 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
     };
     void load();
     return () => controller.abort();
-  }, [lesson.id, lesson.pdfUrl, mapHydratedLessonId, mapGenerationRevision, canManageLesson]);
+  }, [lesson.id, lesson.name, lesson.pdfUrl, availableSummary, mapHydratedLessonId, mapGenerationRevision, canManageLesson]);
 
   const selected = map.nodes.find((node) => node.id === selectedId);
-  const summaryText = useMemo(
-    () => slideSummaries.map((slide) => `Slide ${slide.page} — ${slide.title}\n${slide.summary}`).join('\n\n'),
-    [slideSummaries],
-  );
-
   const addNode = () => {
     learningStateDirty.current = true;
     const index = map.nodes.length;
@@ -327,19 +366,11 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
               </div>
             </header>
 
-            <aside className="live-note-panel">
-              <div className="note-panel-heading"><span className="ai-kicker"><i>✦</i> Nguồn sơ đồ</span><small>{slideSummaries.length ? `${slideSummaries.length} slide` : 'Chưa có tóm tắt'}</small></div>
-              <h3>Tóm tắt theo từng slide</h3>
-              <p>Sơ đồ được tạo từ bản tóm tắt các slide. Ghi chú cá nhân không làm thay đổi sơ đồ.</p>
-              <textarea readOnly value={summaryText} placeholder="Sơ đồ sẽ xuất hiện sau khi bản tóm tắt slide được tạo." />
-              <div className={`analysis-status ${isThinking ? 'thinking' : ''} ${mapSource === 'fallback' ? 'fallback' : ''}`} title={analysisError}><i>{isThinking ? '✦' : mapSource === 'fallback' ? '!' : '✓'}</i><span><b>{isThinking ? 'Đang tải sơ đồ từ tóm tắt…' : mapSource === 'ai' ? 'Đã tải sơ đồ bài học' : mapSource === 'fallback' ? 'Chưa có sơ đồ dùng chung' : 'Đang chờ bản tóm tắt slide'}</b><small>{analysisError || (map.nodes.length ? `${map.nodes.length} khái niệm · ${map.edges.length} mối quan hệ` : 'AI chỉ sử dụng nội dung trong bản tóm tắt bài giảng')}</small></span></div>
-            </aside>
-
             <div className="live-canvas-area">
               <div className="canvas-caption"><div><span>Mind map bài học</span><small>{map.nodes.length ? 'Các nhánh được hình thành từ bản tóm tắt slide' : 'Các khái niệm sẽ xuất hiện tại đây'}</small></div>{map.nodes.length > 0 && <button onClick={() => setSelectedId(null)}>Toàn cảnh</button>}</div>
               <div className="knowledge-board">
                 {map.nodes.length > 0 && <KnowledgeFlow map={map} accent={lesson.color} selectedId={selectedId} onSelect={chooseNode} />}
-              {map.nodes.length === 0 && <div className="live-empty-state"><div className="orbit-loader"><i /><i /><span>✦</span></div><b>Chưa có dữ liệu để tạo sơ đồ</b><p>Sơ đồ sẽ tự động xuất hiện sau khi bản tóm tắt bài giảng được tạo.</p></div>}
+              {map.nodes.length === 0 && <div className="live-empty-state"><div className="orbit-loader"><i /><i /><span>✦</span></div><b>Chưa có dữ liệu để tạo sơ đồ</b><p>{analysisError || 'Sơ đồ sẽ tự động xuất hiện sau khi bản tóm tắt bài giảng được tạo.'}</p></div>}
             </div>
             {selected && (
               <aside className="live-node-editor">
@@ -356,7 +387,7 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
           </section>
         )}
 
-        {tab === 'summary' && <LessonSummary lesson={lesson} cacheScope={summaryCacheScope} onRefreshPdf={onRefreshPdf} canGenerateKeywords={canManageLesson} />}
+        {tab === 'summary' && <LessonSummary lesson={lesson} cacheScope={summaryCacheScope} onRefreshPdf={onRefreshPdf} canGenerateKeywords={canManageLesson} onSummaryReady={setAvailableSummary} />}
 
         {tab === 'community' && <CommunityQuestions
           lesson={lesson}

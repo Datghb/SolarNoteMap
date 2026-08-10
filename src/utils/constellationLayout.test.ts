@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  COMPACT_NODE_DIMENSIONS,
+  FULL_NODE_DIMENSIONS,
+  classifyKnowledgeEdges,
   createMindMapLayout,
   getConnectedNodeIds,
   getDescendantNodeIds,
@@ -39,6 +42,66 @@ describe('mind map layout', () => {
     expect(Math.sign(data.x)).toBe(Math.sign(bias.x));
     expect(Math.abs(bias.x)).toBeGreaterThan(Math.abs(data.x));
     expect(new Set(layout.map(({ x, y }) => `${x}:${y}`)).size).toBe(layout.length);
+  });
+
+  it('keeps every card separated in a wide and deep graph', () => {
+    const wideMap: KnowledgeMap = {
+      nodes: [
+        { id: 'root', title: 'Root', note: '', importance: 'core', status: 'confirmed', x: 0, y: 0 },
+        ...Array.from({ length: 8 }, (_, index) => ({ id: `branch-${index}`, title: `Branch ${index}`, note: '', importance: 'support' as const, status: 'suggested' as const, x: 0, y: 0 })),
+        ...Array.from({ length: 8 }, (_, index) => ({ id: `leaf-${index}`, title: `Leaf ${index}`, note: '', importance: 'detail' as const, status: 'suggested' as const, x: 0, y: 0 })),
+      ],
+      edges: Array.from({ length: 8 }, (_, index) => [
+        { from: 'root', to: `branch-${index}`, label: 'gồm' },
+        { from: `branch-${index}`, to: `leaf-${index}`, label: 'chi tiết' },
+      ]).flat(),
+    };
+    const layout = createMindMapLayout(wideMap);
+
+    for (let first = 0; first < layout.length; first += 1) {
+      for (let second = first + 1; second < layout.length; second += 1) {
+        const a = layout[first];
+        const b = layout[second];
+        const aSize = a.depth === 0 ? FULL_NODE_DIMENSIONS.root : FULL_NODE_DIMENSIONS.node;
+        const bSize = b.depth === 0 ? FULL_NODE_DIMENSIONS.root : FULL_NODE_DIMENSIONS.node;
+        const overlaps = a.x < b.x + bSize.width && a.x + aSize.width > b.x
+          && a.y < b.y + bSize.height && a.y + aSize.height > b.y;
+        expect(overlaps, `${a.id} overlaps ${b.id}`).toBe(false);
+      }
+    }
+  });
+
+  it('is deterministic and balances weighted branches across both sides', () => {
+    const first = createMindMapLayout(map);
+    const shuffled: KnowledgeMap = { nodes: [...map.nodes].reverse(), edges: [...map.edges].reverse() };
+    const second = createMindMapLayout(shuffled);
+    expect([...second].sort((a, b) => a.id.localeCompare(b.id))).toEqual([...first].sort((a, b) => a.id.localeCompare(b.id)));
+  });
+
+  it('classifies cycles as cross-links and only collapses tree descendants', () => {
+    const cyclic: KnowledgeMap = {
+      nodes: [
+        { id: 'a', title: 'A', note: '', importance: 'core', status: 'confirmed', x: 0, y: 0 },
+        { id: 'b', title: 'B', note: '', importance: 'support', status: 'confirmed', x: 0, y: 0 },
+        { id: 'c', title: 'C', note: '', importance: 'support', status: 'confirmed', x: 0, y: 0 },
+      ],
+      edges: [
+        { from: 'a', to: 'b', label: 'ab' },
+        { from: 'b', to: 'c', label: 'bc' },
+        { from: 'c', to: 'a', label: 'ca' },
+      ],
+    };
+    const hierarchy = classifyKnowledgeEdges(cyclic);
+    expect(hierarchy.treeEdgeIndexes.size).toBe(2);
+    expect(hierarchy.crossEdgeIndexes.size).toBe(1);
+    expect(getDescendantNodeIds(cyclic, 'b')).toEqual(new Set(['c']));
+    expect(createMindMapLayout(cyclic)).toHaveLength(3);
+  });
+
+  it('uses smaller but still non-overlapping dimensions in compact mode', () => {
+    expect(COMPACT_NODE_DIMENSIONS.node.width).toBeLessThan(FULL_NODE_DIMENSIONS.node.width);
+    const compact = createMindMapLayout(map, { compact: true });
+    expect(new Set(compact.map(({ x, y }) => `${x}:${y}`)).size).toBe(compact.length);
   });
 
   it('returns direct focus neighbors and all descendants separately', () => {

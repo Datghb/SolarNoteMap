@@ -76,7 +76,7 @@ function renderSummary(summary: string, keywords: LessonKeyword[]) {
   });
 }
 
-export function LessonSummary({ lesson, cacheScope, onRefreshPdf, canGenerateKeywords = false }: { lesson: Lesson; cacheScope: string; onRefreshPdf?: () => Promise<string>; canGenerateKeywords?: boolean }) {
+export function LessonSummary({ lesson, cacheScope, onRefreshPdf, canGenerateKeywords = false, onSummaryReady }: { lesson: Lesson; cacheScope: string; onRefreshPdf?: () => Promise<string>; canGenerateKeywords?: boolean; onSummaryReady?: (summary: string) => void }) {
   const cacheIdentity = `${cacheScope}:${lesson.pdfPath ?? 'built-in'}:${lesson.updatedAt ?? 'initial'}`;
   const initialCachedSummary = getCachedLessonSummary(lesson.id, cacheIdentity);
   const initialSummary = isExtractiveFallbackSummary(lesson.summary) ? '' : (lesson.summary ?? initialCachedSummary?.summary ?? '');
@@ -93,6 +93,10 @@ export function LessonSummary({ lesson, cacheScope, onRefreshPdf, canGenerateKey
   const messagesRef = useRef<HTMLDivElement>(null);
   const chatControllerRef = useRef<AbortController | null>(null);
   const chatSaveChainRef = useRef(Promise.resolve());
+
+  useEffect(() => {
+    if (summary.trim()) onSummaryReady?.(summary.trim());
+  }, [summary, onSummaryReady]);
 
   const persistMessages = (lessonId: string, nextMessages: SummaryChatMessage[]) => {
     chatSaveChainRef.current = chatSaveChainRef.current
