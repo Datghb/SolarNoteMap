@@ -8,7 +8,7 @@
 
 Solar Note Map là ứng dụng học tập trực tuyến được xây dựng bằng React, TypeScript và Three.js. Thay vì tổ chức ghi chú dạng danh sách, người học khám phá khóa học AI qua hệ thống hành tinh 3D và xây dựng bản đồ tri thức trực quan cho từng bài học.
 
-Ứng dụng sử dụng Node.js server để bảo vệ API key, tích hợp AI (OpenAI/Groq) để tạo bản đồ tri thức và tóm tắt bài học, đồng thời lưu trữ dữ liệu qua Supabase với hệ thống phân quyền đầy đủ (Admin, Teacher, Student).
+Ứng dụng sử dụng Node.js server để bảo vệ API key, tích hợp OpenAI và các API OpenAI-compatible (Groq/ZenMux/Kira) để tạo bản đồ tri thức và tóm tắt bài học, đồng thời lưu trữ dữ liệu qua Supabase với hệ thống phân quyền đầy đủ (Admin, Teacher, Student).
 
 ## Tính năng
 
@@ -56,7 +56,7 @@ Solar Note Map là ứng dụng học tập trực tuyến được xây dựng 
 - Lưu một sơ đồ nền dùng chung cho bài học để học viên không phải gọi AI lại
 - Mỗi khái niệm lưu các slide nguồn và hỗ trợ mở lại đúng trang liên quan
 - Xem trước bản đồ đang phát triển ngay bên slide, mở đồ họa đầy đủ khi cần
-- Tạo khái niệm và mối quan hệ ngữ nghĩa qua OpenAI/Groq Structured Outputs
+- Tạo khái niệm và mối quan hệ ngữ nghĩa qua OpenAI hoặc API OpenAI-compatible
 - Fallback về phát hiện khái niệm cục bộ khi AI không khả dụng
 - Render chòm sao tri thức hình tròn tương tác với React Flow
 - Focus một nhánh, các khái niệm không liên quan sẽ mờ đi
@@ -86,7 +86,7 @@ Solar Note Map là ứng dụng học tập trực tuyến được xây dựng 
 | --- | --- |
 | Frontend | React 19, TypeScript, React Flow |
 | Đồ họa 3D | Three.js, React Three Fiber, Drei |
-| AI | OpenAI API / Groq API, Structured Outputs |
+| AI | OpenAI / Groq / ZenMux / Kira, Structured Outputs hoặc JSON validation |
 | Backend | Node.js, Express |
 | Database & Auth | Supabase (PostgreSQL, Row Level Security, Auth) |
 | File storage | Supabase Storage (PDFs) |
@@ -104,7 +104,7 @@ Solar Note Map là ứng dụng học tập trực tuyến được xây dựng 
 - npm
 - Trình duyệt hiện đại hỗ trợ WebGL
 - Tài khoản Supabase (miễn phí)
-- API key từ OpenAI hoặc Groq (miễn phí với Groq)
+- API key từ ít nhất một provider: OpenAI, Groq, ZenMux hoặc Kira
 
 ### Cài đặt
 
@@ -133,7 +133,7 @@ Client Secret chỉ được lưu trong Google/Supabase Dashboard, không thêm 
 **3. Tạo file `.env.local`:**
 
 ```env
-# AI Provider (chọn 'openai' hoặc 'groq')
+# AI Provider: openai, groq, zenmux hoặc kira
 AI_PROVIDER=groq
 AI_MODEL=qwen/qwen3.6-27b
 
@@ -143,12 +143,24 @@ GROQ_API_KEY=gsk_your_key_here
 # Hoặc dùng OpenAI
 OPENAI_API_KEY=sk-your-key-here
 
+# Hoặc dùng ZenMux
+# AI_PROVIDER=zenmux
+# AI_MODEL=z-ai/glm-4.6v-flash-free
+# ZENMUX_API_KEY=your-zenmux-key-here
+
+# Hoặc dùng Kira
+# AI_PROVIDER=kira
+# AI_MODEL=kira-mini-1.0
+# KIRA_API_KEY=your-kira-key-here
+
 # Supabase (lấy từ project settings)
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your_key_here
 ```
 
 > **Lưu ý:** Không bao giờ thêm prefix `VITE_` vào API key của AI provider. Chỉ Supabase credentials mới có prefix `VITE_`.
+
+Sau khi đổi `AI_PROVIDER` hoặc `AI_MODEL`, dừng `npm run dev` bằng `Ctrl+C` rồi chạy lại. ZenMux dùng endpoint OpenAI-compatible `https://zenmux.ai/api/v1`; hệ thống ưu tiên `ZENMUX_API_KEY` và vẫn chấp nhận `GLM_API_KEY` làm alias. Kira dùng endpoint `https://kiraai.vn/api/v1` theo cấu hình OpenAI-compatible. Chỉ cần cấu hình key của provider đang được chọn.
 
 **4. Chạy ứng dụng:**
 
@@ -402,9 +414,9 @@ Repository này bao gồm `render.yaml` Blueprint cho Render free web service.
 **Bước 2:** Tại Render, chọn **New > Blueprint** và kết nối repository
 
 **Bước 3:** Nhập các biến môi trường bí mật:
-- `AI_PROVIDER` = `groq` hoặc `openai`
-- `AI_MODEL` = `qwen/qwen3.6-27b` (cho Groq) hoặc model OpenAI
-- `GROQ_API_KEY` hoặc `OPENAI_API_KEY`
+- `AI_PROVIDER` = `groq`, `openai`, `zenmux` hoặc `kira`
+- `AI_MODEL` = model tương ứng với provider
+- Key tương ứng: `GROQ_API_KEY`, `OPENAI_API_KEY`, `ZENMUX_API_KEY` hoặc `KIRA_API_KEY`
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_PUBLISHABLE_KEY`
 
