@@ -73,6 +73,32 @@ export function resolveAiProvider(environment = {}) {
   });
 }
 
+export function resolveQuizAiProvider(environment = {}) {
+  const providerOverride = clean(environment.QUIZ_AI_PROVIDER).toLowerCase();
+  const modelOverride = clean(environment.QUIZ_AI_MODEL);
+  const genericKeyOverride = clean(environment.QUIZ_AI_API_KEY);
+  const requestedName = providerOverride || clean(environment.AI_PROVIDER).toLowerCase() || 'openai';
+  const definition = PROVIDERS[Object.hasOwn(PROVIDERS, requestedName) ? requestedName : 'openai'];
+  const primaryKeyName = definition.apiKeyNames[0];
+  const providerKeyOverride = clean(environment[`QUIZ_${primaryKeyName}`]);
+  const baseUrlEnvName = definition.baseUrlEnv;
+  const baseUrlOverride = clean(environment.QUIZ_AI_BASE_URL)
+    || (baseUrlEnvName ? clean(environment[`QUIZ_${baseUrlEnvName}`]) : '');
+  const hasScopedOverride = Boolean(providerOverride || modelOverride || genericKeyOverride || providerKeyOverride || baseUrlOverride);
+  if (!hasScopedOverride) return resolveAiProvider(environment);
+
+  const scopedEnvironment = { ...environment, AI_PROVIDER: requestedName };
+  if (modelOverride) {
+    scopedEnvironment.AI_MODEL = modelOverride;
+  } else if (providerOverride) {
+    delete scopedEnvironment.AI_MODEL;
+    delete scopedEnvironment.OPENAI_MODEL;
+  }
+  if (genericKeyOverride || providerKeyOverride) scopedEnvironment[primaryKeyName] = genericKeyOverride || providerKeyOverride;
+  if (baseUrlOverride && baseUrlEnvName) scopedEnvironment[baseUrlEnvName] = baseUrlOverride;
+  return resolveAiProvider(scopedEnvironment);
+}
+
 export function buildChatCompatibilityOptions(provider, maxTokens) {
   if (!provider || provider.protocol !== 'chat') return {};
   const options = provider.name === 'groq' ? { reasoning_effort: 'none' } : {};

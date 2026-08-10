@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildChatCompatibilityOptions, resolveAiProvider, supportedAiProviders } from './aiProvider.mjs';
+import { buildChatCompatibilityOptions, resolveAiProvider, resolveQuizAiProvider, supportedAiProviders } from './aiProvider.mjs';
 
 describe('AI provider configuration', () => {
   it('keeps the existing OpenAI default for an unset or unknown provider', () => {
@@ -44,5 +44,27 @@ describe('AI provider configuration', () => {
 
   it('lists every supported provider', () => {
     expect(supportedAiProviders).toEqual(['openai', 'groq', 'zenmux', 'kira']);
+  });
+
+  it('keeps quiz generation on the main provider when no scoped override exists', () => {
+    expect(resolveQuizAiProvider({ AI_PROVIDER: 'groq', AI_MODEL: 'main-model', GROQ_API_KEY: 'main-key' })).toMatchObject({
+      name: 'groq', model: 'main-model', apiKey: 'main-key',
+    });
+  });
+
+  it('separates quiz provider, model and key from the knowledge graph provider', () => {
+    const environment = {
+      AI_PROVIDER: 'groq', AI_MODEL: 'graph-model', GROQ_API_KEY: 'graph-key',
+      QUIZ_AI_PROVIDER: 'kira', QUIZ_AI_API_KEY: 'quiz-key',
+    };
+    expect(resolveAiProvider(environment)).toMatchObject({ name: 'groq', model: 'graph-model', apiKey: 'graph-key' });
+    expect(resolveQuizAiProvider(environment)).toMatchObject({ name: 'kira', model: 'kira-mini-1.0', apiKey: 'quiz-key' });
+  });
+
+  it('supports a quiz-specific model, provider key and base URL', () => {
+    expect(resolveQuizAiProvider({
+      AI_PROVIDER: 'groq', GROQ_API_KEY: 'main-key',
+      QUIZ_AI_PROVIDER: 'zenmux', QUIZ_AI_MODEL: 'quiz-model', QUIZ_ZENMUX_API_KEY: 'zen-quiz-key', QUIZ_AI_BASE_URL: 'https://quiz.example/v1',
+    })).toMatchObject({ name: 'zenmux', model: 'quiz-model', apiKey: 'zen-quiz-key', baseURL: 'https://quiz.example/v1' });
   });
 });

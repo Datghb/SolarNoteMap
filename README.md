@@ -156,11 +156,56 @@ OPENAI_API_KEY=sk-your-key-here
 # Supabase (lấy từ project settings)
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your_key_here
+
+# Adaptive quiz Phase 1: mặc định tắt
+VITE_ADAPTIVE_QUIZ_ENABLED=false
+ADAPTIVE_QUIZ_ENABLED=false
+
+# Tùy chọn: tách provider tạo quiz khỏi provider tạo summary/sơ đồ
+# Nếu bỏ trống, quiz tiếp tục dùng AI_PROVIDER và AI_MODEL như trước.
+# QUIZ_AI_PROVIDER=kira
+# QUIZ_AI_MODEL=kira-mini-1.0
+# QUIZ_AI_API_KEY=your-quiz-provider-key-here
 ```
 
 > **Lưu ý:** Không bao giờ thêm prefix `VITE_` vào API key của AI provider. Chỉ Supabase credentials mới có prefix `VITE_`.
 
 Sau khi đổi `AI_PROVIDER` hoặc `AI_MODEL`, dừng `npm run dev` bằng `Ctrl+C` rồi chạy lại. ZenMux dùng endpoint OpenAI-compatible `https://zenmux.ai/api/v1`; hệ thống ưu tiên `ZENMUX_API_KEY` và vẫn chấp nhận `GLM_API_KEY` làm alias. Kira dùng endpoint `https://kiraai.vn/api/v1` theo cấu hình OpenAI-compatible. Chỉ cần cấu hình key của provider đang được chọn.
+
+`AI_PROVIDER`/`AI_MODEL` luôn phục vụ pipeline cũ gồm summary và knowledge graph. Khi muốn dùng quota khác cho Quizer + Verifier, đặt `QUIZ_AI_PROVIDER` và `QUIZ_AI_MODEL`; key có thể khai báo gọn bằng `QUIZ_AI_API_KEY`, hoặc dùng key theo provider như `QUIZ_GROQ_API_KEY`, `QUIZ_ZENMUX_API_KEY`, `QUIZ_KIRA_API_KEY`, `QUIZ_OPENAI_API_KEY`. Nếu không có bất kỳ biến `QUIZ_*` nào, quiz dùng lại cấu hình AI chính và hành vi giữ nguyên như trước.
+
+Ví dụ giữ Groq để tạo sơ đồ, dùng Kira cho quiz:
+
+```env
+AI_PROVIDER=groq
+AI_MODEL=qwen/qwen3.6-27b
+GROQ_API_KEY=gsk_...
+
+QUIZ_AI_PROVIDER=kira
+QUIZ_AI_MODEL=kira-mini-1.0
+QUIZ_AI_API_KEY=your-kira-key
+```
+
+Ví dụ giữ Groq cho sơ đồ, dùng ZenMux cho quiz:
+
+```env
+AI_PROVIDER=groq
+AI_MODEL=qwen/qwen3.6-27b
+GROQ_API_KEY=gsk_...
+
+QUIZ_AI_PROVIDER=zenmux
+QUIZ_AI_MODEL=z-ai/glm-4.6v-flash-free
+QUIZ_AI_API_KEY=your-zenmux-key
+```
+
+**Bật Adaptive AI Micro-Quiz Phase 1 (tùy chọn):**
+
+1. Chạy migration `supabase/migrations/20260810120000_adaptive_quiz_phase1.sql` trong Supabase SQL Editor.
+2. Lấy server secret key trong Supabase Project Settings và thêm vào `.env.local` dưới tên `SUPABASE_SECRET_KEY`. Có thể dùng `SUPABASE_SERVICE_ROLE_KEY` cũ làm phương án thay thế. Tuyệt đối không thêm prefix `VITE_` cho key này.
+3. Đặt cả `VITE_ADAPTIVE_QUIZ_ENABLED=true` và `ADAPTIVE_QUIZ_ENABLED=true`, rồi khởi động lại `npm run dev`.
+4. Giáo viên cần mở/tạo lại sơ đồ AI của bài học một lần để hệ thống lập chỉ mục slide gốc. Nếu bài học chỉ có artifact cũ, quiz vẫn dùng slide summary làm fallback nhưng chất lượng retrieval sẽ thấp hơn.
+
+Khi hai flag ở trạng thái `false`, toàn bộ API và giao diện quiz bị vô hiệu hóa; luồng hiện tại không thay đổi. Phase 1 cố định đúng 3 câu, dùng Quizer Agent + Verifier Agent và chỉ truy xuất nội dung trong bài học hiện tại.
 
 **4. Chạy ứng dụng:**
 

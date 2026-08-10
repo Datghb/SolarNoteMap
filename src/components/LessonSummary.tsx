@@ -11,7 +11,7 @@ function mergeKeywords(summary: string, stored: LessonKeyword[]) {
   return resolveSummaryKeywordDefinitions(summary, stored);
 }
 
-function KeywordTerm({ text, keyword }: { text: string; keyword: LessonKeyword }) {
+function KeywordTerm({ text, keyword, onInteraction }: { text: string; keyword: LessonKeyword; onInteraction?: (keyword: LessonKeyword) => void }) {
   const anchorRef = useRef<HTMLSpanElement>(null);
   const tooltipId = useId();
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
@@ -34,6 +34,7 @@ function KeywordTerm({ text, keyword }: { text: string; keyword: LessonKeyword }
       onMouseLeave={() => setPosition(null)}
       onFocus={showTooltip}
       onBlur={() => setPosition(null)}
+      onClick={() => { showTooltip(); onInteraction?.(keyword); }}
     >{text}</span>
     {position && createPortal(
       <span id={tooltipId} role="tooltip" className="summary-keyword-tooltip" style={{ top: position.top, left: position.left }}>
@@ -44,13 +45,13 @@ function KeywordTerm({ text, keyword }: { text: string; keyword: LessonKeyword }
   </>;
 }
 
-function HighlightedText({ parts }: { parts: SummaryTextPart[] }) {
+function HighlightedText({ parts, onKeywordInteraction }: { parts: SummaryTextPart[]; onKeywordInteraction?: (keyword: LessonKeyword) => void }) {
   return parts.map((part, index) => part.keyword
-    ? <KeywordTerm key={`${part.text}-${index}`} text={part.text} keyword={part.keyword} />
+    ? <KeywordTerm key={`${part.text}-${index}`} text={part.text} keyword={part.keyword} onInteraction={onKeywordInteraction} />
     : <span key={`${part.text}-${index}`}>{part.text}</span>);
 }
 
-function renderSummary(summary: string, keywords: LessonKeyword[]) {
+function renderSummary(summary: string, keywords: LessonKeyword[], onKeywordInteraction?: (keyword: LessonKeyword) => void) {
   const parsedLines = summary.split('\n').map((line) => {
     const text = line.trim();
     if (!text) return { kind: 'spacer' as const, text: '' };
@@ -64,7 +65,7 @@ function renderSummary(summary: string, keywords: LessonKeyword[]) {
   });
   const splitLines = splitLinesWithFirstKeywordOccurrences(parsedLines.map((line) => line.text), keywords);
   return parsedLines.map((line, index) => {
-    const content = <HighlightedText parts={splitLines[index]} />;
+    const content = <HighlightedText parts={splitLines[index]} onKeywordInteraction={onKeywordInteraction} />;
     if (line.kind === 'spacer') return <span key={index} className="summary-spacer" />;
     if (line.kind === 'rule') return <hr key={index} />;
     if (line.kind === 'h4') return <h4 key={index}>{content}</h4>;
@@ -76,7 +77,7 @@ function renderSummary(summary: string, keywords: LessonKeyword[]) {
   });
 }
 
-export function LessonSummary({ lesson, cacheScope, onRefreshPdf, canGenerateKeywords = false, onSummaryReady }: { lesson: Lesson; cacheScope: string; onRefreshPdf?: () => Promise<string>; canGenerateKeywords?: boolean; onSummaryReady?: (summary: string) => void }) {
+export function LessonSummary({ lesson, cacheScope, onRefreshPdf, canGenerateKeywords = false, onSummaryReady, onKeywordInteraction }: { lesson: Lesson; cacheScope: string; onRefreshPdf?: () => Promise<string>; canGenerateKeywords?: boolean; onSummaryReady?: (summary: string) => void; onKeywordInteraction?: (keyword: LessonKeyword) => void }) {
   const cacheIdentity = `${cacheScope}:${lesson.pdfPath ?? 'built-in'}:${lesson.updatedAt ?? 'initial'}`;
   const initialCachedSummary = getCachedLessonSummary(lesson.id, cacheIdentity);
   const initialSummary = isExtractiveFallbackSummary(lesson.summary) ? '' : (lesson.summary ?? initialCachedSummary?.summary ?? '');
@@ -206,7 +207,7 @@ export function LessonSummary({ lesson, cacheScope, onRefreshPdf, canGenerateKey
       <header><div><span>✦ Bản tóm tắt toàn bài</span><h3>{lesson.name}</h3></div><small>{loading ? 'AI đang đọc slide…' : source === 'cache' ? 'Đã lưu' : 'Vừa tạo bởi AI'}</small></header>
       {loading && <div className="summary-loading"><i /><b>AI đang tổng hợp toàn bộ slide</b><span>Kết quả sẽ được lưu để dùng cho những lần mở sau.</span></div>}
       {!loading && error && !summary && <div className="summary-error"><b>Chưa thể tải bản tóm tắt</b><span>{error}</span><button onClick={() => void retrySummary()}>Thử lại</button></div>}
-      {summary && <div className="summary-copy">{renderSummary(summary, keywords)}</div>}
+      {summary && <div className="summary-copy">{renderSummary(summary, keywords, onKeywordInteraction)}</div>}
     </div>
     <aside className="summary-chat">
       <header><span>✦ Hỏi AI về bài học</span><small>Trả lời dựa trên nội dung slide</small></header>

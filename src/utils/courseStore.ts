@@ -7,7 +7,7 @@ let activeCloudClassId: string | null = null;
 
 export function setActiveCloudClass(classId: string | null) { activeCloudClassId = classId; }
 
-export type ActivityType = 'lesson_opened' | 'slide_viewed' | 'note_updated' | 'map_saved' | 'question_posted' | 'answer_posted' | 'understanding_updated';
+export type ActivityType = 'lesson_opened' | 'slide_viewed' | 'note_updated' | 'map_saved' | 'question_posted' | 'answer_posted' | 'understanding_updated' | 'keyword_opened' | 'slide_dwell_completed' | 'quiz_recommended' | 'quiz_started' | 'quiz_completed' | 'quiz_dismissed';
 
 export interface StudentActivity {
   id: string;
@@ -17,7 +17,21 @@ export interface StudentActivity {
   type: ActivityType;
   occurredAt: string;
   slideId?: string;
-  metadata?: { wordCount?: number; nodeCount?: number; status?: string; slideId?: string };
+  metadata?: {
+    wordCount?: number;
+    nodeCount?: number;
+    status?: string;
+    slideId?: string;
+    slideNumber?: number;
+    keyword?: string;
+    source?: string;
+    activeSeconds?: number;
+    trigger?: string;
+    quizId?: string;
+    score?: number;
+    questionCount?: number;
+    durationSeconds?: number;
+  };
 }
 
 export interface TeacherLesson extends Lesson {
@@ -87,7 +101,7 @@ export function saveTeacherLessons(lessons: TeacherLesson[]) {
 }
 
 export function loadActivities() {
-  const types = new Set<ActivityType>(['lesson_opened', 'slide_viewed', 'note_updated', 'map_saved', 'question_posted', 'answer_posted', 'understanding_updated']);
+  const types = new Set<ActivityType>(['lesson_opened', 'slide_viewed', 'note_updated', 'map_saved', 'question_posted', 'answer_posted', 'understanding_updated', 'keyword_opened', 'slide_dwell_completed', 'quiz_recommended', 'quiz_started', 'quiz_completed', 'quiz_dismissed']);
   return readArray(ACTIVITY_KEY).filter((value): value is StudentActivity => {
     if (!value || typeof value !== 'object') return false;
     const activity = value as Partial<StudentActivity>;

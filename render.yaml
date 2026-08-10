@@ -19,3 +19,7 @@ services:
         sync: false
       - key: VITE_SUPABASE_PUBLISHABLE_KEY
         sync: false
+      - key: VITE_ADAPTIVE_QUIZ_ENABLED
+        value: false
+      - key: ADAPTIVE_QUIZ_ENABLED
+        value: false

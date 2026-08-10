@@ -8,7 +8,8 @@ import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { findGlossaryMatches, parseKeywordGlossaryCsv, selectFirstGlossaryMatches } from './shared/keywordGlossary.mjs';
-import { buildChatCompatibilityOptions, resolveAiProvider, supportedAiProviders } from './shared/aiProvider.mjs';
+import { buildChatCompatibilityOptions, resolveAiProvider, resolveQuizAiProvider, supportedAiProviders } from './shared/aiProvider.mjs';
+import { createAdaptiveQuizRouter } from './server/adaptiveQuiz.mjs';
 
 dotenv.config({ path: '.env.local', override: false });
 
@@ -20,12 +21,26 @@ const providerLabel = aiProvider.label;
 const model = aiProvider.model;
 const client = aiProvider.apiKey ? new OpenAI({ apiKey: aiProvider.apiKey, ...(aiProvider.baseURL ? { baseURL: aiProvider.baseURL } : {}) }) : null;
 const usesChatCompletions = aiProvider.protocol === 'chat';
+const quizAiProvider = resolveQuizAiProvider(process.env);
+const quizClientUsesMainProvider = quizAiProvider.name === aiProvider.name
+  && quizAiProvider.model === aiProvider.model
+  && quizAiProvider.apiKey === aiProvider.apiKey
+  && quizAiProvider.baseURL === aiProvider.baseURL;
+const quizClient = quizClientUsesMainProvider
+  ? client
+  : quizAiProvider.apiKey ? new OpenAI({ apiKey: quizAiProvider.apiKey, ...(quizAiProvider.baseURL ? { baseURL: quizAiProvider.baseURL } : {}) }) : null;
 if (!aiProvider.recognized) {
   console.warn(`AI_PROVIDER="${aiProvider.requestedName}" không được hỗ trợ; đang dùng OpenAI. Các giá trị hợp lệ: ${supportedAiProviders.join(', ')}.`);
 }
+if (!quizAiProvider.recognized) {
+  console.warn(`QUIZ_AI_PROVIDER="${quizAiProvider.requestedName}" không được hỗ trợ; quiz đang dùng OpenAI. Các giá trị hợp lệ: ${supportedAiProviders.join(', ')}.`);
+}
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabasePublishableKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const supabaseServerKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabaseAuth = supabaseUrl && supabasePublishableKey ? createSupabaseClient(supabaseUrl, supabasePublishableKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }) : null;
+const supabaseAdmin = supabaseUrl && supabaseServerKey ? createSupabaseClient(supabaseUrl, supabaseServerKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }) : null;
+const adaptiveQuizEnabled = /^(?:1|true)$/i.test(process.env.ADAPTIVE_QUIZ_ENABLED || process.env.VITE_ADAPTIVE_QUIZ_ENABLED || '');
 const requests = new Map();
 const rootDirectory = path.dirname(fileURLToPath(import.meta.url));
 const pdfPath = path.join(rootDirectory, 'day01-llm-foundation.pdf');
@@ -548,6 +563,17 @@ function createRequestDatabase(request) {
   });
 }
 
+app.use('/api/adaptive-quiz', createAdaptiveQuizRouter({
+  enabled: adaptiveQuizEnabled,
+  client: quizClient,
+  aiProvider: quizAiProvider,
+  model: quizAiProvider.model,
+  provider: quizAiProvider.name,
+  providerLabel: quizAiProvider.label,
+  supabaseAdmin,
+  createRequestDatabase,
+}));
+
 const graphSchema = {
   type: 'object', additionalProperties: false, required: ['nodes', 'edges'],
   properties: {
@@ -624,7 +650,7 @@ function summarizeSlideMetadata(page, summary, slideText) {
   const title = firstLine.slice(0, 120);
   const words = summary.match(/[\p{L}\p{N}+#][\p{L}\p{N}+#./-]{2,}/gu) || [];
   const keyConcepts = [...new Map(words.map((word) => [word.toLocaleLowerCase('vi'), word])).values()].slice(0, 8);
-  return { page, title, summary, keyConcepts };
+  return { page, title, summary, keyConcepts, content: slideText };
 }
 
 async function createSlideSummaries(uploadedPdfUrl) {
@@ -697,6 +723,92 @@ function pdfUrlMatchesLesson(uploadedPdfUrl, pdfPathValue) {
   }
 }
 
+function isMissingAdaptiveQuizKnowledgeSchema(error) {
+  const code = typeof error?.code === 'string' ? error.code : '';
+  const message = typeof error?.message === 'string' ? error.message.toLowerCase() : '';
+  return ['42P01', 'PGRST204', 'PGRST205'].includes(code)
+    || message.includes('lesson_chunks')
+    || message.includes('lesson_keyword_sources');
+}
+
+async function persistLessonQuizKnowledge(database, lessonId, sourceIdentity, slideSummaries) {
+  const chunkRows = slideSummaries
+    .map((slide) => ({
+      lesson_id: lessonId,
+      source_identity: sourceIdentity,
+      slide_number: slide.page,
+      chunk_index: 0,
+      title: String(slide.title || `Slide ${slide.page}`).trim().slice(0, 180),
+      content: String(slide.content || slide.summary || 'Slide không có nội dung văn bản.').trim().slice(0, 20_000),
+      summary: String(slide.summary || slide.content || 'Slide không có nội dung văn bản.').trim().slice(0, 4_000),
+      keywords: Array.isArray(slide.keyConcepts) ? slide.keyConcepts : [],
+    }))
+    .filter((row) => row.content || row.summary);
+  if (!chunkRows.length) return;
+
+  const chunks = await database
+    .from('lesson_chunks')
+    .upsert(chunkRows, { onConflict: 'lesson_id,source_identity,slide_number,chunk_index' })
+    .select('id,slide_number,title,content,summary,keywords');
+  if (chunks.error) {
+    if (isMissingAdaptiveQuizKnowledgeSchema(chunks.error)) {
+      console.warn('Bỏ qua quiz knowledge index vì migration Phase 1 chưa được áp dụng.');
+      return;
+    }
+    console.error('Không thể cập nhật quiz knowledge index:', chunks.error.message);
+    return;
+  }
+
+  const stale = await database.from('lesson_chunks').delete().eq('lesson_id', lessonId).neq('source_identity', sourceIdentity);
+  if (stale.error) console.error('Không thể xóa quiz knowledge index cũ:', stale.error.message);
+
+  const keywords = await database
+    .from('lesson_keywords')
+    .select('keyword_id,keyword_definitions!inner(term,normalized_term)')
+    .eq('lesson_id', lessonId);
+  if (keywords.error) {
+    console.error('Không thể đọc keyword để liên kết nguồn quiz:', keywords.error.message);
+    return;
+  }
+
+  const sources = [];
+  for (const keyword of keywords.data ?? []) {
+    const definition = Array.isArray(keyword.keyword_definitions)
+      ? keyword.keyword_definitions[0]
+      : keyword.keyword_definitions;
+    const term = String(definition?.term ?? '').trim();
+    const normalizedTerm = String(definition?.normalized_term ?? term).toLocaleLowerCase('vi');
+    if (!term || !normalizedTerm) continue;
+    for (const chunk of chunks.data ?? []) {
+      const haystack = `${chunk.title ?? ''} ${chunk.content ?? ''} ${chunk.summary ?? ''}`.toLocaleLowerCase('vi');
+      if (!haystack.includes(normalizedTerm)) continue;
+      const sourceText = `${chunk.title ?? ''}. ${chunk.content ?? ''} ${chunk.summary ?? ''}`.trim();
+      const matchIndex = sourceText.toLocaleLowerCase('vi').indexOf(normalizedTerm);
+      const start = Math.max(0, matchIndex - 90);
+      sources.push({
+        lesson_id: lessonId,
+        keyword_id: keyword.keyword_id,
+        chunk_id: chunk.id,
+        slide_number: chunk.slide_number,
+        evidence_text: sourceText.slice(start, start + 260),
+        confidence: 1,
+      });
+    }
+  }
+
+  const removed = await database.from('lesson_keyword_sources').delete().eq('lesson_id', lessonId);
+  if (removed.error) {
+    console.error('Không thể làm mới liên kết keyword-source:', removed.error.message);
+    return;
+  }
+  if (sources.length) {
+    const linked = await database
+      .from('lesson_keyword_sources')
+      .insert(sources);
+    if (linked.error) console.error('Không thể liên kết keyword với nguồn quiz:', linked.error.message);
+  }
+}
+
 async function generateLessonKnowledgeArtifact(lessonId, uploadedPdfUrl, database, actorId, force = false) {
   if (!database) throw new Error('Supabase chưa được cấu hình.');
   const lessonResult = await database.from('lessons').select('id,title,pdf_path,course_id,updated_at').eq('id', lessonId).maybeSingle();
@@ -716,14 +828,17 @@ async function generateLessonKnowledgeArtifact(lessonId, uploadedPdfUrl, databas
     const slideSummaries = await createSlideSummaries(uploadedPdfUrl);
     const { graph, graphModel } = await createKnowledgeGraph(slideSummaries, lesson.title);
     const generatedAt = new Date().toISOString();
+    const storedSlideSummaries = slideSummaries.map(({ content: _content, ...slide }) => slide);
     const payload = {
-      lesson_id: lessonId, slide_summaries: slideSummaries, graph,
+      lesson_id: lessonId, slide_summaries: storedSlideSummaries, graph,
       source_pdf_path: lesson.pdf_path, source_identity: sourceIdentity,
       summary_model: `${provider}:${model}`, graph_model: `${provider}:${graphModel}`,
       generated_by: actorId, generated_at: generatedAt,
     };
     const persisted = await database.from('lesson_knowledge_artifacts').upsert(payload, { onConflict: 'lesson_id' }).select('*').single();
     if (persisted.error) throw new Error(`Không thể lưu sơ đồ: ${persisted.error.message}`);
+    await persistLessonQuizKnowledge(database, lessonId, sourceIdentity, slideSummaries)
+      .catch((error) => console.error('Không thể lập quiz knowledge index:', error instanceof Error ? error.message : 'Unknown error'));
     return serializeKnowledgeArtifact(persisted.data, 'generated');
   })().finally(() => knowledgeArtifactInFlight.delete(taskKey));
   knowledgeArtifactInFlight.set(taskKey, task);
@@ -1003,4 +1118,8 @@ if (process.env.NODE_ENV === 'production') {
   app.get('/*splat', (_request, response) => response.sendFile(path.join(rootDirectory, 'dist', 'index.html')));
 }
 
-app.listen(port, '0.0.0.0', () => console.log(`Solar Note Map server listening on port ${port}`));
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Solar Note Map server listening on port ${port}`);
+  console.log(`Knowledge AI: ${provider}/${model}`);
+  if (adaptiveQuizEnabled) console.log(`Quiz AI: ${quizAiProvider.name}/${quizAiProvider.model}`);
+});

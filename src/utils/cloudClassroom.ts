@@ -10,10 +10,12 @@ export interface CloudCourse { id: string; name: string; description: string; ow
 
 const DB_TO_ACTIVITY: Record<string, StudentActivity['type']> = {
   lesson_viewed: 'lesson_opened', slide_viewed: 'slide_viewed', note_created: 'note_updated', map_created: 'map_saved', question_posted: 'question_posted', answer_posted: 'answer_posted', understanding_updated: 'understanding_updated',
+  keyword_opened: 'keyword_opened', slide_dwell_completed: 'slide_dwell_completed', quiz_recommended: 'quiz_recommended', quiz_started: 'quiz_started', quiz_completed: 'quiz_completed', quiz_dismissed: 'quiz_dismissed',
 };
 const ACTIVITY_TO_DB: Record<StudentActivity['type'], string> = {
   lesson_opened: 'lesson_viewed', slide_viewed: 'slide_viewed', note_updated: 'note_created', map_saved: 'map_created',
   question_posted: 'question_posted', answer_posted: 'answer_posted', understanding_updated: 'understanding_updated',
+  keyword_opened: 'keyword_opened', slide_dwell_completed: 'slide_dwell_completed', quiz_recommended: 'quiz_recommended', quiz_started: 'quiz_started', quiz_completed: 'quiz_completed', quiz_dismissed: 'quiz_dismissed',
 };
 
 export function toCloudActivityKind(type: StudentActivity['type']) { return ACTIVITY_TO_DB[type]; }

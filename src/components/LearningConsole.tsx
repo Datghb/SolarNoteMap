@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useRef, useState, Suspense, lazy } from 'react';
+import { useMemo, useEffect, useRef, useState, Suspense, lazy, useCallback } from 'react';
 import type { Lesson } from '../data/lessons';
 import { getLessonSlides, getPdfPageSlides } from '../data/slides';
 import type { KnowledgeMap, KnowledgeNode } from '../utils/smartMap';
@@ -13,6 +13,11 @@ import { fetchLessonSummary, isExtractiveFallbackSummary } from '../utils/lesson
 import { persistCloudMap, persistCloudNote, recordStudentActivity } from '../utils/courseStore';
 import { builtInSlidePdfUrl } from './pdfUrls';
 import { loadCloudLearningState } from '../utils/cloudClassroom';
+import { useActiveSlideDwell } from '../hooks/useActiveSlideDwell';
+import { addQuizDwell, addQuizKeyword, createQuizBehaviorState, deriveAdaptiveQuizContext, markQuizSlideUnclear } from '../utils/quizBehavior';
+import { AdaptiveQuizApiError, dismissAdaptiveQuiz, loadAdaptiveQuizRecommendation, prepareAdaptiveQuiz, reportAdaptiveQuizQuestion, startAdaptiveQuiz, submitAdaptiveQuiz, type AdaptiveQuizRecommendation, type AdaptiveQuizResult, type QuizSlotId } from '../utils/adaptiveQuiz';
+import { AdaptiveQuizPanel } from './AdaptiveQuizPanel';
+import type { LessonKeyword } from '../utils/lessonSummary';
 
 // pdfjs-dist (~1.4MB worker + parser code) is only needed once a lesson that
 // actually uses the PDF slide deck is opened, so keep it out of the initial
@@ -22,7 +27,7 @@ const PdfSlideWorkspace = lazy(() => import('./PdfSlideWorkspace').then((m) => (
 const EMPTY_MAP: KnowledgeMap = { nodes: [], edges: [] };
 
 export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, onRefreshPdf, canManageLesson = false }: { lesson: Lesson; classId: string; summaryCacheScope: string; onClose: () => void; onRefreshPdf: () => Promise<string>; canManageLesson?: boolean }) {
-  const [tab, setTab] = useState<'brief' | 'summary' | 'map' | 'community'>('brief');
+  const [tab, setTab] = useState<'brief' | 'summary' | 'map' | 'community' | 'quiz'>('brief');
   const [map, setMap] = useState<KnowledgeMap>(EMPTY_MAP);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -34,6 +39,13 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
   const [mapHydratedLessonId, setMapHydratedLessonId] = useState<string | null>(null);
   const [mapGenerationRevision, setMapGenerationRevision] = useState(0);
   const [availableSummary, setAvailableSummary] = useState(isExtractiveFallbackSummary(lesson.summary) ? '' : (lesson.summary?.trim() ?? ''));
+  const adaptiveQuizEnabled = import.meta.env.VITE_ADAPTIVE_QUIZ_ENABLED === 'true' && !canManageLesson;
+  const [quizBehavior, setQuizBehavior] = useState(() => createQuizBehaviorState(1));
+  const [quizRecommendation, setQuizRecommendation] = useState<AdaptiveQuizRecommendation | null>(null);
+  const [quizResult, setQuizResult] = useState<AdaptiveQuizResult | null>(null);
+  const [quizPreparing, setQuizPreparing] = useState(false);
+  const [quizSubmitting, setQuizSubmitting] = useState(false);
+  const [quizError, setQuizError] = useState('');
   const noteActivityTimer = useRef<number | null>(null);
   const cloudNoteTimer = useRef<number | null>(null);
   const cloudNoteSaveChain = useRef(Promise.resolve());
@@ -41,6 +53,8 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
   const personalMap = useRef<KnowledgeMap | null>(null);
   const forceMapGeneration = useRef(false);
   const mapRetryCount = useRef(0);
+  const preparedQuizSignatures = useRef(new Set<string>());
+  const interactedQuizKeywords = useRef(new Set<string>());
   const learningStateDirty = useRef(false);
   const learningStateLessonId = useRef<string | null>(null);
   const mapStorageKey = useMemo(() => `solar-note-map:${classId}:${lesson.id}`, [classId, lesson.id]);
@@ -49,7 +63,79 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
   const usesDay01Pdf = lesson.id === 'ai-foundations' || Boolean(lesson.pdfUrl);
   const [pdfPageCount, setPdfPageCount] = useState(42);
   const [pdfLoadedLessonId, setPdfLoadedLessonId] = useState<string | null>(null);
-  const slides = usesDay01Pdf ? getPdfPageSlides(pdfPageCount) : getLessonSlides(lesson.id, lesson.name);
+  const slides = useMemo(
+    () => usesDay01Pdf ? getPdfPageSlides(pdfPageCount) : getLessonSlides(lesson.id, lesson.name),
+    [usesDay01Pdf, pdfPageCount, lesson.id, lesson.name],
+  );
+  const quizContext = useMemo(() => deriveAdaptiveQuizContext(quizBehavior), [quizBehavior]);
+
+  const completeSlideDwell = useCallback((signal: { slideNumber: number; activeSeconds: number; revisitCount: number }) => {
+    setQuizBehavior((current) => addQuizDwell(current, signal));
+    recordStudentActivity({
+      lessonId: lesson.id,
+      slideId: slides[signal.slideNumber - 1]?.id,
+      type: 'slide_dwell_completed',
+      metadata: { slideNumber: signal.slideNumber, activeSeconds: signal.activeSeconds, source: 'lesson_slide' },
+    });
+  }, [lesson.id, slides]);
+
+  useActiveSlideDwell({
+    enabled: adaptiveQuizEnabled && tab === 'brief',
+    lessonId: lesson.id,
+    slideNumber: slideIndex + 1,
+    onComplete: completeSlideDwell,
+  });
+
+  const interactWithQuizKeyword = useCallback((keyword: LessonKeyword) => {
+    if (!adaptiveQuizEnabled) return;
+    const normalized = keyword.term.normalize('NFKC').trim().toLocaleLowerCase('vi');
+    if (!normalized || interactedQuizKeywords.current.has(normalized)) return;
+    interactedQuizKeywords.current.add(normalized);
+    setQuizBehavior((current) => addQuizKeyword(current, keyword.term));
+    recordStudentActivity({ lessonId: lesson.id, type: 'keyword_opened', metadata: { keyword: keyword.term.slice(0, 80), source: 'lesson_summary' } });
+  }, [adaptiveQuizEnabled, lesson.id]);
+
+  useEffect(() => {
+    setQuizBehavior(createQuizBehaviorState(1));
+    setQuizRecommendation(null);
+    setQuizResult(null);
+    setQuizPreparing(false);
+    setQuizSubmitting(false);
+    setQuizError('');
+    preparedQuizSignatures.current.clear();
+    interactedQuizKeywords.current.clear();
+  }, [classId, lesson.id]);
+
+  useEffect(() => {
+    if (!adaptiveQuizEnabled) return;
+    let active = true;
+    loadAdaptiveQuizRecommendation(classId, lesson.id).then((recommendation) => {
+      if (active && recommendation) setQuizRecommendation(recommendation);
+    }).catch((error) => console.error('Không tải được adaptive quiz đang chờ:', error));
+    return () => { active = false; };
+  }, [adaptiveQuizEnabled, classId, lesson.id]);
+
+  useEffect(() => {
+    if (!adaptiveQuizEnabled || !quizContext.eligible || quizRecommendation || preparedQuizSignatures.current.has(quizContext.signature)) return;
+    let active = true;
+    preparedQuizSignatures.current.add(quizContext.signature);
+    setQuizPreparing(true);
+    setQuizError('');
+    prepareAdaptiveQuiz({ classId, lessonId: lesson.id, ...quizContext }).then((recommendation) => {
+      if (!active || !recommendation) return;
+      setQuizRecommendation(recommendation);
+      recordStudentActivity({
+        lessonId: lesson.id,
+        type: 'quiz_recommended',
+        metadata: { quizId: recommendation.id, questionCount: 3, trigger: quizContext.reasons.join(',').slice(0, 120) },
+      });
+    }).catch((error) => {
+      if (active && !(error instanceof AdaptiveQuizApiError && error.status === 409)) {
+        setQuizError(error instanceof Error ? error.message : 'Chưa thể chuẩn bị quiz lúc này.');
+      }
+    }).finally(() => { if (active) setQuizPreparing(false); });
+    return () => { active = false; };
+  }, [adaptiveQuizEnabled, classId, lesson.id, quizContext, quizRecommendation]);
 
   useEffect(() => {
     setAvailableSummary(isExtractiveFallbackSummary(lesson.summary) ? '' : (lesson.summary?.trim() ?? ''));
@@ -303,8 +389,76 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
     }, 1200);
   };
 
+  const updateUnderstanding = (status: 'understood' | 'question' | 'unmarked') => {
+    const slideNumber = slideIndex + 1;
+    recordStudentActivity({ lessonId: lesson.id, slideId: slides[slideIndex].id, type: 'understanding_updated', metadata: { status, slideNumber } });
+    if (adaptiveQuizEnabled && status === 'question') setQuizBehavior((current) => markQuizSlideUnclear(current, slideNumber));
+  };
+
+  const openAdaptiveQuiz = async () => {
+    if (!quizRecommendation || quizSubmitting) return;
+    if (quizRecommendation.status === 'accepted' || quizRecommendation.status === 'completed') {
+      setTab('quiz');
+      return;
+    }
+    setQuizError('');
+    try {
+      const started = await startAdaptiveQuiz(quizRecommendation.id);
+      if (!started) throw new Error('Máy chủ không trả về quiz.');
+      setQuizRecommendation(started);
+      setTab('quiz');
+      recordStudentActivity({ lessonId: lesson.id, type: 'quiz_started', metadata: { quizId: started.id, questionCount: 3 } });
+    } catch (error) {
+      setQuizError(error instanceof Error ? error.message : 'Không thể mở quiz lúc này.');
+    }
+  };
+
+  const closeAdaptiveQuizRecommendation = async () => {
+    if (!quizRecommendation) return;
+    setQuizError('');
+    try {
+      await dismissAdaptiveQuiz(quizRecommendation.id);
+      recordStudentActivity({ lessonId: lesson.id, type: 'quiz_dismissed', metadata: { quizId: quizRecommendation.id, questionCount: 3 } });
+      setQuizRecommendation(null);
+      if (tab === 'quiz') setTab('brief');
+    } catch (error) {
+      setQuizError(error instanceof Error ? error.message : 'Không thể đóng đề xuất quiz.');
+    }
+  };
+
+  const submitQuiz = async (answers: number[]) => {
+    if (!quizRecommendation || quizSubmitting) return;
+    setQuizSubmitting(true);
+    setQuizError('');
+    try {
+      const result = await submitAdaptiveQuiz(quizRecommendation.id, answers);
+      setQuizResult(result);
+      setQuizRecommendation((current) => current ? { ...current, status: 'completed' } : current);
+      recordStudentActivity({
+        lessonId: lesson.id,
+        type: 'quiz_completed',
+        metadata: { quizId: quizRecommendation.id, score: result.score, questionCount: 3, durationSeconds: result.durationSeconds },
+      });
+    } catch (error) {
+      setQuizError(error instanceof Error ? error.message : 'Không thể chấm quiz lúc này.');
+    } finally {
+      setQuizSubmitting(false);
+    }
+  };
+
+  const reportQuizQuestion = async (slotId: QuizSlotId) => {
+    if (!quizRecommendation) return;
+    setQuizError('');
+    try {
+      await reportAdaptiveQuizQuestion(quizRecommendation.id, slotId, 'Câu hỏi, đáp án hoặc giải thích chưa phù hợp với nội dung bài học.');
+    } catch (error) {
+      setQuizError(error instanceof Error ? error.message : 'Không thể gửi báo cáo câu hỏi.');
+      throw error;
+    }
+  };
+
   return (
-    <aside className={`learning-console ${tab === 'brief' ? 'slide-open' : ''} ${tab === 'summary' ? 'summary-open' : ''} ${tab === 'map' ? 'map-open' : ''} ${tab === 'community' ? 'community-open' : ''}`} style={{ '--lesson-color': lesson.color } as React.CSSProperties}>
+    <aside className={`learning-console ${tab === 'brief' ? 'slide-open' : ''} ${tab === 'summary' ? 'summary-open' : ''} ${tab === 'map' ? 'map-open' : ''} ${tab === 'community' ? 'community-open' : ''} ${tab === 'quiz' ? 'quiz-open' : ''}`} style={{ '--lesson-color': lesson.color } as React.CSSProperties}>
       <header className="console-header">
         <div>
           <h2>{lesson.name}</h2>
@@ -312,12 +466,20 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
         <button className="icon-button" onClick={onClose} aria-label="Đóng">×</button>
       </header>
 
-      <nav className="console-tabs" style={{ gridTemplateColumns: `repeat(${usesDay01Pdf ? 4 : 3}, 1fr)` }}>
+      <nav className="console-tabs" style={{ gridTemplateColumns: `repeat(${(usesDay01Pdf ? 4 : 3) + (adaptiveQuizEnabled && quizRecommendation ? 1 : 0)}, 1fr)` }}>
         <button className={tab === 'brief' ? 'active' : ''} onClick={() => setTab('brief')}>Bài giảng</button>
         {usesDay01Pdf && <button className={tab === 'summary' ? 'active' : ''} onClick={() => setTab('summary')}>Tóm tắt</button>}
         <button className={tab === 'map' ? 'active' : ''} onClick={() => setTab('map')}>Sơ đồ <span>{map.nodes.length}</span></button>
         <button className={tab === 'community' ? 'active' : ''} onClick={() => setTab('community')}>Thảo luận</button>
+        {adaptiveQuizEnabled && quizRecommendation && <button className={tab === 'quiz' ? 'active' : ''} onClick={() => void openAdaptiveQuiz()}>Quiz <span>3</span></button>}
       </nav>
+
+      {adaptiveQuizEnabled && tab !== 'quiz' && quizRecommendation && quizRecommendation.status !== 'completed' && <div className="adaptive-quiz-notice" role="status">
+        <div><span>✦ Quiz đã sẵn sàng</span><b>{quizRecommendation.title}</b><small>3 câu · dựa trên phần bạn vừa học</small></div>
+        <div><button onClick={() => void closeAdaptiveQuizRecommendation()}>Để sau</button><button className="primary" onClick={() => void openAdaptiveQuiz()}>Làm ngay</button></div>
+      </div>}
+      {adaptiveQuizEnabled && !quizRecommendation && quizPreparing && <div className="adaptive-quiz-preparing" role="status">✦ AI đang chuẩn bị 3 câu kiểm tra nhanh…</div>}
+      {adaptiveQuizEnabled && !quizRecommendation && quizError && quizContext.eligible && <div className="adaptive-quiz-preparing error" role="status">{quizError}</div>}
 
       <div className="console-content">
         {tab === 'brief' && (
@@ -338,7 +500,7 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
               onPageChange={(page) => setSlideIndex(page - 1)}
               onNoteChange={changeSlideNote}
               onOpenMap={() => setTab('map')}
-              onUnderstandingChange={(status) => recordStudentActivity({ lessonId: lesson.id, slideId: slides[slideIndex].id, type: 'understanding_updated', metadata: { status } })}
+              onUnderstandingChange={updateUnderstanding}
             />
           </Suspense> : <SlideLearningWorkspace
             slides={slides}
@@ -351,7 +513,7 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
             onIndexChange={setSlideIndex}
             onNoteChange={changeSlideNote}
             onOpenMap={() => setTab('map')}
-            onUnderstandingChange={(status) => recordStudentActivity({ lessonId: lesson.id, slideId: slides[slideIndex].id, type: 'understanding_updated', metadata: { status } })}
+            onUnderstandingChange={updateUnderstanding}
           />
         )}
 
@@ -387,7 +549,7 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
           </section>
         )}
 
-        {tab === 'summary' && <LessonSummary lesson={lesson} cacheScope={summaryCacheScope} onRefreshPdf={onRefreshPdf} canGenerateKeywords={canManageLesson} onSummaryReady={setAvailableSummary} />}
+        {tab === 'summary' && <LessonSummary lesson={lesson} cacheScope={summaryCacheScope} onRefreshPdf={onRefreshPdf} canGenerateKeywords={canManageLesson} onSummaryReady={setAvailableSummary} onKeywordInteraction={interactWithQuizKeyword} />}
 
         {tab === 'community' && <CommunityQuestions
           lesson={lesson}
@@ -398,6 +560,16 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
             if (index >= 0) setSlideIndex(index);
             setTab('brief');
           }}
+        />}
+
+        {tab === 'quiz' && adaptiveQuizEnabled && quizRecommendation && <AdaptiveQuizPanel
+          recommendation={quizRecommendation}
+          result={quizResult}
+          submitting={quizSubmitting}
+          error={quizError}
+          onSubmit={submitQuiz}
+          onOpenSlide={(slideNumber) => { setSlideIndex(Math.max(0, Math.min(slides.length - 1, slideNumber - 1))); setTab('brief'); }}
+          onReport={reportQuizQuestion}
         />}
 
       </div>

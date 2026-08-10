@@ -20,6 +20,12 @@ const EVENT_LABELS: Record<StudentActivity["type"], string> = {
   question_posted: "Đăng câu hỏi",
   answer_posted: "Phản hồi thảo luận",
   understanding_updated: "Đánh dấu mức độ hiểu",
+  keyword_opened: "Mở chú giải keyword",
+  slide_dwell_completed: "Học slide chủ động",
+  quiz_recommended: "Được đề xuất quiz",
+  quiz_started: "Bắt đầu quiz",
+  quiz_completed: "Hoàn thành quiz",
+  quiz_dismissed: "Để quiz làm sau",
 };
 
 function describeLessonSchedule(lesson: Lesson) {
