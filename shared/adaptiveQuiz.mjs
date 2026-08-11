@@ -65,6 +65,47 @@ export function normalizeQuizTerm(value) {
   return String(value ?? '').normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('vi');
 }
 
+export function resolveQuizKnowledgeState({ sourceIdentity, artifact, chunks }) {
+  const identity = String(sourceIdentity ?? '').trim();
+  const currentChunks = (Array.isArray(chunks) ? chunks : []).filter((chunk) => {
+    const chunkIdentity = String(chunk?.source_identity ?? chunk?.sourceIdentity ?? '').trim();
+    return identity && chunkIdentity === identity;
+  });
+  const chunkPages = [...new Set(currentChunks
+    .map((chunk) => Number(chunk?.slide_number ?? chunk?.slideNumber ?? chunk?.page))
+    .filter((page) => Number.isInteger(page) && page >= 1 && page <= 500))]
+    .sort((left, right) => left - right);
+  const currentArtifact = artifact && String(artifact.source_identity ?? artifact.sourceIdentity ?? '').trim() === identity
+    ? artifact
+    : null;
+  return {
+    ready: currentChunks.length > 0 && chunkPages.length > 0,
+    currentChunks,
+    chunkPages,
+    currentArtifact,
+  };
+}
+
+export function evaluateCompletedQuizPolicy({ completedAt = [], now = Date.now(), cooldownSeconds = 600, maxCompleted = 3 }) {
+  const timestamps = (Array.isArray(completedAt) ? completedAt : [])
+    .map((value) => Date.parse(String(value ?? '')))
+    .filter(Number.isFinite)
+    .sort((left, right) => right - left);
+  const cooldown = Math.max(0, Math.round(Number(cooldownSeconds) || 0));
+  const limit = Math.max(1, Math.round(Number(maxCompleted) || 1));
+  const remainingSeconds = timestamps.length
+    ? Math.max(0, Math.ceil((timestamps[0] + cooldown * 1_000 - Number(now)) / 1_000))
+    : 0;
+  if (remainingSeconds > 0) return { allowed: false, reason: 'cooldown', remainingSeconds };
+  if (timestamps.length >= limit) return { allowed: false, reason: 'daily_limit', remainingSeconds: 0 };
+  return { allowed: true, reason: 'ready', remainingSeconds: 0 };
+}
+
+export function quizVariantMatchesMode(variant, requestedMode = 'live') {
+  const storedMode = variant?.validation && typeof variant.validation === 'object' ? variant.validation.mode : null;
+  return requestedMode === 'mock' ? storedMode === 'mock' : storedMode !== 'mock';
+}
+
 function uniqueStrings(values, limit, maxLength = 100) {
   const seen = new Set();
   const result = [];
@@ -230,6 +271,42 @@ export function mergeRegeneratedQuestions(currentQuestions, replacementQuestions
   const replacementBySlot = new Map(replacementQuestions.map((question) => [question.slotId, question]));
   if (replacementBySlot.size !== replacementSlots.size) throw new Error('Quizer không tạo lại đủ slot bị fail.');
   return currentQuestions.map((question) => replacementBySlot.get(question.slotId) ?? question);
+}
+
+export function createMockQuizDraft({ evidence, targetKeywords = [] }) {
+  const safeEvidence = Array.isArray(evidence) ? evidence : [];
+  if (!safeEvidence.length) throw new Error('Mock quiz cần ít nhất một evidence chunk.');
+  const allowedKeywords = uniqueStrings(targetKeywords, 5, 80);
+  const levels = ['recall', 'relationship', 'application'];
+  const prompts = [
+    'Theo nội dung slide nguồn, mô tả nào phù hợp nhất với keyword',
+    'Theo nội dung slide nguồn, nhận định nào thể hiện đúng mối liên hệ quanh keyword',
+    'Nếu vận dụng đúng nội dung slide nguồn, lựa chọn nào phù hợp nhất với keyword',
+  ];
+  const keyword = allowedKeywords[0] ?? uniqueStrings(safeEvidence[0]?.keywords, 1, 80)[0] ?? String(safeEvidence[0]?.title ?? 'nội dung bài học').slice(0, 80);
+  const questions = SLOT_IDS.map((slotId, index) => {
+    const chunk = safeEvidence[index % safeEvidence.length];
+    const chunkId = String(chunk.id);
+    const slideNumber = Number(chunk.slideNumber ?? chunk.slide_number);
+    const correct = String(chunk.summary || chunk.content).trim().slice(0, 220);
+    return {
+      slotId,
+      question: `[MOCK] ${prompts[index]} “${keyword}”?`,
+      options: [
+        correct,
+        `Phương án mô phỏng ${index + 1}A không được slide ${slideNumber} hỗ trợ.`,
+        `Phương án mô phỏng ${index + 1}B nằm ngoài phạm vi slide ${slideNumber}.`,
+        `Phương án mô phỏng ${index + 1}C mâu thuẫn với nguồn đã retrieval.`,
+      ],
+      correctIndex: 0,
+      explanation: `[MOCK] Đáp án này được đối chiếu trực tiếp với nội dung Slide ${slideNumber}.`,
+      keyword,
+      sourceChunkIds: [chunkId],
+      sourceSlides: [slideNumber],
+      level: levels[index],
+    };
+  });
+  return validateQuizDraft({ questions }, { evidence: safeEvidence, allowedKeywords });
 }
 
 export function serializePublicQuiz(questions) {

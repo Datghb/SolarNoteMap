@@ -8,7 +8,7 @@ import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { findGlossaryMatches, parseKeywordGlossaryCsv, selectFirstGlossaryMatches } from './shared/keywordGlossary.mjs';
-import { buildChatCompatibilityOptions, resolveAiProvider, resolveQuizAiProvider, supportedAiProviders } from './shared/aiProvider.mjs';
+import { buildChatCompatibilityOptions, resolveAiProvider, resolveQuizAiProvider, resolveQuizFallbackAiProvider, supportedAiProviders } from './shared/aiProvider.mjs';
 import { createAdaptiveQuizRouter } from './server/adaptiveQuiz.mjs';
 
 dotenv.config({ path: '.env.local', override: false });
@@ -21,6 +21,10 @@ const providerLabel = aiProvider.label;
 const model = aiProvider.model;
 const client = aiProvider.apiKey ? new OpenAI({ apiKey: aiProvider.apiKey, ...(aiProvider.baseURL ? { baseURL: aiProvider.baseURL } : {}) }) : null;
 const usesChatCompletions = aiProvider.protocol === 'chat';
+const requestedQuizAiMode = String(process.env.QUIZ_AI_MODE || 'live').trim().toLowerCase();
+const quizAiMode = ['live', 'mock'].includes(requestedQuizAiMode) ? requestedQuizAiMode : 'live';
+if (requestedQuizAiMode !== quizAiMode) console.warn(`QUIZ_AI_MODE="${requestedQuizAiMode}" không hợp lệ; đang dùng live.`);
+if (quizAiMode === 'mock' && process.env.NODE_ENV === 'production') throw new Error('QUIZ_AI_MODE=mock bị chặn trong production.');
 const quizAiProvider = resolveQuizAiProvider(process.env);
 const quizClientUsesMainProvider = quizAiProvider.name === aiProvider.name
   && quizAiProvider.model === aiProvider.model
@@ -29,6 +33,10 @@ const quizClientUsesMainProvider = quizAiProvider.name === aiProvider.name
 const quizClient = quizClientUsesMainProvider
   ? client
   : quizAiProvider.apiKey ? new OpenAI({ apiKey: quizAiProvider.apiKey, ...(quizAiProvider.baseURL ? { baseURL: quizAiProvider.baseURL } : {}) }) : null;
+const quizFallbackAiProvider = resolveQuizFallbackAiProvider(process.env);
+const quizFallbackClient = quizFallbackAiProvider?.apiKey
+  ? new OpenAI({ apiKey: quizFallbackAiProvider.apiKey, ...(quizFallbackAiProvider.baseURL ? { baseURL: quizFallbackAiProvider.baseURL } : {}) })
+  : null;
 if (!aiProvider.recognized) {
   console.warn(`AI_PROVIDER="${aiProvider.requestedName}" không được hỗ trợ; đang dùng OpenAI. Các giá trị hợp lệ: ${supportedAiProviders.join(', ')}.`);
 }
@@ -41,6 +49,8 @@ const supabaseServerKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABAS
 const supabaseAuth = supabaseUrl && supabasePublishableKey ? createSupabaseClient(supabaseUrl, supabasePublishableKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }) : null;
 const supabaseAdmin = supabaseUrl && supabaseServerKey ? createSupabaseClient(supabaseUrl, supabaseServerKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }) : null;
 const adaptiveQuizEnabled = /^(?:1|true)$/i.test(process.env.ADAPTIVE_QUIZ_ENABLED || process.env.VITE_ADAPTIVE_QUIZ_ENABLED || '');
+const adaptiveQuizCompletionCooldownSeconds = Math.max(0, Math.min(86_400, Math.round(Number(process.env.ADAPTIVE_QUIZ_COMPLETION_COOLDOWN_SECONDS || 600) || 0)));
+const adaptiveQuizMaxCompletedPerLesson24h = Math.max(1, Math.min(20, Math.round(Number(process.env.ADAPTIVE_QUIZ_MAX_PER_LESSON_24H || 3) || 3)));
 const requests = new Map();
 const rootDirectory = path.dirname(fileURLToPath(import.meta.url));
 const pdfPath = path.join(rootDirectory, 'day01-llm-foundation.pdf');
@@ -52,6 +62,7 @@ const summaryInFlight = new Map();
 const deckSummaryInFlight = new Map();
 const backgroundSummaryJobs = new Map();
 const knowledgeArtifactInFlight = new Map();
+const quizKnowledgeIndexInFlight = new Map();
 let pdfDocumentPromise;
 let slideSummaryCachePromise;
 let cacheWriteQueue = Promise.resolve();
@@ -570,6 +581,10 @@ app.use('/api/adaptive-quiz', createAdaptiveQuizRouter({
   model: quizAiProvider.model,
   provider: quizAiProvider.name,
   providerLabel: quizAiProvider.label,
+  mode: quizAiMode,
+  fallback: quizFallbackAiProvider ? { client: quizFallbackClient, aiProvider: quizFallbackAiProvider } : null,
+  completionCooldownSeconds: adaptiveQuizCompletionCooldownSeconds,
+  maxCompletedPerLesson24h: adaptiveQuizMaxCompletedPerLesson24h,
   supabaseAdmin,
   createRequestDatabase,
 }));
@@ -653,10 +668,10 @@ function summarizeSlideMetadata(page, summary, slideText) {
   return { page, title, summary, keyConcepts, content: slideText };
 }
 
-async function createSlideSummaries(uploadedPdfUrl) {
+async function extractPdfSlides(uploadedPdfUrl) {
   const document = await getDeckDocument(uploadedPdfUrl);
   if (document.numPages < 1 || document.numPages > 500) throw new Error('PDF phải có từ 1 đến 500 trang.');
-  const summaries = [];
+  const slides = [];
   const concurrency = 3;
   for (let start = 1; start <= document.numPages; start += concurrency) {
     const pages = Array.from({ length: Math.min(concurrency, document.numPages - start + 1) }, (_, index) => start + index);
@@ -664,9 +679,22 @@ async function createSlideSummaries(uploadedPdfUrl) {
       const pdfPage = await document.getPage(page);
       const content = await pdfPage.getTextContent();
       const slideText = content.items.map((item) => ('str' in item ? item.str : '')).join(' ').replace(/\s+/g, ' ').trim().slice(0, 14_000);
-      if (!slideText) return { page, title: `Slide ${page}`, summary: 'Slide không có nội dung văn bản có thể trích xuất.', keyConcepts: [] };
-      const summary = await createSlideSummary(page, slideText);
-      return summarizeSlideMetadata(page, summary, slideText);
+      const extractiveText = slideText || 'Slide không có nội dung văn bản có thể trích xuất.';
+      return summarizeSlideMetadata(page, extractiveText.slice(0, 4_000), extractiveText);
+    }));
+    slides.push(...batch);
+  }
+  return slides;
+}
+
+async function createSlideSummaries(extractedSlides) {
+  const summaries = [];
+  const concurrency = 3;
+  for (let start = 0; start < extractedSlides.length; start += concurrency) {
+    const batch = await Promise.all(extractedSlides.slice(start, start + concurrency).map(async (slide) => {
+      if (slide.content === 'Slide không có nội dung văn bản có thể trích xuất.') return slide;
+      const summary = await createSlideSummary(slide.page, slide.content);
+      return summarizeSlideMetadata(slide.page, summary, slide.content);
     }));
     summaries.push(...batch);
   }
@@ -731,7 +759,7 @@ function isMissingAdaptiveQuizKnowledgeSchema(error) {
     || message.includes('lesson_keyword_sources');
 }
 
-async function persistLessonQuizKnowledge(database, lessonId, sourceIdentity, slideSummaries) {
+async function persistLessonQuizKnowledge(database, lessonId, sourceIdentity, slideSummaries, { strict = false } = {}) {
   const chunkRows = slideSummaries
     .map((slide) => ({
       lesson_id: lessonId,
@@ -744,7 +772,10 @@ async function persistLessonQuizKnowledge(database, lessonId, sourceIdentity, sl
       keywords: Array.isArray(slide.keyConcepts) ? slide.keyConcepts : [],
     }))
     .filter((row) => row.content || row.summary);
-  if (!chunkRows.length) return;
+  if (!chunkRows.length) {
+    if (strict) throw new Error('PDF không có nội dung có thể dùng để lập chỉ mục quiz.');
+    return { chunkCount: 0, keywordSourceCount: 0 };
+  }
 
   const chunks = await database
     .from('lesson_chunks')
@@ -752,11 +783,13 @@ async function persistLessonQuizKnowledge(database, lessonId, sourceIdentity, sl
     .select('id,slide_number,title,content,summary,keywords');
   if (chunks.error) {
     if (isMissingAdaptiveQuizKnowledgeSchema(chunks.error)) {
+      if (strict) throw new Error('Database chưa có migration adaptive quiz Phase 1.');
       console.warn('Bỏ qua quiz knowledge index vì migration Phase 1 chưa được áp dụng.');
-      return;
+      return { chunkCount: 0, keywordSourceCount: 0 };
     }
+    if (strict) throw new Error(`Không thể cập nhật quiz knowledge index: ${chunks.error.message}`);
     console.error('Không thể cập nhật quiz knowledge index:', chunks.error.message);
-    return;
+    return { chunkCount: 0, keywordSourceCount: 0 };
   }
 
   const stale = await database.from('lesson_chunks').delete().eq('lesson_id', lessonId).neq('source_identity', sourceIdentity);
@@ -768,7 +801,7 @@ async function persistLessonQuizKnowledge(database, lessonId, sourceIdentity, sl
     .eq('lesson_id', lessonId);
   if (keywords.error) {
     console.error('Không thể đọc keyword để liên kết nguồn quiz:', keywords.error.message);
-    return;
+    return { chunkCount: chunks.data?.length ?? 0, keywordSourceCount: 0 };
   }
 
   const sources = [];
@@ -799,14 +832,47 @@ async function persistLessonQuizKnowledge(database, lessonId, sourceIdentity, sl
   const removed = await database.from('lesson_keyword_sources').delete().eq('lesson_id', lessonId);
   if (removed.error) {
     console.error('Không thể làm mới liên kết keyword-source:', removed.error.message);
-    return;
+    return { chunkCount: chunks.data?.length ?? 0, keywordSourceCount: 0 };
   }
   if (sources.length) {
     const linked = await database
       .from('lesson_keyword_sources')
       .insert(sources);
-    if (linked.error) console.error('Không thể liên kết keyword với nguồn quiz:', linked.error.message);
+    if (linked.error) {
+      console.error('Không thể liên kết keyword với nguồn quiz:', linked.error.message);
+      return { chunkCount: chunks.data?.length ?? 0, keywordSourceCount: 0 };
+    }
   }
+  return { chunkCount: chunks.data?.length ?? 0, keywordSourceCount: sources.length };
+}
+
+async function ensureLessonQuizKnowledge(database, lesson, uploadedPdfUrl, { force = false, strict = false } = {}) {
+  const sourceIdentity = `${lesson.pdf_path}:${lesson.updated_at}`;
+  const existing = await database
+    .from('lesson_chunks')
+    .select('id', { count: 'exact', head: true })
+    .eq('lesson_id', lesson.id)
+    .eq('source_identity', sourceIdentity);
+  if (existing.error) {
+    if (isMissingAdaptiveQuizKnowledgeSchema(existing.error) && !strict) {
+      console.warn('Bỏ qua quiz knowledge index vì migration Phase 1 chưa được áp dụng.');
+      return { sourceIdentity, chunkCount: 0, source: 'unavailable', slides: null };
+    }
+    if (isMissingAdaptiveQuizKnowledgeSchema(existing.error)) throw new Error('Database chưa có migration adaptive quiz Phase 1.');
+    throw new Error(`Không thể kiểm tra quiz knowledge index: ${existing.error.message}`);
+  }
+  if (!force && Number(existing.count) > 0) {
+    return { sourceIdentity, chunkCount: Number(existing.count), source: 'cache', slides: null };
+  }
+  const taskKey = `${lesson.id}:${sourceIdentity}`;
+  if (quizKnowledgeIndexInFlight.has(taskKey)) return quizKnowledgeIndexInFlight.get(taskKey);
+  const task = (async () => {
+    const slides = await extractPdfSlides(uploadedPdfUrl);
+    const persisted = await persistLessonQuizKnowledge(database, lesson.id, sourceIdentity, slides, { strict });
+    return { sourceIdentity, chunkCount: persisted?.chunkCount ?? 0, source: 'generated', slides };
+  })().finally(() => quizKnowledgeIndexInFlight.delete(taskKey));
+  quizKnowledgeIndexInFlight.set(taskKey, task);
+  return task;
 }
 
 async function generateLessonKnowledgeArtifact(lessonId, uploadedPdfUrl, database, actorId, force = false) {
@@ -820,12 +886,14 @@ async function generateLessonKnowledgeArtifact(lessonId, uploadedPdfUrl, databas
   const sourceIdentity = `${lesson.pdf_path}:${lesson.updated_at}`;
   const cached = await database.from('lesson_knowledge_artifacts').select('*').eq('lesson_id', lessonId).maybeSingle();
   if (cached.error) throw new Error(`Không thể đọc sơ đồ đã lưu: ${cached.error.message}`);
+  const quizIndex = await ensureLessonQuizKnowledge(database, lesson, uploadedPdfUrl, { force, strict: false });
   if (!force && cached.data?.source_identity === sourceIdentity) return serializeKnowledgeArtifact(cached.data);
   if (!client) throw new Error('AI provider is not configured.');
   const taskKey = `${lessonId}:${sourceIdentity}`;
   if (knowledgeArtifactInFlight.has(taskKey)) return knowledgeArtifactInFlight.get(taskKey);
   const task = (async () => {
-    const slideSummaries = await createSlideSummaries(uploadedPdfUrl);
+    const extractedSlides = quizIndex.slides ?? await extractPdfSlides(uploadedPdfUrl);
+    const slideSummaries = await createSlideSummaries(extractedSlides);
     const { graph, graphModel } = await createKnowledgeGraph(slideSummaries, lesson.title);
     const generatedAt = new Date().toISOString();
     const storedSlideSummaries = slideSummaries.map(({ content: _content, ...slide }) => slide);
@@ -837,13 +905,51 @@ async function generateLessonKnowledgeArtifact(lessonId, uploadedPdfUrl, databas
     };
     const persisted = await database.from('lesson_knowledge_artifacts').upsert(payload, { onConflict: 'lesson_id' }).select('*').single();
     if (persisted.error) throw new Error(`Không thể lưu sơ đồ: ${persisted.error.message}`);
-    await persistLessonQuizKnowledge(database, lessonId, sourceIdentity, slideSummaries)
-      .catch((error) => console.error('Không thể lập quiz knowledge index:', error instanceof Error ? error.message : 'Unknown error'));
     return serializeKnowledgeArtifact(persisted.data, 'generated');
   })().finally(() => knowledgeArtifactInFlight.delete(taskKey));
   knowledgeArtifactInFlight.set(taskKey, task);
   return task;
 }
+
+app.post('/api/lesson-quiz-index/generate', async (request, response) => {
+  if (!adaptiveQuizEnabled) return response.status(404).json({ error: 'Adaptive quiz chưa được bật.' });
+  const lessonId = typeof request.body?.lessonId === 'string' ? request.body.lessonId.trim() : '';
+  if (!/^[a-z0-9-]{2,64}$/.test(lessonId)) return response.status(400).json({ error: 'Bài học không hợp lệ.' });
+  let uploadedPdfUrl;
+  try {
+    uploadedPdfUrl = validateUploadedPdfUrl(typeof request.body?.pdfUrl === 'string' ? request.body.pdfUrl : '');
+  } catch {
+    return response.status(400).json({ error: 'Nguồn PDF không hợp lệ.' });
+  }
+  if (!uploadedPdfUrl) return response.status(400).json({ error: 'Bài học chưa có PDF để lập chỉ mục quiz.' });
+  const database = createRequestDatabase(request);
+  try {
+    const lessonResult = await database.from('lessons').select('id,title,pdf_path,course_id,updated_at').eq('id', lessonId).maybeSingle();
+    if (lessonResult.error || !lessonResult.data) throw new Error('Không tìm thấy bài học hoặc bạn không có quyền truy cập.');
+    const lesson = lessonResult.data;
+    const ownership = await database.rpc('is_course_owner', { target_course_id: lesson.course_id });
+    if (ownership.error || ownership.data !== true) return response.status(403).json({ error: 'Chỉ giáo viên sở hữu khóa học mới có thể lập chỉ mục quiz.' });
+    if (!lesson.pdf_path || !pdfUrlMatchesLesson(uploadedPdfUrl, lesson.pdf_path)) return response.status(400).json({ error: 'Nguồn PDF không khớp với bài học.' });
+    const result = await ensureLessonQuizKnowledge(database, lesson, uploadedPdfUrl, {
+      force: request.body?.force === true,
+      strict: true,
+    });
+    if (result.chunkCount < 1) throw new Error('Không thể tạo chunk nào từ PDF cho quiz.');
+    return response.json({
+      lessonId,
+      sourceIdentity: result.sourceIdentity,
+      chunkCount: result.chunkCount,
+      source: result.source,
+      ready: result.chunkCount > 0,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Lesson quiz index generation failed:', message);
+    if (message.includes('migration')) return response.status(503).json({ error: message });
+    if (message.includes('không tìm thấy') || message.includes('khớp') || message.includes('không có nội dung')) return response.status(400).json({ error: message });
+    return response.status(502).json({ error: 'Không thể lập chỉ mục PDF cho quiz lúc này.' });
+  }
+});
 
 app.get('/api/lesson-knowledge-map', async (request, response) => {
   const lessonId = typeof request.query?.lessonId === 'string' ? request.query.lessonId.trim() : '';
@@ -1121,5 +1227,11 @@ if (process.env.NODE_ENV === 'production') {
 app.listen(port, '0.0.0.0', () => {
   console.log(`Solar Note Map server listening on port ${port}`);
   console.log(`Knowledge AI: ${provider}/${model}`);
-  if (adaptiveQuizEnabled) console.log(`Quiz AI: ${quizAiProvider.name}/${quizAiProvider.model}`);
+  if (adaptiveQuizEnabled) {
+    if (quizAiMode === 'mock') console.log('Quiz AI: mock (development only, no external LLM calls)');
+    else {
+      console.log(`Quiz AI: ${quizAiProvider.name}/${quizAiProvider.model} [key: ${quizAiProvider.apiKeySource}]`);
+      if (quizFallbackAiProvider) console.log(`Quiz AI fallback: ${quizFallbackAiProvider.name}/${quizFallbackAiProvider.model} [key: ${quizFallbackAiProvider.apiKeySource}]`);
+    }
+  }
 });

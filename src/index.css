@@ -496,6 +496,15 @@ body { margin: 0; overflow: hidden; }
 .adaptive-quiz-preparing { padding:10px 18px; border-bottom:1px solid #2b2e40; background:#111522ed; color:#aeb7cf; font-size:10px; }
 .adaptive-quiz-preparing.error,.adaptive-quiz-error { color:#f2a1ad; }
 .adaptive-quiz-panel { width:min(900px,calc(100% - 32px)); margin:0 auto; padding:24px 0 42px; }
+.adaptive-quiz-history-shell { width:100%; }
+.adaptive-quiz-history-strip { display:flex; gap:9px; overflow-x:auto; padding:14px 18px 2px; scrollbar-width:thin; }
+.adaptive-quiz-history-strip button { display:grid; flex:0 0 150px; gap:3px; padding:10px 12px; border:1px solid #2e3347; border-radius:10px; background:#0d1120; color:#aeb5c8; text-align:left; cursor:pointer; }
+.adaptive-quiz-history-strip button.active { border-color:#ff8a6199; background:#241720; box-shadow:0 0 16px #ff8a6122; }
+.adaptive-quiz-history-strip span { color:#ff9a72; font-size:9px; font-weight:800; text-transform:uppercase; }
+.adaptive-quiz-history-strip b { color:#edf0f7; font-size:12px; }
+.adaptive-quiz-history-strip em { overflow:hidden; color:#aeb5c8; font-size:9px; font-style:normal; line-height:1.35; text-overflow:ellipsis; white-space:nowrap; }
+.adaptive-quiz-history-strip small { color:#777f94; font-size:9px; }
+.adaptive-quiz-history-empty { padding:40px 18px; color:#8e95a8; text-align:center; }
 .adaptive-quiz-header { display:flex; align-items:flex-end; justify-content:space-between; gap:20px; margin-bottom:18px; padding:0 2px; }
 .adaptive-quiz-header h3 { margin:5px 0 0; color:#f4f3f8; font-size:24px; }
 .adaptive-quiz-header small { color:#8f95a8; font-size:10px; }
@@ -520,6 +529,7 @@ body { margin: 0; overflow: hidden; }
 .adaptive-answer-feedback { margin-top:13px; padding:12px 13px; border-radius:9px; background:#111724; }
 .adaptive-answer-feedback b { color:#9ce5bd; font-size:11px; }
 .adaptive-quiz-question.incorrect .adaptive-answer-feedback b { color:#f0a69f; }
+.adaptive-source-citation { display:block; margin:7px 0 9px; color:#aeb6cb; font-size:10px; font-weight:700; }
 .adaptive-answer-feedback p { margin:5px 0 9px; color:#b7bdca; font-size:10px; line-height:1.6; }
 .adaptive-answer-feedback > div { display:flex; flex-wrap:wrap; gap:6px; }
 .adaptive-answer-feedback button { padding:6px 9px; border:1px solid #38415b; border-radius:6px; background:#161c2c; color:#aebbe0; font-size:9px; cursor:pointer; }

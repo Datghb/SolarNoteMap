@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildChatCompatibilityOptions, resolveAiProvider, resolveQuizAiProvider, supportedAiProviders } from './aiProvider.mjs';
+import { buildChatCompatibilityOptions, resolveAiProvider, resolveQuizAiProvider, resolveQuizFallbackAiProvider, supportedAiProviders } from './aiProvider.mjs';
 
 describe('AI provider configuration', () => {
   it('keeps the existing OpenAI default for an unset or unknown provider', () => {
@@ -25,10 +25,13 @@ describe('AI provider configuration', () => {
   it('supports ZenMux with the preferred key and the GLM_API_KEY alias', () => {
     expect(resolveAiProvider({ AI_PROVIDER: 'zenmux', ZENMUX_API_KEY: 'zen-key' })).toMatchObject({
       name: 'zenmux', protocol: 'chat', model: 'z-ai/glm-4.6v-flash-free',
-      apiKey: 'zen-key', baseURL: 'https://zenmux.ai/api/v1',
+      apiKey: 'zen-key', baseURL: 'https://zenmux.ai/api/v1', structuredOutputMode: 'chat_json_schema',
     });
     expect(resolveAiProvider({ AI_PROVIDER: 'zenmux', GLM_API_KEY: 'legacy-key' })).toMatchObject({
       apiKey: 'legacy-key', apiKeyName: 'GLM_API_KEY',
+    });
+    expect(buildChatCompatibilityOptions(resolveAiProvider({ AI_PROVIDER: 'zenmux', ZENMUX_API_KEY: 'zen-key' }), 1_800)).toEqual({
+      reasoning_effort: 'none', max_completion_tokens: 1_800,
     });
   });
 
@@ -37,7 +40,7 @@ describe('AI provider configuration', () => {
       AI_PROVIDER: 'kira', AI_MODEL: 'custom-kira', KIRA_API_KEY: 'kira-key', KIRA_BASE_URL: 'https://example.test/v1',
     });
     expect(provider).toMatchObject({
-      name: 'kira', protocol: 'chat', model: 'custom-kira', apiKey: 'kira-key', baseURL: 'https://example.test/v1',
+      name: 'kira', protocol: 'chat', model: 'custom-kira', apiKey: 'kira-key', baseURL: 'https://example.test/v1', structuredOutputMode: 'prompt_only',
     });
     expect(buildChatCompatibilityOptions(provider, 500)).toEqual({ max_tokens: 500 });
   });
@@ -58,7 +61,16 @@ describe('AI provider configuration', () => {
       QUIZ_AI_PROVIDER: 'kira', QUIZ_AI_API_KEY: 'quiz-key',
     };
     expect(resolveAiProvider(environment)).toMatchObject({ name: 'groq', model: 'graph-model', apiKey: 'graph-key' });
-    expect(resolveQuizAiProvider(environment)).toMatchObject({ name: 'kira', model: 'kira-mini-1.0', apiKey: 'quiz-key' });
+    expect(resolveQuizAiProvider(environment)).toMatchObject({ name: 'kira', model: 'kira-mini-1.0', apiKey: 'quiz-key', apiKeySource: 'QUIZ_AI_API_KEY' });
+  });
+
+  it('prefers provider-specific keys over the ambiguous generic quiz key', () => {
+    expect(resolveQuizAiProvider({
+      QUIZ_AI_PROVIDER: 'kira', KIRA_API_KEY: 'kira-dashboard-key', QUIZ_AI_API_KEY: 'old-other-account-key',
+    })).toMatchObject({ apiKey: 'kira-dashboard-key', apiKeySource: 'KIRA_API_KEY' });
+    expect(resolveQuizAiProvider({
+      QUIZ_AI_PROVIDER: 'kira', KIRA_API_KEY: 'base-key', QUIZ_KIRA_API_KEY: 'scoped-key', QUIZ_AI_API_KEY: 'generic-key',
+    })).toMatchObject({ apiKey: 'scoped-key', apiKeySource: 'QUIZ_KIRA_API_KEY' });
   });
 
   it('supports a quiz-specific model, provider key and base URL', () => {
@@ -66,5 +78,13 @@ describe('AI provider configuration', () => {
       AI_PROVIDER: 'groq', GROQ_API_KEY: 'main-key',
       QUIZ_AI_PROVIDER: 'zenmux', QUIZ_AI_MODEL: 'quiz-model', QUIZ_ZENMUX_API_KEY: 'zen-quiz-key', QUIZ_AI_BASE_URL: 'https://quiz.example/v1',
     })).toMatchObject({ name: 'zenmux', model: 'quiz-model', apiKey: 'zen-quiz-key', baseURL: 'https://quiz.example/v1' });
+  });
+
+  it('resolves an optional bounded fallback provider', () => {
+    expect(resolveQuizFallbackAiProvider({ QUIZ_AI_PROVIDER: 'kira' })).toBeNull();
+    expect(resolveQuizFallbackAiProvider({
+      QUIZ_AI_FALLBACK_PROVIDER: 'zenmux', QUIZ_AI_FALLBACK_MODEL: 'fallback-model',
+      QUIZ_AI_FALLBACK_API_KEY: 'fallback-key',
+    })).toMatchObject({ name: 'zenmux', model: 'fallback-model', apiKey: 'fallback-key', apiKeySource: 'QUIZ_AI_FALLBACK_API_KEY' });
   });
 });

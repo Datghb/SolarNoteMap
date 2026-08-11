@@ -13,24 +13,28 @@ export function AdaptiveQuizPanel({
   submitting,
   error,
   onSubmit,
+  onContinue,
   onOpenSlide,
   onReport,
+  historyMode = false,
 }: {
   recommendation: AdaptiveQuizRecommendation;
   result: AdaptiveQuizResult | null;
   submitting: boolean;
   error: string;
   onSubmit: (answers: number[]) => Promise<void>;
+  onContinue: () => void;
   onOpenSlide: (slideNumber: number) => void;
   onReport: (slotId: QuizSlotId) => Promise<void>;
+  historyMode?: boolean;
 }) {
   const [answers, setAnswers] = useState<Array<number | null>>([null, null, null]);
   const [reportedSlots, setReportedSlots] = useState<Set<QuizSlotId>>(new Set());
 
   useEffect(() => {
-    setAnswers([null, null, null]);
+    setAnswers(result ? result.items.map((item) => item.selectedIndex) : [null, null, null]);
     setReportedSlots(new Set());
-  }, [recommendation.id]);
+  }, [recommendation.id, result]);
 
   const complete = answers.every((answer) => answer !== null);
   const feedbackBySlot = new Map(result?.items.map((item) => [item.slotId, item]));
@@ -47,7 +51,7 @@ export function AdaptiveQuizPanel({
 
   return <section className="adaptive-quiz-panel" aria-labelledby="adaptive-quiz-title">
     <header className="adaptive-quiz-header">
-      <div><span>✦ AI micro-quiz · 3 câu</span><h3 id="adaptive-quiz-title">{recommendation.title}</h3></div>
+      <div><span>{historyMode ? 'Lịch sử micro-quiz · 3 câu' : '✦ AI micro-quiz · 3 câu'}</span><h3 id="adaptive-quiz-title">{recommendation.title}</h3></div>
       {result ? <strong>{result.score}/3 đúng</strong> : <small>Dựa trên phần bạn vừa tương tác</small>}
     </header>
 
@@ -82,9 +86,10 @@ export function AdaptiveQuizPanel({
           {feedback && <div className="adaptive-answer-feedback">
             <b>{feedback.correct ? '✓ Chính xác' : 'Đáp án cần xem lại'}</b>
             <p>{feedback.explanation}</p>
+            <small className="adaptive-source-citation">Trích nguồn: {feedback.sourceSlides.map((slide) => `Slide ${slide}`).join(', ')}</small>
             <div>
               {feedback.sourceSlides.map((slide) => <button key={slide} onClick={() => onOpenSlide(slide)}>Mở slide {slide} →</button>)}
-              <button className="report-question" disabled={reportedSlots.has(question.slotId)} onClick={() => void report(question.slotId)}>{reportedSlots.has(question.slotId) ? 'Đã báo cáo' : 'Báo câu chưa phù hợp'}</button>
+              {!historyMode && <button className="report-question" disabled={reportedSlots.has(question.slotId)} onClick={() => void report(question.slotId)}>{reportedSlots.has(question.slotId) ? 'Đã báo cáo' : 'Báo câu chưa phù hợp'}</button>}
             </div>
           </div>}
         </article>;
@@ -95,6 +100,10 @@ export function AdaptiveQuizPanel({
     {!result && <footer className="adaptive-quiz-submit">
       <span>{complete ? 'Đã chọn đủ 3 đáp án' : `Còn ${answers.filter((answer) => answer === null).length} câu chưa chọn`}</span>
       <button disabled={!complete || submitting} onClick={() => void onSubmit(answers as number[])}>{submitting ? 'Đang chấm…' : 'Nộp bài'}</button>
+    </footer>}
+    {result && <footer className="adaptive-quiz-submit">
+      <span>{historyMode ? 'Đây là kết quả đã lưu của lượt quiz này.' : 'Quiz tiếp theo chỉ xuất hiện khi có context học mới và hết cooldown.'}</span>
+      <button onClick={onContinue}>{historyMode ? 'Quay lại bài học' : 'Tiếp tục bài học'}</button>
     </footer>}
   </section>;
 }

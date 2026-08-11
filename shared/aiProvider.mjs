@@ -9,6 +9,7 @@ const PROVIDERS = Object.freeze({
     baseUrlEnv: undefined,
     maxTokensField: undefined,
     supportsJsonObject: true,
+    structuredOutputMode: 'responses_json_schema',
   }),
   groq: Object.freeze({
     name: 'groq',
@@ -20,6 +21,7 @@ const PROVIDERS = Object.freeze({
     baseUrlEnv: 'GROQ_BASE_URL',
     maxTokensField: 'max_completion_tokens',
     supportsJsonObject: true,
+    structuredOutputMode: 'json_object',
   }),
   zenmux: Object.freeze({
     name: 'zenmux',
@@ -31,6 +33,7 @@ const PROVIDERS = Object.freeze({
     baseUrlEnv: 'ZENMUX_BASE_URL',
     maxTokensField: 'max_completion_tokens',
     supportsJsonObject: true,
+    structuredOutputMode: 'chat_json_schema',
   }),
   kira: Object.freeze({
     name: 'kira',
@@ -42,6 +45,7 @@ const PROVIDERS = Object.freeze({
     baseUrlEnv: 'KIRA_BASE_URL',
     maxTokensField: 'max_tokens',
     supportsJsonObject: false,
+    structuredOutputMode: 'prompt_only',
   }),
 });
 
@@ -68,6 +72,7 @@ export function resolveAiProvider(environment = {}) {
     model: providerModel,
     apiKey: configuredKeyName ? clean(environment[configuredKeyName]) : '',
     apiKeyName: configuredKeyName || definition.apiKeyNames[0],
+    apiKeySource: configuredKeyName || definition.apiKeyNames[0],
     missingKeyLabel: definition.apiKeyNames.join(' hoặc '),
     baseURL: baseUrlOverride || definition.baseURL,
   });
@@ -81,6 +86,8 @@ export function resolveQuizAiProvider(environment = {}) {
   const definition = PROVIDERS[Object.hasOwn(PROVIDERS, requestedName) ? requestedName : 'openai'];
   const primaryKeyName = definition.apiKeyNames[0];
   const providerKeyOverride = clean(environment[`QUIZ_${primaryKeyName}`]);
+  const configuredProviderKeyName = definition.apiKeyNames.find((name) => clean(environment[name]));
+  const configuredProviderKey = configuredProviderKeyName ? clean(environment[configuredProviderKeyName]) : '';
   const baseUrlEnvName = definition.baseUrlEnv;
   const baseUrlOverride = clean(environment.QUIZ_AI_BASE_URL)
     || (baseUrlEnvName ? clean(environment[`QUIZ_${baseUrlEnvName}`]) : '');
@@ -94,14 +101,37 @@ export function resolveQuizAiProvider(environment = {}) {
     delete scopedEnvironment.AI_MODEL;
     delete scopedEnvironment.OPENAI_MODEL;
   }
-  if (genericKeyOverride || providerKeyOverride) scopedEnvironment[primaryKeyName] = genericKeyOverride || providerKeyOverride;
+  const selectedKey = providerKeyOverride || configuredProviderKey || genericKeyOverride;
+  const selectedKeySource = providerKeyOverride
+    ? `QUIZ_${primaryKeyName}`
+    : configuredProviderKeyName || (genericKeyOverride ? 'QUIZ_AI_API_KEY' : primaryKeyName);
+  if (selectedKey) scopedEnvironment[primaryKeyName] = selectedKey;
   if (baseUrlOverride && baseUrlEnvName) scopedEnvironment[baseUrlEnvName] = baseUrlOverride;
-  return resolveAiProvider(scopedEnvironment);
+  return Object.freeze({ ...resolveAiProvider(scopedEnvironment), apiKeySource: selectedKeySource });
+}
+
+export function resolveQuizFallbackAiProvider(environment = {}) {
+  const fallbackProvider = clean(environment.QUIZ_AI_FALLBACK_PROVIDER).toLowerCase();
+  if (!fallbackProvider) return null;
+  const mapped = {
+    ...environment,
+    QUIZ_AI_PROVIDER: fallbackProvider,
+    QUIZ_AI_MODEL: clean(environment.QUIZ_AI_FALLBACK_MODEL),
+    QUIZ_AI_API_KEY: clean(environment.QUIZ_AI_FALLBACK_API_KEY),
+    QUIZ_AI_BASE_URL: clean(environment.QUIZ_AI_FALLBACK_BASE_URL),
+  };
+  const resolved = resolveQuizAiProvider(mapped);
+  const fallbackKey = clean(environment.QUIZ_AI_FALLBACK_API_KEY);
+  return Object.freeze({
+    ...resolved,
+    apiKey: fallbackKey || resolved.apiKey,
+    apiKeySource: fallbackKey ? 'QUIZ_AI_FALLBACK_API_KEY' : resolved.apiKeySource,
+  });
 }
 
 export function buildChatCompatibilityOptions(provider, maxTokens) {
   if (!provider || provider.protocol !== 'chat') return {};
-  const options = provider.name === 'groq' ? { reasoning_effort: 'none' } : {};
+  const options = ['groq', 'zenmux'].includes(provider.name) ? { reasoning_effort: 'none' } : {};
   if (Number.isInteger(maxTokens) && maxTokens > 0 && provider.maxTokensField) {
     options[provider.maxTokensField] = maxTokens;
   }

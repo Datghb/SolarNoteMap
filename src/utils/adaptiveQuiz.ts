@@ -41,6 +41,13 @@ export interface AdaptiveQuizResult {
   items: AdaptiveQuizAnswerResult[];
 }
 
+export interface AdaptiveQuizHistoryItem {
+  id: string;
+  recommendation: AdaptiveQuizRecommendation;
+  result: AdaptiveQuizResult;
+  completedAt: string;
+}
+
 export interface AdaptiveQuizContextRequest {
   classId: string;
   lessonId: string;
@@ -129,6 +136,23 @@ function parseAdaptiveQuizResult(value: unknown): AdaptiveQuizResult {
   return { score: value.score as number, questionCount: 3, durationSeconds: value.durationSeconds as number, items };
 }
 
+export function parseAdaptiveQuizHistory(value: unknown): AdaptiveQuizHistoryItem[] {
+  if (!Array.isArray(value)) throw new Error('Máy chủ trả về lịch sử quiz không hợp lệ.');
+  return value.map((item) => {
+    if (!isRecord(item) || typeof item.id !== 'string' || typeof item.completedAt !== 'string' || !Number.isFinite(Date.parse(item.completedAt))) {
+      throw new Error('Lượt quiz trong lịch sử không hợp lệ.');
+    }
+    const recommendation = parseAdaptiveQuizRecommendation(item.recommendation);
+    if (!recommendation || recommendation.status !== 'completed') throw new Error('Quiz lịch sử chưa ở trạng thái hoàn thành.');
+    return {
+      id: item.id,
+      recommendation,
+      result: parseAdaptiveQuizResult(item.result),
+      completedAt: item.completedAt,
+    };
+  });
+}
+
 async function request(path: string, init?: RequestInit) {
   const response = await fetch(`/api/adaptive-quiz${path}`, {
     ...init,
@@ -156,6 +180,12 @@ export async function loadAdaptiveQuizRecommendation(classId: string, lessonId: 
   const query = new URLSearchParams({ classId, lessonId });
   const payload = await request(`/recommendation?${query.toString()}`);
   return parseAdaptiveQuizRecommendation(payload.recommendation);
+}
+
+export async function loadAdaptiveQuizHistory(classId: string, lessonId: string) {
+  const query = new URLSearchParams({ classId, lessonId });
+  const payload = await request(`/history?${query.toString()}`);
+  return parseAdaptiveQuizHistory(payload.history);
 }
 
 export async function startAdaptiveQuiz(recommendationId: string) {

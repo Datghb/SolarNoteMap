@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   canonicalQuizTarget,
+  createMockQuizDraft,
+  evaluateCompletedQuizPolicy,
   mergeRegeneratedQuestions,
   rankQuizEvidence,
+  quizVariantMatchesMode,
+  resolveQuizKnowledgeState,
   scoreQuizAnswers,
   serializePublicQuiz,
   validateQuizDraft,
@@ -30,6 +34,48 @@ function question(slotId, keyword = 'Context Window') {
 }
 
 describe('adaptive quiz retrieval', () => {
+  it('enforces completion cooldown and the per-lesson 24h cap deterministically', () => {
+    const now = Date.parse('2026-08-11T10:00:00.000Z');
+    expect(evaluateCompletedQuizPolicy({ completedAt: ['2026-08-11T09:58:30.000Z'], now, cooldownSeconds: 600, maxCompleted: 3 }))
+      .toMatchObject({ allowed: false, reason: 'cooldown', remainingSeconds: 510 });
+    expect(evaluateCompletedQuizPolicy({ completedAt: ['2026-08-11T08:00:00.000Z', '2026-08-11T07:00:00.000Z', '2026-08-11T06:00:00.000Z'], now, cooldownSeconds: 600, maxCompleted: 3 }))
+      .toMatchObject({ allowed: false, reason: 'daily_limit' });
+    expect(evaluateCompletedQuizPolicy({ completedAt: ['2026-08-11T08:00:00.000Z'], now, cooldownSeconds: 600, maxCompleted: 3 }))
+      .toMatchObject({ allowed: true, reason: 'ready' });
+  });
+
+  it('isolates mock variants from live mode while preserving old live variants', () => {
+    expect(quizVariantMatchesMode({ validation: { mode: 'mock' } }, 'live')).toBe(false);
+    expect(quizVariantMatchesMode({ validation: { mode: 'mock' } }, 'mock')).toBe(true);
+    expect(quizVariantMatchesMode({ validation: { mode: 'live' } }, 'mock')).toBe(false);
+    expect(quizVariantMatchesMode({ validation: {} }, 'live')).toBe(true);
+  });
+
+  it('is ready with current PDF chunks even when the AI graph artifact is absent', () => {
+    const state = resolveQuizKnowledgeState({
+      sourceIdentity: 'lesson.pdf:2026-08-11',
+      artifact: null,
+      chunks: [
+        { id: 'chunk-1', source_identity: 'lesson.pdf:2026-08-11', slide_number: 1 },
+        { id: 'stale', source_identity: 'lesson.pdf:old', slide_number: 2 },
+      ],
+    });
+    expect(state.ready).toBe(true);
+    expect(state.chunkPages).toEqual([1]);
+    expect(state.currentArtifact).toBeNull();
+  });
+
+  it('does not treat an artifact or stale chunks as a quiz knowledge index', () => {
+    const state = resolveQuizKnowledgeState({
+      sourceIdentity: 'lesson.pdf:new',
+      artifact: { source_identity: 'lesson.pdf:new', graph: { nodes: [], edges: [] } },
+      chunks: [{ id: 'stale', source_identity: 'lesson.pdf:old', slide_number: 1 }],
+    });
+    expect(state.ready).toBe(false);
+    expect(state.currentChunks).toEqual([]);
+    expect(state.currentArtifact).not.toBeNull();
+  });
+
   it('prioritizes unclear slides and exact keywords deterministically', () => {
     const ranked = rankQuizEvidence({ chunks: evidence, targetKeywords: ['Context Window'], targetSlides: [12], unclearSlides: [12] });
     expect(ranked[0]).toMatchObject({ id: 'chunk-12', slideNumber: 12 });
@@ -45,6 +91,15 @@ describe('adaptive quiz retrieval', () => {
 });
 
 describe('adaptive quiz validation', () => {
+  it('creates a deterministic grounded mock quiz without an external LLM', () => {
+    const questions = createMockQuizDraft({ evidence, targetKeywords: ['Context Window'] });
+    expect(questions).toHaveLength(3);
+    expect(questions.map((item) => item.level)).toEqual(['recall', 'relationship', 'application']);
+    expect(questions.every((item) => item.question.startsWith('[MOCK]'))).toBe(true);
+    expect(questions.every((item) => item.sourceChunkIds.length === 1)).toBe(true);
+    expect(questions.every((item) => /Slide \d+/.test(item.explanation) && !item.explanation.includes(item.sourceChunkIds[0]))).toBe(true);
+  });
+
   it('accepts a grounded three-question draft and removes answers from the public shape', () => {
     const questions = validateQuizDraft({ questions: ['q1', 'q2', 'q3'].map((slot) => question(slot)) }, { evidence, allowedKeywords: ['Context Window'] });
     expect(questions).toHaveLength(3);
