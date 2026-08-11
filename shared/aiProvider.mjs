@@ -47,6 +47,18 @@ const PROVIDERS = Object.freeze({
     supportsJsonObject: false,
     structuredOutputMode: 'prompt_only',
   }),
+  custom: Object.freeze({
+    name: 'custom',
+    label: 'Custom OpenAI-compatible',
+    protocol: 'chat',
+    defaultModel: '',
+    apiKeyNames: Object.freeze(['CUSTOM_AI_API_KEY']),
+    baseURL: undefined,
+    baseUrlEnv: 'CUSTOM_AI_BASE_URL',
+    maxTokensField: 'max_tokens',
+    supportsJsonObject: false,
+    structuredOutputMode: 'prompt_only',
+  }),
 });
 
 function clean(value) {
@@ -101,10 +113,12 @@ export function resolveQuizAiProvider(environment = {}) {
     delete scopedEnvironment.AI_MODEL;
     delete scopedEnvironment.OPENAI_MODEL;
   }
-  const selectedKey = providerKeyOverride || configuredProviderKey || genericKeyOverride;
+  // Every QUIZ_* key is more specific than the provider key used by the
+  // summary/graph pipeline. This allows two different Groq accounts/keys.
+  const selectedKey = providerKeyOverride || genericKeyOverride || configuredProviderKey;
   const selectedKeySource = providerKeyOverride
     ? `QUIZ_${primaryKeyName}`
-    : configuredProviderKeyName || (genericKeyOverride ? 'QUIZ_AI_API_KEY' : primaryKeyName);
+    : genericKeyOverride ? 'QUIZ_AI_API_KEY' : configuredProviderKeyName || primaryKeyName;
   if (selectedKey) scopedEnvironment[primaryKeyName] = selectedKey;
   if (baseUrlOverride && baseUrlEnvName) scopedEnvironment[baseUrlEnvName] = baseUrlOverride;
   return Object.freeze({ ...resolveAiProvider(scopedEnvironment), apiKeySource: selectedKeySource });

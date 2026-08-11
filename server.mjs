@@ -49,6 +49,10 @@ const supabaseServerKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABAS
 const supabaseAuth = supabaseUrl && supabasePublishableKey ? createSupabaseClient(supabaseUrl, supabasePublishableKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }) : null;
 const supabaseAdmin = supabaseUrl && supabaseServerKey ? createSupabaseClient(supabaseUrl, supabaseServerKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }) : null;
 const adaptiveQuizEnabled = /^(?:1|true)$/i.test(process.env.ADAPTIVE_QUIZ_ENABLED || process.env.VITE_ADAPTIVE_QUIZ_ENABLED || '');
+if (adaptiveQuizEnabled && quizAiMode === 'live' && quizAiProvider.name === 'custom') {
+  if (!quizAiProvider.baseURL) throw new Error('QUIZ_AI_PROVIDER=custom yêu cầu QUIZ_AI_BASE_URL.');
+  if (!quizAiProvider.model) throw new Error('QUIZ_AI_PROVIDER=custom yêu cầu QUIZ_AI_MODEL.');
+}
 const adaptiveQuizCompletionCooldownSeconds = Math.max(0, Math.min(86_400, Math.round(Number(process.env.ADAPTIVE_QUIZ_COMPLETION_COOLDOWN_SECONDS || 600) || 0)));
 const adaptiveQuizMaxCompletedPerLesson24h = Math.max(1, Math.min(20, Math.round(Number(process.env.ADAPTIVE_QUIZ_MAX_PER_LESSON_24H || 3) || 3)));
 const requests = new Map();

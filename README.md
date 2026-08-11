@@ -165,6 +165,7 @@ ADAPTIVE_QUIZ_ENABLED=false
 # Nếu bỏ trống, quiz tiếp tục dùng AI_PROVIDER và AI_MODEL như trước.
 # QUIZ_AI_PROVIDER=kira
 # QUIZ_AI_MODEL=kira-mini-1.0
+# QUIZ_AI_BASE_URL=https://kiraai.vn/api/v1
 # QUIZ_AI_API_KEY=your-quiz-provider-key-here
 ```
 
@@ -172,7 +173,31 @@ ADAPTIVE_QUIZ_ENABLED=false
 
 Sau khi đổi `AI_PROVIDER` hoặc `AI_MODEL`, dừng `npm run dev` bằng `Ctrl+C` rồi chạy lại. ZenMux dùng endpoint OpenAI-compatible `https://zenmux.ai/api/v1`; hệ thống ưu tiên `ZENMUX_API_KEY` và vẫn chấp nhận `GLM_API_KEY` làm alias. Kira dùng endpoint `https://kiraai.vn/api/v1` theo cấu hình OpenAI-compatible. Chỉ cần cấu hình key của provider đang được chọn.
 
-`AI_PROVIDER`/`AI_MODEL` luôn phục vụ pipeline cũ gồm summary và knowledge graph. Khi muốn dùng quota khác cho Quizer + Verifier, đặt `QUIZ_AI_PROVIDER` và `QUIZ_AI_MODEL`; key có thể khai báo gọn bằng `QUIZ_AI_API_KEY`, hoặc dùng key theo provider như `QUIZ_GROQ_API_KEY`, `QUIZ_ZENMUX_API_KEY`, `QUIZ_KIRA_API_KEY`, `QUIZ_OPENAI_API_KEY`. Nếu không có bất kỳ biến `QUIZ_*` nào, quiz dùng lại cấu hình AI chính và hành vi giữ nguyên như trước.
+`AI_PROVIDER`/`AI_MODEL` luôn phục vụ pipeline cũ gồm summary và knowledge graph. Quiz có bộ cấu hình server-only độc lập gồm `QUIZ_AI_PROVIDER`, `QUIZ_AI_BASE_URL`, `QUIZ_AI_MODEL`, `QUIZ_AI_API_KEY`. Key Quiz luôn được ưu tiên hơn key provider chính, nên có thể dùng hai Groq API key khác nhau. Có thể dùng key theo provider như `QUIZ_GROQ_API_KEY`, `QUIZ_ZENMUX_API_KEY`, `QUIZ_KIRA_API_KEY`, `QUIZ_OPENAI_API_KEY`; key này có độ ưu tiên cao nhất. Nếu không có bất kỳ biến `QUIZ_*` nào, quiz dùng lại cấu hình AI chính và hành vi giữ nguyên như trước.
+
+Ví dụ dùng hai Groq API key độc lập cho sơ đồ và quiz:
+
+```env
+AI_PROVIDER=groq
+AI_MODEL=qwen/qwen3.6-27b
+GROQ_API_KEY=gsk_graph_key
+
+QUIZ_AI_PROVIDER=groq
+QUIZ_AI_BASE_URL=https://api.groq.com/openai/v1
+QUIZ_AI_MODEL=qwen/qwen3.6-27b
+QUIZ_AI_API_KEY=gsk_quiz_key
+```
+
+Với một API Chat Completions tương thích OpenAI chưa có tên trong hệ thống, dùng `custom`:
+
+```env
+QUIZ_AI_PROVIDER=custom
+QUIZ_AI_BASE_URL=https://your-provider.example/v1
+QUIZ_AI_MODEL=provider/model-name
+QUIZ_AI_API_KEY=your-custom-key
+```
+
+`custom` chỉ áp dụng giao thức OpenAI-compatible Chat Completions. Khi đổi cấu hình, phải khởi động lại `npm run dev`. Không đặt prefix `VITE_` trước các key này.
 
 Ví dụ giữ Groq để tạo sơ đồ, dùng Kira cho quiz:
 

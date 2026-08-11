@@ -46,7 +46,7 @@ describe('AI provider configuration', () => {
   });
 
   it('lists every supported provider', () => {
-    expect(supportedAiProviders).toEqual(['openai', 'groq', 'zenmux', 'kira']);
+    expect(supportedAiProviders).toEqual(['openai', 'groq', 'zenmux', 'kira', 'custom']);
   });
 
   it('keeps quiz generation on the main provider when no scoped override exists', () => {
@@ -64,13 +64,33 @@ describe('AI provider configuration', () => {
     expect(resolveQuizAiProvider(environment)).toMatchObject({ name: 'kira', model: 'kira-mini-1.0', apiKey: 'quiz-key', apiKeySource: 'QUIZ_AI_API_KEY' });
   });
 
-  it('prefers provider-specific keys over the ambiguous generic quiz key', () => {
+  it('prefers quiz-scoped keys over the provider key used by summary and graph', () => {
     expect(resolveQuizAiProvider({
       QUIZ_AI_PROVIDER: 'kira', KIRA_API_KEY: 'kira-dashboard-key', QUIZ_AI_API_KEY: 'old-other-account-key',
-    })).toMatchObject({ apiKey: 'kira-dashboard-key', apiKeySource: 'KIRA_API_KEY' });
+    })).toMatchObject({ apiKey: 'old-other-account-key', apiKeySource: 'QUIZ_AI_API_KEY' });
     expect(resolveQuizAiProvider({
       QUIZ_AI_PROVIDER: 'kira', KIRA_API_KEY: 'base-key', QUIZ_KIRA_API_KEY: 'scoped-key', QUIZ_AI_API_KEY: 'generic-key',
     })).toMatchObject({ apiKey: 'scoped-key', apiKeySource: 'QUIZ_KIRA_API_KEY' });
+    expect(resolveQuizAiProvider({
+      AI_PROVIDER: 'groq', AI_MODEL: 'graph-model', GROQ_API_KEY: 'graph-groq-key',
+      QUIZ_AI_PROVIDER: 'groq', QUIZ_AI_MODEL: 'quiz-model', QUIZ_AI_API_KEY: 'quiz-groq-key',
+    })).toMatchObject({
+      name: 'groq', model: 'quiz-model', apiKey: 'quiz-groq-key', apiKeySource: 'QUIZ_AI_API_KEY',
+    });
+  });
+
+  it('supports an arbitrary OpenAI-compatible chat endpoint for quiz testing', () => {
+    expect(resolveQuizAiProvider({
+      AI_PROVIDER: 'groq', GROQ_API_KEY: 'graph-key',
+      QUIZ_AI_PROVIDER: 'custom',
+      QUIZ_AI_BASE_URL: 'https://llm-gateway.example/v1',
+      QUIZ_AI_MODEL: 'vendor/model-name',
+      QUIZ_AI_API_KEY: 'custom-quiz-key',
+    })).toMatchObject({
+      name: 'custom', protocol: 'chat', model: 'vendor/model-name',
+      baseURL: 'https://llm-gateway.example/v1', apiKey: 'custom-quiz-key',
+      apiKeySource: 'QUIZ_AI_API_KEY', structuredOutputMode: 'prompt_only',
+    });
   });
 
   it('supports a quiz-specific model, provider key and base URL', () => {
