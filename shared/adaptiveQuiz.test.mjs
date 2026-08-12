@@ -4,6 +4,7 @@ import {
   createMockQuizDraft,
   evaluateCompletedQuizPolicy,
   mergeRegeneratedQuestions,
+  normalizeQuizDraftSlots,
   rankQuizEvidence,
   quizVariantMatchesMode,
   resolveQuizKnowledgeState,
@@ -105,6 +106,22 @@ describe('adaptive quiz validation', () => {
     expect(questions).toHaveLength(3);
     expect(serializePublicQuiz(questions)[0]).not.toHaveProperty('correctIndex');
     expect(serializePublicQuiz(questions)[0]).not.toHaveProperty('explanation');
+  });
+
+  it('repairs duplicate slot IDs deterministically when cognitive levels identify all three slots', () => {
+    const draft = { questions: [question('q1'), question('q2'), question('q3')] };
+    draft.questions[1].slotId = 'q1';
+    draft.questions[2].slotId = 'q1';
+    expect(normalizeQuizDraftSlots(draft).questions.map((item) => item.slotId)).toEqual(['q1', 'q2', 'q3']);
+    expect(validateQuizDraft(draft, { evidence, allowedKeywords: ['Context Window'] })).toHaveLength(3);
+  });
+
+  it('still rejects duplicate slots when cognitive levels are also ambiguous', () => {
+    const draft = { questions: [question('q1'), question('q2'), question('q3')] };
+    draft.questions[1].slotId = 'q1';
+    draft.questions[2].slotId = 'q1';
+    draft.questions[1].level = 'recall';
+    expect(() => validateQuizDraft(draft, { evidence, allowedKeywords: ['Context Window'] })).toThrow(/không thể chuẩn hóa/);
   });
 
   it('rejects duplicate options and citations outside retrieved evidence', () => {

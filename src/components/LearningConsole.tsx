@@ -461,6 +461,7 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
   const openAdaptiveQuiz = async () => {
     if (!quizRecommendation || quizSubmitting) return;
     if (quizRecommendation.status === 'accepted' || quizRecommendation.status === 'completed') {
+      setSelectedQuizHistoryId(null);
       setTab('quiz');
       return;
     }
@@ -469,6 +470,7 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
       const started = await startAdaptiveQuiz(quizRecommendation.id);
       if (!started) throw new Error('Máy chủ không trả về quiz.');
       setQuizRecommendation(started);
+      setSelectedQuizHistoryId(null);
       setTab('quiz');
       recordStudentActivity({ lessonId: lesson.id, type: 'quiz_started', metadata: { quizId: started.id, questionCount: 3 } });
     } catch (error) {
@@ -561,7 +563,7 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
       {adaptiveQuizFeatureEnabled && canManageLesson && quizIndexState.status === 'ready' && <div className="adaptive-quiz-preparing" role="status">✓ Quiz knowledge base sẵn sàng · {quizIndexState.chunkCount} chunks</div>}
       {adaptiveQuizFeatureEnabled && canManageLesson && quizIndexState.status === 'error' && <div className="adaptive-quiz-preparing error" role="alert">Quiz chưa sẵn sàng: {quizIndexState.message}</div>}
 
-      {adaptiveQuizEnabled && tab !== 'quiz' && quizRecommendation && quizRecommendation.status !== 'completed' && <div className="adaptive-quiz-notice" role="status">
+      {adaptiveQuizEnabled && quizRecommendation && (quizRecommendation.status === 'pending' || (quizRecommendation.status === 'accepted' && tab !== 'quiz')) && <div className="adaptive-quiz-notice" role="status">
         <div><span>✦ Quiz đã sẵn sàng</span><b>{quizRecommendation.title}</b><small>3 câu · dựa trên phần bạn vừa học</small></div>
         <div><button onClick={() => void closeAdaptiveQuizRecommendation()}>Để sau</button><button className="primary" onClick={() => void openAdaptiveQuiz()}>Làm ngay</button></div>
       </div>}

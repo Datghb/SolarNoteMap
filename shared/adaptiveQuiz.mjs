@@ -1,8 +1,9 @@
 const SLOT_IDS = Object.freeze(['q1', 'q2', 'q3']);
 const LEVELS = new Set(['recall', 'relationship', 'application']);
+const SLOT_LEVELS = Object.freeze({ q1: 'recall', q2: 'relationship', q3: 'application' });
 
 export const QUIZ_QUESTION_COUNT = 3;
-export const QUIZ_PROMPT_VERSION = 'adaptive-quiz-phase1-v1';
+export const QUIZ_PROMPT_VERSION = 'adaptive-quiz-phase1-v2-slot-normalization';
 
 export const quizDraftJsonSchema = Object.freeze({
   type: 'object',
@@ -63,6 +64,19 @@ export const verifierJsonSchema = Object.freeze({
 
 export function normalizeQuizTerm(value) {
   return String(value ?? '').normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('vi');
+}
+
+export function normalizeQuizDraftSlots(value, expectedSlots = SLOT_IDS) {
+  if (!value || !Array.isArray(value.questions)) return value;
+  const slots = uniqueStrings(expectedSlots, 3, 2);
+  if (value.questions.length !== slots.length) return value;
+  const levelToSlot = new Map(slots.map((slotId) => [SLOT_LEVELS[slotId], slotId]));
+  const returnedLevels = value.questions.map((question) => question?.level);
+  if (returnedLevels.some((level) => !levelToSlot.has(level)) || new Set(returnedLevels).size !== slots.length) return value;
+  return {
+    ...value,
+    questions: value.questions.map((question) => ({ ...question, slotId: levelToSlot.get(question.level) })),
+  };
 }
 
 export function resolveQuizKnowledgeState({ sourceIdentity, artifact, chunks }) {
@@ -226,7 +240,7 @@ function validateQuestion(question, context, expectedSlot) {
   const citedSlides = new Set(sourceChunkIds.map((id) => context.chunkSlides.get(id)).filter(Number.isInteger));
   if (sourceSlides.some((page) => !citedSlides.has(page))) throw new Error(`${expectedSlot} có slide nguồn không khớp chunk trích dẫn.`);
   if (!LEVELS.has(question.level)) throw new Error(`${expectedSlot} có cognitive level không hợp lệ.`);
-  const expectedLevel = { q1: 'recall', q2: 'relationship', q3: 'application' }[expectedSlot];
+  const expectedLevel = SLOT_LEVELS[expectedSlot];
   if (expectedLevel && question.level !== expectedLevel) throw new Error(`${expectedSlot} không đúng cognitive level ${expectedLevel}.`);
   return { slotId: expectedSlot, question: prompt, options, correctIndex, explanation, keyword, sourceChunkIds, sourceSlides, level: question.level };
 }
@@ -234,9 +248,10 @@ function validateQuestion(question, context, expectedSlot) {
 export function validateQuizDraft(value, { evidence, allowedKeywords = [], expectedSlots = SLOT_IDS } = {}) {
   if (!value || !Array.isArray(value.questions)) throw new Error('AI không trả về danh sách câu hỏi.');
   const slots = uniqueStrings(expectedSlots, 3, 2);
-  if (value.questions.length !== slots.length) throw new Error(`AI phải trả về đúng ${slots.length} câu hỏi.`);
-  const bySlot = new Map(value.questions.map((question) => [question?.slotId, question]));
-  if (bySlot.size !== value.questions.length) throw new Error('AI trả về slot câu hỏi bị trùng.');
+  const normalizedValue = normalizeQuizDraftSlots(value, slots);
+  if (normalizedValue.questions.length !== slots.length) throw new Error(`AI phải trả về đúng ${slots.length} câu hỏi.`);
+  const bySlot = new Map(normalizedValue.questions.map((question) => [question?.slotId, question]));
+  if (bySlot.size !== normalizedValue.questions.length) throw new Error('AI trả về slot câu hỏi bị trùng và không thể chuẩn hóa theo cognitive level.');
   const safeEvidence = Array.isArray(evidence) ? evidence : [];
   const chunkSlides = new Map(safeEvidence.map((chunk) => [String(chunk.id), Number(chunk.slideNumber)]));
   const allowedChunkIds = new Set(chunkSlides.keys());

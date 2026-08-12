@@ -85,7 +85,7 @@ export function AdaptiveQuizPanel({
           </fieldset>
           {feedback && <div className="adaptive-answer-feedback">
             <b>{feedback.correct ? '✓ Chính xác' : 'Đáp án cần xem lại'}</b>
-            <p>{feedback.explanation}</p>
+            <p><strong>Giải thích:</strong> {feedback.explanation}</p>
             <small className="adaptive-source-citation">Trích nguồn: {feedback.sourceSlides.map((slide) => `Slide ${slide}`).join(', ')}</small>
             <div>
               {feedback.sourceSlides.map((slide) => <button key={slide} onClick={() => onOpenSlide(slide)}>Mở slide {slide} →</button>)}
