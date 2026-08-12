@@ -160,6 +160,8 @@ VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your_key_here
 # Adaptive quiz Phase 1: mặc định tắt
 VITE_ADAPTIVE_QUIZ_ENABLED=false
 ADAPTIVE_QUIZ_ENABLED=false
+VITE_ADAPTIVE_QUIZ_PHASE2_ENABLED=false
+ADAPTIVE_QUIZ_PHASE2_ENABLED=false
 
 # Tùy chọn: tách provider tạo quiz khỏi provider tạo summary/sơ đồ
 # Nếu bỏ trống, quiz tiếp tục dùng AI_PROVIDER và AI_MODEL như trước.
@@ -228,9 +230,18 @@ QUIZ_AI_API_KEY=your-zenmux-key
 1. Chạy migration `supabase/migrations/20260810120000_adaptive_quiz_phase1.sql` trong Supabase SQL Editor.
 2. Lấy server secret key trong Supabase Project Settings và thêm vào `.env.local` dưới tên `SUPABASE_SECRET_KEY`. Có thể dùng `SUPABASE_SERVICE_ROLE_KEY` cũ làm phương án thay thế. Tuyệt đối không thêm prefix `VITE_` cho key này.
 3. Đặt cả `VITE_ADAPTIVE_QUIZ_ENABLED=true` và `ADAPTIVE_QUIZ_ENABLED=true`, rồi khởi động lại `npm run dev`.
-4. Giáo viên cần mở/tạo lại sơ đồ AI của bài học một lần để hệ thống lập chỉ mục slide gốc. Nếu bài học chỉ có artifact cũ, quiz vẫn dùng slide summary làm fallback nhưng chất lượng retrieval sẽ thấp hơn.
+4. Giáo viên mở bài giảng PDF một lần; hệ thống tự lập `lesson_chunks` độc lập với việc tạo sơ đồ. Kiểm tra số chunk trước khi pilot.
 
 Khi hai flag ở trạng thái `false`, toàn bộ API và giao diện quiz bị vô hiệu hóa; luồng hiện tại không thay đổi. Phase 1 cố định đúng 3 câu, dùng Quizer Agent + Verifier Agent và chỉ truy xuất nội dung trong bài học hiện tại.
+
+**Bật Adaptive Quiz Phase 2 (sau khi Phase 1 đã hoạt động):**
+
+1. Giữ nguyên migration Phase 1 và chạy thêm `supabase/migrations/20260812090000_adaptive_quiz_phase2.sql` một lần trong Supabase SQL Editor.
+2. Giữ `VITE_ADAPTIVE_QUIZ_ENABLED=true` và `ADAPTIVE_QUIZ_ENABLED=true`.
+3. Đặt thêm `VITE_ADAPTIVE_QUIZ_PHASE2_ENABLED=true` và `ADAPTIVE_QUIZ_PHASE2_ENABLED=true`, rồi khởi động lại `npm run dev`.
+4. Học sinh tương tác keyword/đánh dấu slide chưa rõ và có ít nhất thời gian active theo trigger. Thông báo sẽ cho chọn 3 câu, 5 câu hoặc ôn tập 10 câu.
+
+Phase 2 dùng BM25-only, coverage plan deterministic, sinh theo batch tối đa 5 câu và chỉ tạo lại slot bị Verifier từ chối. Quiz đang làm được lưu tiến độ; dashboard giáo viên hiển thị acceptance, completion, điểm, retry và latency. Hai flag Phase 2 là kill switch: chuyển cả hai về `false` sẽ quay lại đúng luồng Phase 1 ba câu mà không cần rollback migration hoặc xóa dữ liệu.
 
 **4. Chạy ứng dụng:**
 

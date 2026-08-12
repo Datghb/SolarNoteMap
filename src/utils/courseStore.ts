@@ -31,6 +31,10 @@ export interface StudentActivity {
     score?: number;
     questionCount?: number;
     durationSeconds?: number;
+    quizMode?: 'micro' | 'lesson_review';
+    requestedQuestionCount?: number;
+    deliveredQuestionCount?: number;
+    retrievalVersion?: string;
   };
 }
 

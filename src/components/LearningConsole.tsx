@@ -14,8 +14,8 @@ import { persistCloudMap, persistCloudNote, recordStudentActivity } from '../uti
 import { builtInSlidePdfUrl } from './pdfUrls';
 import { loadCloudLearningState } from '../utils/cloudClassroom';
 import { useActiveSlideDwell } from '../hooks/useActiveSlideDwell';
-import { addQuizDwell, addQuizKeyword, createQuizBehaviorState, deriveAdaptiveQuizContext, markQuizSlideUnclear } from '../utils/quizBehavior';
-import { AdaptiveQuizApiError, dismissAdaptiveQuiz, loadAdaptiveQuizHistory, loadAdaptiveQuizRecommendation, prepareAdaptiveQuiz, reportAdaptiveQuizQuestion, startAdaptiveQuiz, submitAdaptiveQuiz, type AdaptiveQuizHistoryItem, type AdaptiveQuizRecommendation, type AdaptiveQuizResult, type QuizSlotId } from '../utils/adaptiveQuiz';
+import { addQuizDwell, addQuizKeyword, addQuizWrongKeywords, createQuizBehaviorState, deriveAdaptiveQuizContext, markQuizSlideUnclear } from '../utils/quizBehavior';
+import { AdaptiveQuizApiError, dismissAdaptiveQuiz, loadAdaptiveQuizHistory, loadAdaptiveQuizRecommendation, prepareAdaptiveQuiz, reportAdaptiveQuizQuestion, saveAdaptiveQuizProgress, startAdaptiveQuiz, submitAdaptiveQuiz, type AdaptiveQuizHistoryItem, type AdaptiveQuizMode, type AdaptiveQuizRecommendation, type AdaptiveQuizResult, type QuizSlotId } from '../utils/adaptiveQuiz';
 import { AdaptiveQuizPanel } from './AdaptiveQuizPanel';
 import type { LessonKeyword } from '../utils/lessonSummary';
 import { generateLessonQuizIndex, LessonQuizIndexApiError } from '../utils/lessonQuizIndex';
@@ -46,6 +46,7 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
   const [mapGenerationRevision, setMapGenerationRevision] = useState(0);
   const [availableSummary, setAvailableSummary] = useState(isExtractiveFallbackSummary(lesson.summary) ? '' : (lesson.summary?.trim() ?? ''));
   const adaptiveQuizFeatureEnabled = import.meta.env.VITE_ADAPTIVE_QUIZ_ENABLED === 'true';
+  const adaptiveQuizPhase2Enabled = import.meta.env.VITE_ADAPTIVE_QUIZ_PHASE2_ENABLED === 'true';
   const adaptiveQuizEnabled = adaptiveQuizFeatureEnabled && !canManageLesson;
   const quizTriggerSeconds = boundedEnvSeconds(import.meta.env.VITE_ADAPTIVE_QUIZ_TRIGGER_SECONDS, 30, 30, 3_600);
   const quizCompletionCooldownSeconds = boundedEnvSeconds(import.meta.env.VITE_ADAPTIVE_QUIZ_COMPLETION_COOLDOWN_SECONDS, 600, 0, 86_400);
@@ -59,6 +60,8 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
   const [quizSubmitting, setQuizSubmitting] = useState(false);
   const [quizError, setQuizError] = useState('');
   const [quizCooldownActive, setQuizCooldownActive] = useState(false);
+  const [dismissedPhase2OfferSignature, setDismissedPhase2OfferSignature] = useState<string | null>(null);
+  const [preparingQuestionCount, setPreparingQuestionCount] = useState(3);
   const noteActivityTimer = useRef<number | null>(null);
   const cloudNoteTimer = useRef<number | null>(null);
   const cloudNoteSaveChain = useRef(Promise.resolve());
@@ -119,6 +122,7 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
     setQuizSubmitting(false);
     setQuizError('');
     setQuizCooldownActive(false);
+    setDismissedPhase2OfferSignature(null);
     preparedQuizSignatures.current.clear();
     interactedQuizKeywords.current.clear();
   }, [classId, lesson.id]);
@@ -176,7 +180,7 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
   }, [adaptiveQuizEnabled, classId, lesson.id]);
 
   useEffect(() => {
-    if (!adaptiveQuizEnabled || quizCooldownActive || !quizContext.eligible || quizRecommendation || preparedQuizSignatures.current.has(quizContext.signature)) return;
+    if (!adaptiveQuizEnabled || adaptiveQuizPhase2Enabled || quizCooldownActive || !quizContext.eligible || quizRecommendation || preparedQuizSignatures.current.has(quizContext.signature)) return;
     let active = true;
     preparedQuizSignatures.current.add(quizContext.signature);
     setQuizPreparing(true);
@@ -198,7 +202,7 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
       setQuizError(error instanceof Error ? error.message : 'Chưa thể chuẩn bị quiz lúc này.');
     }).finally(() => { if (active) setQuizPreparing(false); });
     return () => { active = false; };
-  }, [adaptiveQuizEnabled, classId, lesson.id, quizContext, quizRecommendation, quizCooldownActive]);
+  }, [adaptiveQuizEnabled, adaptiveQuizPhase2Enabled, classId, lesson.id, quizContext, quizRecommendation, quizCooldownActive]);
 
   useEffect(() => {
     setAvailableSummary(isExtractiveFallbackSummary(lesson.summary) ? '' : (lesson.summary?.trim() ?? ''));
@@ -458,6 +462,31 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
     if (adaptiveQuizEnabled && status === 'question') setQuizBehavior((current) => markQuizSlideUnclear(current, slideNumber));
   };
 
+  const preparePhase2Quiz = async (questionCount: number, quizMode: AdaptiveQuizMode) => {
+    if (!adaptiveQuizPhase2Enabled || quizPreparing || quizRecommendation) return;
+    const signature = `${quizContext.signature}:${quizMode}:${questionCount}`;
+    preparedQuizSignatures.current.add(signature);
+    setPreparingQuestionCount(questionCount);
+    setQuizPreparing(true);
+    setQuizError('');
+    try {
+      const recommendation = await prepareAdaptiveQuiz({ classId, lessonId: lesson.id, ...quizContext, questionCount, quizMode });
+      if (!recommendation) throw new Error('Máy chủ không trả về quiz.');
+      setQuizRecommendation(recommendation);
+      setDismissedPhase2OfferSignature(null);
+      recordStudentActivity({
+        lessonId: lesson.id,
+        type: 'quiz_recommended',
+        metadata: { quizId: recommendation.id, questionCount: recommendation.questionCount, trigger: quizContext.reasons.join(',').slice(0, 120), quizMode: recommendation.quizMode },
+      });
+    } catch (error) {
+      preparedQuizSignatures.current.delete(signature);
+      setQuizError(error instanceof Error ? error.message : 'Chưa thể chuẩn bị quiz lúc này.');
+    } finally {
+      setQuizPreparing(false);
+    }
+  };
+
   const openAdaptiveQuiz = async () => {
     if (!quizRecommendation || quizSubmitting) return;
     if (quizRecommendation.status === 'accepted' || quizRecommendation.status === 'completed') {
@@ -472,7 +501,7 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
       setQuizRecommendation(started);
       setSelectedQuizHistoryId(null);
       setTab('quiz');
-      recordStudentActivity({ lessonId: lesson.id, type: 'quiz_started', metadata: { quizId: started.id, questionCount: 3 } });
+      recordStudentActivity({ lessonId: lesson.id, type: 'quiz_started', metadata: { quizId: started.id, questionCount: started.questionCount, quizMode: started.quizMode } });
     } catch (error) {
       setQuizError(error instanceof Error ? error.message : 'Không thể mở quiz lúc này.');
     }
@@ -483,7 +512,7 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
     setQuizError('');
     try {
       await dismissAdaptiveQuiz(quizRecommendation.id);
-      recordStudentActivity({ lessonId: lesson.id, type: 'quiz_dismissed', metadata: { quizId: quizRecommendation.id, questionCount: 3 } });
+      recordStudentActivity({ lessonId: lesson.id, type: 'quiz_dismissed', metadata: { quizId: quizRecommendation.id, questionCount: quizRecommendation.questionCount, quizMode: quizRecommendation.quizMode } });
       setQuizRecommendation(null);
       if (tab === 'quiz') setTab('brief');
     } catch (error) {
@@ -506,7 +535,7 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
       recordStudentActivity({
         lessonId: lesson.id,
         type: 'quiz_completed',
-        metadata: { quizId: quizRecommendation.id, score: result.score, questionCount: 3, durationSeconds: result.durationSeconds },
+        metadata: { quizId: quizRecommendation.id, score: result.score, questionCount: result.questionCount, durationSeconds: result.durationSeconds, quizMode: quizRecommendation.quizMode },
       });
     } catch (error) {
       setQuizError(error instanceof Error ? error.message : 'Không thể chấm quiz lúc này.');
@@ -515,12 +544,25 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
     }
   };
 
+  const saveQuizProgress = async (answers: Array<number | null>) => {
+    if (!adaptiveQuizPhase2Enabled || !quizRecommendation || quizRecommendation.status !== 'accepted') return;
+    try {
+      await saveAdaptiveQuizProgress(quizRecommendation.id, answers);
+    } catch (error) {
+      setQuizError(error instanceof Error ? error.message : 'Không thể lưu tiến độ quiz.');
+    }
+  };
+
   const continueAfterQuiz = () => {
+    const weakKeywords = adaptiveQuizPhase2Enabled
+      ? (quizResult?.items.filter((item) => !item.correct).map((item) => item.keyword) ?? [])
+      : [];
     setQuizRecommendation(null);
     setSelectedQuizHistoryId(null);
     setQuizResult(null);
     setQuizError('');
-    setQuizBehavior(createQuizBehaviorState(slideIndex + 1));
+    setQuizBehavior(addQuizWrongKeywords(createQuizBehaviorState(slideIndex + 1), weakKeywords));
+    setDismissedPhase2OfferSignature(null);
     preparedQuizSignatures.current.clear();
     interactedQuizKeywords.current.clear();
     setTab('brief');
@@ -564,10 +606,19 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
       {adaptiveQuizFeatureEnabled && canManageLesson && quizIndexState.status === 'error' && <div className="adaptive-quiz-preparing error" role="alert">Quiz chưa sẵn sàng: {quizIndexState.message}</div>}
 
       {adaptiveQuizEnabled && quizRecommendation && (quizRecommendation.status === 'pending' || (quizRecommendation.status === 'accepted' && tab !== 'quiz')) && <div className="adaptive-quiz-notice" role="status">
-        <div><span>✦ Quiz đã sẵn sàng</span><b>{quizRecommendation.title}</b><small>3 câu · dựa trên phần bạn vừa học</small></div>
+        <div><span>✦ Quiz đã sẵn sàng</span><b>{quizRecommendation.title}</b><small>{quizRecommendation.questionCount} câu · khoảng {quizRecommendation.estimatedDurationMinutes} phút · {quizRecommendation.quizMode === 'lesson_review' ? 'ôn tập toàn bài' : 'dựa trên phần bạn vừa học'}</small></div>
         <div><button onClick={() => void closeAdaptiveQuizRecommendation()}>Để sau</button><button className="primary" onClick={() => void openAdaptiveQuiz()}>Làm ngay</button></div>
       </div>}
-      {adaptiveQuizEnabled && !quizRecommendation && quizPreparing && <div className="adaptive-quiz-preparing" role="status">✦ AI đang chuẩn bị 3 câu kiểm tra nhanh…</div>}
+      {adaptiveQuizEnabled && adaptiveQuizPhase2Enabled && !quizRecommendation && !quizPreparing && !quizCooldownActive && quizContext.eligible && dismissedPhase2OfferSignature !== quizContext.signature && <div className="adaptive-quiz-offer" role="status">
+        <div><span>✦ Bạn đã có đủ context để luyện tập</span><b>Chọn độ dài quiz phù hợp</b><small>BM25 sẽ lấy đúng nội dung từ slide bạn vừa tương tác; AI chỉ nhận các đoạn đã retrieval.</small></div>
+        <div className="adaptive-quiz-presets">
+          <button onClick={() => void preparePhase2Quiz(3, 'micro')}><b>3 câu</b><small>Kiểm tra nhanh · ~2 phút</small></button>
+          <button onClick={() => void preparePhase2Quiz(5, 'micro')}><b>5 câu</b><small>Luyện thêm · ~4 phút</small></button>
+          <button onClick={() => void preparePhase2Quiz(10, 'lesson_review')}><b>10 câu</b><small>Ôn tập bài · ~8 phút</small></button>
+          <button className="quiet" onClick={() => setDismissedPhase2OfferSignature(quizContext.signature)}>Để sau</button>
+        </div>
+      </div>}
+      {adaptiveQuizEnabled && !quizRecommendation && quizPreparing && <div className="adaptive-quiz-preparing" role="status">✦ AI đang chuẩn bị {preparingQuestionCount} câu kiểm tra…</div>}
       {adaptiveQuizEnabled && !quizRecommendation && quizCooldownActive && <div className="adaptive-quiz-preparing" role="status">Quiz tiếp theo sẽ được xét khi hết cooldown và bạn tạo context học mới.</div>}
       {adaptiveQuizEnabled && !quizRecommendation && quizError && quizContext.eligible && <div className="adaptive-quiz-preparing error" role="status">{quizError}</div>}
 
@@ -660,7 +711,7 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
               onClick={() => setSelectedQuizHistoryId(item.id)}
             >
               <span>Lượt {quizHistory.length - index}</span>
-              <b>{item.result.score}/3 đúng</b>
+              <b>{item.result.score}/{item.result.questionCount} đúng</b>
               <em>{item.recommendation.questions[0]?.question}</em>
               <small>{new Date(item.completedAt).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</small>
             </button>)}
@@ -681,6 +732,7 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
             submitting={quizSubmitting}
             error={quizError}
             onSubmit={submitQuiz}
+            onProgress={saveQuizProgress}
             onContinue={continueAfterQuiz}
             onOpenSlide={(slideNumber) => { setSlideIndex(Math.max(0, Math.min(slides.length - 1, slideNumber - 1))); setTab('brief'); }}
             onReport={reportQuizQuestion}

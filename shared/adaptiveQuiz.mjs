@@ -1,4 +1,7 @@
+import { buildQuizCoveragePlan, phase2SlotIds } from './adaptiveQuizPhase2.mjs';
+
 const SLOT_IDS = Object.freeze(['q1', 'q2', 'q3']);
+const ALL_SLOT_IDS = Object.freeze(phase2SlotIds(15));
 const LEVELS = new Set(['recall', 'relationship', 'application']);
 const SLOT_LEVELS = Object.freeze({ q1: 'recall', q2: 'relationship', q3: 'application' });
 
@@ -11,12 +14,12 @@ export const quizDraftJsonSchema = Object.freeze({
   required: ['questions'],
   properties: {
     questions: {
-      type: 'array', minItems: 3, maxItems: 3,
+      type: 'array', minItems: 3, maxItems: 15,
       items: {
         type: 'object', additionalProperties: false,
         required: ['slotId', 'question', 'options', 'correctIndex', 'explanation', 'keyword', 'sourceChunkIds', 'sourceSlides', 'level'],
         properties: {
-          slotId: { type: 'string', enum: SLOT_IDS },
+          slotId: { type: 'string', enum: ALL_SLOT_IDS },
           question: { type: 'string', minLength: 8, maxLength: 500 },
           options: { type: 'array', minItems: 4, maxItems: 4, items: { type: 'string', minLength: 1, maxLength: 300 } },
           correctIndex: { type: 'integer', minimum: 0, maximum: 3 },
@@ -37,12 +40,12 @@ export const verifierJsonSchema = Object.freeze({
   required: ['items'],
   properties: {
     items: {
-      type: 'array', minItems: 1, maxItems: 3,
+      type: 'array', minItems: 1, maxItems: 15,
       items: {
         type: 'object', additionalProperties: false,
         required: ['slotId', 'verdict', 'issues', 'retryInstruction'],
         properties: {
-          slotId: { type: 'string', enum: SLOT_IDS },
+          slotId: { type: 'string', enum: ALL_SLOT_IDS },
           verdict: { type: 'string', enum: ['pass', 'retry'] },
           issues: {
             type: 'array', maxItems: 8,
@@ -66,16 +69,16 @@ export function normalizeQuizTerm(value) {
   return String(value ?? '').normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('vi');
 }
 
-export function normalizeQuizDraftSlots(value, expectedSlots = SLOT_IDS) {
+export function normalizeQuizDraftSlots(value, expectedSlots = SLOT_IDS, coveragePlan = null) {
   if (!value || !Array.isArray(value.questions)) return value;
-  const slots = uniqueStrings(expectedSlots, 3, 2);
+  const slots = uniqueStrings(expectedSlots, 15, 3);
   if (value.questions.length !== slots.length) return value;
-  const levelToSlot = new Map(slots.map((slotId) => [SLOT_LEVELS[slotId], slotId]));
-  const returnedLevels = value.questions.map((question) => question?.level);
-  if (returnedLevels.some((level) => !levelToSlot.has(level)) || new Set(returnedLevels).size !== slots.length) return value;
+  const expectedLevels = new Map((Array.isArray(coveragePlan) ? coveragePlan : slots.map((slotId) => ({ slotId, level: SLOT_LEVELS[slotId] })))
+    .map((slot) => [slot.slotId, slot.level]));
+  if (value.questions.some((question, index) => question?.level !== expectedLevels.get(slots[index]))) return value;
   return {
     ...value,
-    questions: value.questions.map((question) => ({ ...question, slotId: levelToSlot.get(question.level) })),
+    questions: value.questions.map((question, index) => ({ ...question, slotId: slots[index] })),
   };
 }
 
@@ -216,7 +219,7 @@ export function rankQuizEvidence({ chunks, graph, targetKeywords = [], targetSli
   return selected;
 }
 
-function validateQuestion(question, context, expectedSlot) {
+function validateQuestion(question, context, expectedSlot, expectedLevel) {
   if (!question || typeof question !== 'object') throw new Error(`Quiz ${expectedSlot} không phải object.`);
   if (question.slotId !== expectedSlot) throw new Error(`Quiz thiếu hoặc sai slot ${expectedSlot}.`);
   const prompt = String(question.question ?? '').trim();
@@ -240,15 +243,16 @@ function validateQuestion(question, context, expectedSlot) {
   const citedSlides = new Set(sourceChunkIds.map((id) => context.chunkSlides.get(id)).filter(Number.isInteger));
   if (sourceSlides.some((page) => !citedSlides.has(page))) throw new Error(`${expectedSlot} có slide nguồn không khớp chunk trích dẫn.`);
   if (!LEVELS.has(question.level)) throw new Error(`${expectedSlot} có cognitive level không hợp lệ.`);
-  const expectedLevel = SLOT_LEVELS[expectedSlot];
   if (expectedLevel && question.level !== expectedLevel) throw new Error(`${expectedSlot} không đúng cognitive level ${expectedLevel}.`);
   return { slotId: expectedSlot, question: prompt, options, correctIndex, explanation, keyword, sourceChunkIds, sourceSlides, level: question.level };
 }
 
-export function validateQuizDraft(value, { evidence, allowedKeywords = [], expectedSlots = SLOT_IDS } = {}) {
+export function validateQuizDraft(value, { evidence, allowedKeywords = [], expectedSlots = SLOT_IDS, coveragePlan = null } = {}) {
   if (!value || !Array.isArray(value.questions)) throw new Error('AI không trả về danh sách câu hỏi.');
-  const slots = uniqueStrings(expectedSlots, 3, 2);
-  const normalizedValue = normalizeQuizDraftSlots(value, slots);
+  const slots = uniqueStrings(expectedSlots, 15, 3);
+  const plan = Array.isArray(coveragePlan) ? coveragePlan : slots.map((slotId) => ({ slotId, level: SLOT_LEVELS[slotId] }));
+  const expectedLevels = new Map(plan.map((slot) => [slot.slotId, slot.level]));
+  const normalizedValue = normalizeQuizDraftSlots(value, slots, plan);
   if (normalizedValue.questions.length !== slots.length) throw new Error(`AI phải trả về đúng ${slots.length} câu hỏi.`);
   const bySlot = new Map(normalizedValue.questions.map((question) => [question?.slotId, question]));
   if (bySlot.size !== normalizedValue.questions.length) throw new Error('AI trả về slot câu hỏi bị trùng và không thể chuẩn hóa theo cognitive level.');
@@ -257,12 +261,12 @@ export function validateQuizDraft(value, { evidence, allowedKeywords = [], expec
   const allowedChunkIds = new Set(chunkSlides.keys());
   const allowedSlides = new Set([...chunkSlides.values()].filter(Number.isInteger));
   if (!allowedChunkIds.size || !allowedSlides.size) throw new Error('Không có evidence hợp lệ để kiểm tra quiz.');
-  return slots.map((slot) => validateQuestion(bySlot.get(slot), { allowedChunkIds, allowedSlides, allowedKeywords, chunkSlides }, slot));
+  return slots.map((slot) => validateQuestion(bySlot.get(slot), { allowedChunkIds, allowedSlides, allowedKeywords, chunkSlides }, slot, expectedLevels.get(slot)));
 }
 
 export function validateVerifierReview(value, expectedSlots = SLOT_IDS) {
   if (!value || !Array.isArray(value.items)) throw new Error('Verifier không trả về danh sách review.');
-  const slots = uniqueStrings(expectedSlots, 3, 2);
+  const slots = uniqueStrings(expectedSlots, 15, 3);
   if (value.items.length !== slots.length) throw new Error('Verifier không review đủ các slot yêu cầu.');
   const bySlot = new Map(value.items.map((item) => [item?.slotId, item]));
   if (bySlot.size !== value.items.length) throw new Error('Verifier trả về slot bị trùng.');
@@ -288,24 +292,24 @@ export function mergeRegeneratedQuestions(currentQuestions, replacementQuestions
   return currentQuestions.map((question) => replacementBySlot.get(question.slotId) ?? question);
 }
 
-export function createMockQuizDraft({ evidence, targetKeywords = [] }) {
+export function createMockQuizDraft({ evidence, targetKeywords = [], questionCount = 3, coveragePlan = null }) {
   const safeEvidence = Array.isArray(evidence) ? evidence : [];
   if (!safeEvidence.length) throw new Error('Mock quiz cần ít nhất một evidence chunk.');
   const allowedKeywords = uniqueStrings(targetKeywords, 5, 80);
-  const levels = ['recall', 'relationship', 'application'];
+  const plan = Array.isArray(coveragePlan) ? coveragePlan : buildQuizCoveragePlan({ questionCount, targetKeywords: allowedKeywords, evidence: safeEvidence });
   const prompts = [
     'Theo nội dung slide nguồn, mô tả nào phù hợp nhất với keyword',
     'Theo nội dung slide nguồn, nhận định nào thể hiện đúng mối liên hệ quanh keyword',
     'Nếu vận dụng đúng nội dung slide nguồn, lựa chọn nào phù hợp nhất với keyword',
   ];
   const keyword = allowedKeywords[0] ?? uniqueStrings(safeEvidence[0]?.keywords, 1, 80)[0] ?? String(safeEvidence[0]?.title ?? 'nội dung bài học').slice(0, 80);
-  const questions = SLOT_IDS.map((slotId, index) => {
+  const questions = plan.map((slot, index) => {
     const chunk = safeEvidence[index % safeEvidence.length];
     const chunkId = String(chunk.id);
     const slideNumber = Number(chunk.slideNumber ?? chunk.slide_number);
     const correct = String(chunk.summary || chunk.content).trim().slice(0, 220);
     return {
-      slotId,
+      slotId: slot.slotId,
       question: `[MOCK] ${prompts[index]} “${keyword}”?`,
       options: [
         correct,
@@ -315,13 +319,13 @@ export function createMockQuizDraft({ evidence, targetKeywords = [] }) {
       ],
       correctIndex: 0,
       explanation: `[MOCK] Đáp án này được đối chiếu trực tiếp với nội dung Slide ${slideNumber}.`,
-      keyword,
+      keyword: slot.keyword,
       sourceChunkIds: [chunkId],
       sourceSlides: [slideNumber],
-      level: levels[index],
+      level: slot.level,
     };
   });
-  return validateQuizDraft({ questions }, { evidence: safeEvidence, allowedKeywords });
+  return validateQuizDraft({ questions }, { evidence: safeEvidence, allowedKeywords: [...new Set(plan.map((slot) => slot.keyword))], expectedSlots: plan.map((slot) => slot.slotId), coveragePlan: plan });
 }
 
 export function serializePublicQuiz(questions) {
@@ -329,7 +333,7 @@ export function serializePublicQuiz(questions) {
 }
 
 export function scoreQuizAnswers(questions, answers) {
-  if (!Array.isArray(questions) || questions.length !== QUIZ_QUESTION_COUNT || !Array.isArray(answers) || answers.length !== questions.length) {
+  if (!Array.isArray(questions) || questions.length < 3 || questions.length > 15 || !Array.isArray(answers) || answers.length !== questions.length) {
     throw new Error('Bài làm không hợp lệ.');
   }
   const selected = answers.map(Number);

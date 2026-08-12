@@ -16,6 +16,7 @@ export function AdaptiveQuizPanel({
   onContinue,
   onOpenSlide,
   onReport,
+  onProgress,
   historyMode = false,
 }: {
   recommendation: AdaptiveQuizRecommendation;
@@ -26,15 +27,16 @@ export function AdaptiveQuizPanel({
   onContinue: () => void;
   onOpenSlide: (slideNumber: number) => void;
   onReport: (slotId: QuizSlotId) => Promise<void>;
+  onProgress?: (answers: Array<number | null>) => Promise<void> | void;
   historyMode?: boolean;
 }) {
-  const [answers, setAnswers] = useState<Array<number | null>>([null, null, null]);
+  const [answers, setAnswers] = useState<Array<number | null>>(() => recommendation.savedAnswers ?? Array(recommendation.questionCount).fill(null));
   const [reportedSlots, setReportedSlots] = useState<Set<QuizSlotId>>(new Set());
 
   useEffect(() => {
-    setAnswers(result ? result.items.map((item) => item.selectedIndex) : [null, null, null]);
+    setAnswers(result ? result.items.map((item) => item.selectedIndex) : recommendation.savedAnswers ?? Array(recommendation.questionCount).fill(null));
     setReportedSlots(new Set());
-  }, [recommendation.id, result]);
+  }, [recommendation.id, recommendation.questionCount, recommendation.savedAnswers, result]);
 
   const complete = answers.every((answer) => answer !== null);
   const feedbackBySlot = new Map(result?.items.map((item) => [item.slotId, item]));
@@ -51,14 +53,16 @@ export function AdaptiveQuizPanel({
 
   return <section className="adaptive-quiz-panel" aria-labelledby="adaptive-quiz-title">
     <header className="adaptive-quiz-header">
-      <div><span>{historyMode ? 'Lịch sử micro-quiz · 3 câu' : '✦ AI micro-quiz · 3 câu'}</span><h3 id="adaptive-quiz-title">{recommendation.title}</h3></div>
-      {result ? <strong>{result.score}/3 đúng</strong> : <small>Dựa trên phần bạn vừa tương tác</small>}
+      <div><span>{historyMode ? 'Lịch sử quiz' : recommendation.quizMode === 'lesson_review' ? '✦ AI ôn tập toàn bài' : '✦ AI micro-quiz'} · {recommendation.questionCount} câu</span><h3 id="adaptive-quiz-title">{recommendation.title}</h3></div>
+      {result ? <strong>{result.score}/{recommendation.questionCount} đúng</strong> : <small>Khoảng {recommendation.estimatedDurationMinutes} phút</small>}
     </header>
 
-    {result && <div className={`adaptive-quiz-score ${result.score === 3 ? 'perfect' : ''}`} role="status">
-      <b>{result.score === 3 ? 'Bạn đã nắm chắc phần này.' : `Bạn trả lời đúng ${result.score}/3 câu.`}</b>
-      <span>{result.score === 3 ? 'Bạn có thể tiếp tục bài học.' : 'Xem giải thích và quay lại slide nguồn để củng cố.'}</span>
+    {result && <div className={`adaptive-quiz-score ${result.score === recommendation.questionCount ? 'perfect' : ''}`} role="status">
+      <b>{result.score === recommendation.questionCount ? 'Bạn đã nắm chắc phần này.' : `Bạn trả lời đúng ${result.score}/${recommendation.questionCount} câu.`}</b>
+      <span>{result.score === recommendation.questionCount ? 'Bạn có thể tiếp tục bài học.' : 'Xem giải thích và quay lại slide nguồn để củng cố.'}</span>
     </div>}
+
+    {!result && <div className="adaptive-quiz-progress" role="status"><span style={{ width: `${100 * answers.filter((answer) => answer !== null).length / recommendation.questionCount}%` }} /><small>{answers.filter((answer) => answer !== null).length}/{recommendation.questionCount} câu đã chọn</small></div>}
 
     <div className="adaptive-quiz-questions">
       {recommendation.questions.map((question, questionIndex) => {
@@ -77,7 +81,11 @@ export function AdaptiveQuizPanel({
                   type="radio"
                   name={`${recommendation.id}-${question.slotId}`}
                   checked={selected}
-                  onChange={() => setAnswers((current) => current.map((answer, index) => index === questionIndex ? optionIndex : answer))}
+                  onChange={() => setAnswers((current) => {
+                    const next = current.map((answer, index) => index === questionIndex ? optionIndex : answer);
+                    void onProgress?.(next);
+                    return next;
+                  })}
                 />
                 <i>{String.fromCharCode(65 + optionIndex)}</i><span>{option}</span>
               </label>;
@@ -98,7 +106,7 @@ export function AdaptiveQuizPanel({
 
     {error && <p className="adaptive-quiz-error" role="alert">{error}</p>}
     {!result && <footer className="adaptive-quiz-submit">
-      <span>{complete ? 'Đã chọn đủ 3 đáp án' : `Còn ${answers.filter((answer) => answer === null).length} câu chưa chọn`}</span>
+      <span>{complete ? `Đã chọn đủ ${recommendation.questionCount} đáp án` : `Còn ${answers.filter((answer) => answer === null).length} câu chưa chọn`}</span>
       <button disabled={!complete || submitting} onClick={() => void onSubmit(answers as number[])}>{submitting ? 'Đang chấm…' : 'Nộp bài'}</button>
     </footer>}
     {result && <footer className="adaptive-quiz-submit">

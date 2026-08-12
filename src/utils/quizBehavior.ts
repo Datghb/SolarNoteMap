@@ -6,6 +6,7 @@ export interface QuizDwellSignal {
 
 export interface QuizBehaviorState {
   keywords: string[];
+  weakKeywords: string[];
   dwellBySlide: Record<number, QuizDwellSignal>;
   unclearSlides: number[];
   latestSlide: number;
@@ -36,7 +37,19 @@ function normalizedKeyword(value: string) {
 }
 
 export function createQuizBehaviorState(slideNumber = 1): QuizBehaviorState {
-  return { keywords: [], dwellBySlide: {}, unclearSlides: [], latestSlide: slideNumber };
+  return { keywords: [], weakKeywords: [], dwellBySlide: {}, unclearSlides: [], latestSlide: slideNumber };
+}
+
+export function addQuizWrongKeywords(state: QuizBehaviorState, keywordValues: string[]): QuizBehaviorState {
+  const seen = new Set(state.weakKeywords.map(normalizedKeyword));
+  const additions = (Array.isArray(keywordValues) ? keywordValues : []).flatMap((value) => {
+    const keyword = cleanKeyword(value).slice(0, 80);
+    const normalized = normalizedKeyword(keyword);
+    if (!keyword || seen.has(normalized)) return [];
+    seen.add(normalized);
+    return [keyword];
+  });
+  return additions.length ? { ...state, weakKeywords: [...state.weakKeywords, ...additions].slice(-8) } : state;
 }
 
 export function addQuizKeyword(state: QuizBehaviorState, keywordValue: string): QuizBehaviorState {
@@ -104,10 +117,13 @@ export function deriveAdaptiveQuizContext(state: QuizBehaviorState, thresholdSec
     .map(([slide]) => slide);
   const reasons = [];
   if (state.keywords.length) reasons.push('keyword_opened');
+  if (state.weakKeywords.length) reasons.push('wrong_answer_history');
   if (state.unclearSlides.length) reasons.push('slide_marked_unclear');
   if (activeSeconds >= thresholdSeconds) reasons.push('active_dwell');
-  const eligible = activeSeconds >= thresholdSeconds && Boolean(state.keywords.length || state.unclearSlides.length);
-  const targetKeywords = state.keywords.slice(-3);
+  const eligible = activeSeconds >= thresholdSeconds && Boolean(state.keywords.length || state.unclearSlides.length || state.weakKeywords.length);
+  const targetKeywords = [...state.weakKeywords.slice(-3), ...state.keywords.slice(-3)]
+    .filter((keyword, index, values) => values.findIndex((candidate) => normalizedKeyword(candidate) === normalizedKeyword(keyword)) === index)
+    .slice(0, 5);
   const signature = JSON.stringify({
     keywords: targetKeywords.map(normalizedKeyword).sort(),
     slides: [...targetSlides].sort((a, b) => a - b),

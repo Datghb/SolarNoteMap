@@ -1,7 +1,8 @@
 import { getSupabaseAuthHeaders } from '../lib/supabase';
 
-export type QuizSlotId = 'q1' | 'q2' | 'q3';
+export type QuizSlotId = `q${number}`;
 export type QuizLevel = 'recall' | 'relationship' | 'application';
+export type AdaptiveQuizMode = 'micro' | 'lesson_review';
 
 export interface AdaptiveQuizQuestion {
   slotId: QuizSlotId;
@@ -18,8 +19,12 @@ export interface AdaptiveQuizRecommendation {
   title: string;
   targetKeywords: string[];
   targetSlides: number[];
-  questionCount: 3;
+  questionCount: number;
+  requestedQuestionCount: number;
+  quizMode: AdaptiveQuizMode;
+  estimatedDurationMinutes: number;
   questions: AdaptiveQuizQuestion[];
+  savedAnswers: Array<number | null> | null;
   recommendedAt: string;
   cacheHit: boolean;
 }
@@ -36,7 +41,7 @@ export interface AdaptiveQuizAnswerResult {
 
 export interface AdaptiveQuizResult {
   score: number;
-  questionCount: 3;
+  questionCount: number;
   durationSeconds: number;
   items: AdaptiveQuizAnswerResult[];
 }
@@ -57,6 +62,8 @@ export interface AdaptiveQuizContextRequest {
   currentSlide: number;
   activeSeconds: number;
   reasons: string[];
+  questionCount?: number;
+  quizMode?: AdaptiveQuizMode;
 }
 
 export class AdaptiveQuizApiError extends Error {
@@ -77,16 +84,21 @@ function slides(value: unknown) {
   return Array.isArray(value) ? value.map(Number).filter((page) => Number.isInteger(page) && page >= 1 && page <= 500).slice(0, 10) : [];
 }
 
+function isQuizSlot(value: unknown) {
+  return typeof value === 'string' && /^q(?:[1-9]|1[0-5])$/.test(value);
+}
+
 export function parseAdaptiveQuizRecommendation(value: unknown): AdaptiveQuizRecommendation | null {
   if (value === null) return null;
   if (!isRecord(value) || typeof value.id !== 'string' || typeof value.title !== 'string' || typeof value.recommendedAt !== 'string') {
     throw new Error('Máy chủ trả về quiz không hợp lệ.');
   }
-  if (!['pending', 'accepted', 'dismissed', 'completed'].includes(String(value.status)) || value.questionCount !== 3 || !Array.isArray(value.questions) || value.questions.length !== 3) {
-    throw new Error('Máy chủ trả về quiz không đủ 3 câu.');
+  const questionCount = Number(value.questionCount);
+  if (!['pending', 'accepted', 'dismissed', 'completed'].includes(String(value.status)) || !Number.isInteger(questionCount) || questionCount < 3 || questionCount > 15 || !Array.isArray(value.questions) || value.questions.length !== questionCount) {
+    throw new Error('Máy chủ trả về quiz có số câu không hợp lệ.');
   }
   const questions = value.questions.map((question): AdaptiveQuizQuestion => {
-    if (!isRecord(question) || !['q1', 'q2', 'q3'].includes(String(question.slotId)) || typeof question.question !== 'string' || typeof question.keyword !== 'string' || !['recall', 'relationship', 'application'].includes(String(question.level))) {
+    if (!isRecord(question) || !isQuizSlot(question.slotId) || typeof question.question !== 'string' || typeof question.keyword !== 'string' || !['recall', 'relationship', 'application'].includes(String(question.level))) {
       throw new Error('Máy chủ trả về câu hỏi không hợp lệ.');
     }
     if ('correctIndex' in question || 'explanation' in question || !Array.isArray(question.options) || question.options.length !== 4 || question.options.some((option) => typeof option !== 'string' || !option.trim())) {
@@ -101,26 +113,34 @@ export function parseAdaptiveQuizRecommendation(value: unknown): AdaptiveQuizRec
       level: question.level as QuizLevel,
     };
   });
-  if (new Set(questions.map((question) => question.slotId)).size !== 3) throw new Error('Quiz có slot câu hỏi bị trùng.');
+  const expectedSlots = questions.map((_, index) => `q${index + 1}`);
+  if (questions.some((question, index) => question.slotId !== expectedSlots[index])) throw new Error('Quiz có slot câu hỏi thiếu, trùng hoặc sai thứ tự.');
+  const savedAnswers = Array.isArray(value.savedAnswers) && value.savedAnswers.length === questionCount && value.savedAnswers.every((answer) => answer === null || (Number.isInteger(answer) && Number(answer) >= 0 && Number(answer) <= 3))
+    ? value.savedAnswers.map((answer) => answer === null ? null : Number(answer)) : null;
   return {
     id: value.id,
     status: value.status as AdaptiveQuizRecommendation['status'],
     title: value.title,
     targetKeywords: strings(value.targetKeywords, 5),
     targetSlides: slides(value.targetSlides),
-    questionCount: 3,
+    questionCount,
+    requestedQuestionCount: Number.isInteger(value.requestedQuestionCount) ? Number(value.requestedQuestionCount) : questionCount,
+    quizMode: value.quizMode === 'lesson_review' ? 'lesson_review' : 'micro',
+    estimatedDurationMinutes: Number.isInteger(value.estimatedDurationMinutes) ? Number(value.estimatedDurationMinutes) : Math.max(2, Math.ceil(questionCount * 0.75)),
     questions,
+    savedAnswers,
     recommendedAt: value.recommendedAt,
     cacheHit: value.cacheHit === true,
   };
 }
 
 function parseAdaptiveQuizResult(value: unknown): AdaptiveQuizResult {
-  if (!isRecord(value) || !Number.isInteger(value.score) || Number(value.score) < 0 || Number(value.score) > 3 || value.questionCount !== 3 || !Number.isInteger(value.durationSeconds) || Number(value.durationSeconds) < 0 || Number(value.durationSeconds) > 86_400 || !Array.isArray(value.items) || value.items.length !== 3) {
+  const questionCount = isRecord(value) ? Number(value.questionCount) : 0;
+  if (!isRecord(value) || !Number.isInteger(questionCount) || questionCount < 3 || questionCount > 15 || !Number.isInteger(value.score) || Number(value.score) < 0 || Number(value.score) > questionCount || !Number.isInteger(value.durationSeconds) || Number(value.durationSeconds) < 0 || Number(value.durationSeconds) > 86_400 || !Array.isArray(value.items) || value.items.length !== questionCount) {
     throw new Error('Máy chủ trả về kết quả quiz không hợp lệ.');
   }
   const items = value.items.map((item): AdaptiveQuizAnswerResult => {
-    if (!isRecord(item) || !['q1', 'q2', 'q3'].includes(String(item.slotId)) || !Number.isInteger(item.selectedIndex) || Number(item.selectedIndex) < 0 || Number(item.selectedIndex) > 3 || !Number.isInteger(item.correctIndex) || Number(item.correctIndex) < 0 || Number(item.correctIndex) > 3 || typeof item.correct !== 'boolean' || typeof item.explanation !== 'string' || typeof item.keyword !== 'string') {
+    if (!isRecord(item) || !isQuizSlot(item.slotId) || !Number.isInteger(item.selectedIndex) || Number(item.selectedIndex) < 0 || Number(item.selectedIndex) > 3 || !Number.isInteger(item.correctIndex) || Number(item.correctIndex) < 0 || Number(item.correctIndex) > 3 || typeof item.correct !== 'boolean' || typeof item.explanation !== 'string' || typeof item.keyword !== 'string') {
       throw new Error('Máy chủ trả về chi tiết đáp án không hợp lệ.');
     }
     return {
@@ -133,7 +153,7 @@ function parseAdaptiveQuizResult(value: unknown): AdaptiveQuizResult {
       keyword: item.keyword,
     };
   });
-  return { score: value.score as number, questionCount: 3, durationSeconds: value.durationSeconds as number, items };
+  return { score: value.score as number, questionCount, durationSeconds: value.durationSeconds as number, items };
 }
 
 export function parseAdaptiveQuizHistory(value: unknown): AdaptiveQuizHistoryItem[] {
@@ -196,6 +216,10 @@ export async function startAdaptiveQuiz(recommendationId: string) {
 export async function submitAdaptiveQuiz(recommendationId: string, answers: number[]) {
   const payload = await request(`/${encodeURIComponent(recommendationId)}/submit`, { method: 'POST', body: JSON.stringify({ answers }) });
   return parseAdaptiveQuizResult(payload.result);
+}
+
+export async function saveAdaptiveQuizProgress(recommendationId: string, answers: Array<number | null>) {
+  await request(`/${encodeURIComponent(recommendationId)}/progress`, { method: 'PATCH', body: JSON.stringify({ answers }) });
 }
 
 export async function dismissAdaptiveQuiz(recommendationId: string) {

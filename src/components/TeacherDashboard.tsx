@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Lesson } from "../data/lessons";
 import {
   createTeacherLesson,
@@ -11,6 +11,7 @@ import { getLessonTitleFromPdfName } from "../utils/fileTitle";
 import type { CloudClassroom, CloudCourse } from "../utils/cloudClassroom";
 import { getInitialReleaseLocalValue, toFutureReleaseIso } from "../utils/lessonSchedule";
 import { copyTextToClipboard } from "../utils/clipboard";
+import { loadAdaptiveQuizAnalytics, type AdaptiveQuizAnalytics } from "../utils/quizAnalytics";
 
 const EVENT_LABELS: Record<StudentActivity["type"], string> = {
   lesson_opened: "Mở bài học",
@@ -122,6 +123,9 @@ export function TeacherDashboard({
   const [deletingLesson, setDeletingLesson] = useState<TeacherLesson | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+  const adaptiveQuizPhase2Enabled = import.meta.env.VITE_ADAPTIVE_QUIZ_ENABLED === "true" && import.meta.env.VITE_ADAPTIVE_QUIZ_PHASE2_ENABLED === "true";
+  const [quizAnalytics, setQuizAnalytics] = useState<AdaptiveQuizAnalytics | null>(null);
+  const [quizAnalyticsError, setQuizAnalyticsError] = useState("");
   const metrics = summarizeClassroom(activities);
   const students = useMemo(
     () =>
@@ -141,6 +145,25 @@ export function TeacherDashboard({
       ),
     [activities],
   );
+
+  useEffect(() => {
+    if (!adaptiveQuizPhase2Enabled || !activeClassId) {
+      setQuizAnalytics(null);
+      setQuizAnalyticsError("");
+      return;
+    }
+    let active = true;
+    loadAdaptiveQuizAnalytics(activeClassId).then((analytics) => {
+      if (!active) return;
+      setQuizAnalytics(analytics);
+      setQuizAnalyticsError("");
+    }).catch((error) => {
+      if (!active) return;
+      setQuizAnalytics(null);
+      setQuizAnalyticsError(error instanceof Error ? error.message : "Không thể tải analytics quiz.");
+    });
+    return () => { active = false; };
+  }, [adaptiveQuizPhase2Enabled, activeClassId, activities.length]);
 
   const submitLesson = async () => {
     setSavingLesson(true);
@@ -481,6 +504,18 @@ export function TeacherDashboard({
                   <small>Cần giáo viên theo dõi</small>
                 </article>
               </div>
+              {adaptiveQuizPhase2Enabled && hasActiveClass && <>
+                <header className="teacher-heading adaptive-quiz-analytics-heading">
+                  <div><span>ADAPTIVE QUIZ · PHASE 2</span><h2>Hiệu quả luyện tập</h2></div>
+                </header>
+                {quizAnalyticsError && <p className="creator-error">{quizAnalyticsError}</p>}
+                {quizAnalytics && <div className="teacher-metrics adaptive-quiz-analytics">
+                  <article><span>Đề xuất → chấp nhận</span><b>{Math.round(quizAnalytics.acceptanceRate * 100)}%</b><small>{quizAnalytics.acceptedCount}/{quizAnalytics.recommendationCount} lượt</small></article>
+                  <article><span>Chấp nhận → hoàn thành</span><b>{Math.round(quizAnalytics.completionRate * 100)}%</b><small>{quizAnalytics.completedCount} lượt hoàn thành</small></article>
+                  <article><span>Điểm trung bình</span><b>{Math.round(quizAnalytics.averageScorePercent * 100)}%</b><small>{quizAnalytics.averageDurationSeconds}s/lượt</small></article>
+                  <article><span>Chất lượng pipeline</span><b>{Math.round(quizAnalytics.verifierRetryRate * 100)}%</b><small>retry · {quizAnalytics.reportedQuestionCount} câu bị báo cáo · {quizAnalytics.averageGenerationLatencyMs}ms</small></article>
+                </div>}
+              </>}
               <div className="teacher-grid">
                 <section className="teacher-panel">
                   <header>

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseAdaptiveQuizHistory, parseAdaptiveQuizRecommendation } from './adaptiveQuiz';
 
-const validQuestion = (slotId: 'q1' | 'q2' | 'q3') => ({
+const validQuestion = (slotId: `q${number}`) => ({
   slotId,
   question: `Câu hỏi đủ dài cho ${slotId}?`,
   options: ['A', 'B', 'C', 'D'],
@@ -24,6 +24,18 @@ describe('parseAdaptiveQuizRecommendation', () => {
       id: 'quiz-id', status: 'pending', title: 'Kiểm tra nhanh', targetKeywords: ['Token'], targetSlides: [2],
       questionCount: 3, questions: [{ ...validQuestion('q1'), correctIndex: 0 }, validQuestion('q2'), validQuestion('q3')], recommendedAt: new Date().toISOString(), cacheHit: false,
     })).toThrow(/không an toàn/);
+  });
+
+  it('accepts a safe ten-question lesson review with resumable answers', () => {
+    const questions = Array.from({ length: 10 }, (_, index) => validQuestion(`q${index + 1}`));
+    const savedAnswers = questions.map((_, index) => index < 2 ? index : null);
+    const parsed = parseAdaptiveQuizRecommendation({
+      id: 'review-id', status: 'accepted', title: 'Ôn tập toàn bài', targetKeywords: ['Token'], targetSlides: [2],
+      questionCount: 10, requestedQuestionCount: 10, quizMode: 'lesson_review', estimatedDurationMinutes: 8,
+      questions, savedAnswers, recommendedAt: new Date().toISOString(), cacheHit: false,
+    });
+    expect(parsed).toMatchObject({ questionCount: 10, quizMode: 'lesson_review' });
+    expect(parsed?.savedAnswers?.slice(0, 3)).toEqual([0, 1, null]);
   });
 });
 

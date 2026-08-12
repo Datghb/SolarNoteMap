@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   addQuizDwell,
   addQuizKeyword,
+  addQuizWrongKeywords,
   createDwellClock,
   createQuizBehaviorState,
   deriveAdaptiveQuizContext,
@@ -40,5 +41,15 @@ describe('adaptive quiz behavior', () => {
     expect(context.eligible).toBe(true);
     expect(context.targetSlides[0]).toBe(7);
     expect(context.reasons).toContain('slide_marked_unclear');
+  });
+
+  it('carries wrong-answer keywords into the next Phase 2 context', () => {
+    let state = createQuizBehaviorState(9);
+    state = addQuizWrongKeywords(state, ['Self-Attention', 'Self-Attention']);
+    state = addQuizDwell(state, { slideNumber: 9, activeSeconds: 30, revisitCount: 0 });
+    const context = deriveAdaptiveQuizContext(state);
+    expect(context.eligible).toBe(true);
+    expect(context.targetKeywords).toEqual(['Self-Attention']);
+    expect(context.reasons).toContain('wrong_answer_history');
   });
 });

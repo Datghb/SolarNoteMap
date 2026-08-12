@@ -49,6 +49,7 @@ const supabaseServerKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABAS
 const supabaseAuth = supabaseUrl && supabasePublishableKey ? createSupabaseClient(supabaseUrl, supabasePublishableKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }) : null;
 const supabaseAdmin = supabaseUrl && supabaseServerKey ? createSupabaseClient(supabaseUrl, supabaseServerKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }) : null;
 const adaptiveQuizEnabled = /^(?:1|true)$/i.test(process.env.ADAPTIVE_QUIZ_ENABLED || process.env.VITE_ADAPTIVE_QUIZ_ENABLED || '');
+const adaptiveQuizPhase2Enabled = adaptiveQuizEnabled && /^(?:1|true)$/i.test(process.env.ADAPTIVE_QUIZ_PHASE2_ENABLED || '');
 if (adaptiveQuizEnabled && quizAiMode === 'live' && quizAiProvider.name === 'custom') {
   if (!quizAiProvider.baseURL) throw new Error('QUIZ_AI_PROVIDER=custom yêu cầu QUIZ_AI_BASE_URL.');
   if (!quizAiProvider.model) throw new Error('QUIZ_AI_PROVIDER=custom yêu cầu QUIZ_AI_MODEL.');
@@ -586,6 +587,7 @@ app.use('/api/adaptive-quiz', createAdaptiveQuizRouter({
   provider: quizAiProvider.name,
   providerLabel: quizAiProvider.label,
   mode: quizAiMode,
+  phase2Enabled: adaptiveQuizPhase2Enabled,
   fallback: quizFallbackAiProvider ? { client: quizFallbackClient, aiProvider: quizFallbackAiProvider } : null,
   completionCooldownSeconds: adaptiveQuizCompletionCooldownSeconds,
   maxCompletedPerLesson24h: adaptiveQuizMaxCompletedPerLesson24h,
@@ -1232,6 +1234,7 @@ app.listen(port, '0.0.0.0', () => {
   console.log(`Solar Note Map server listening on port ${port}`);
   console.log(`Knowledge AI: ${provider}/${model}`);
   if (adaptiveQuizEnabled) {
+    console.log(`Adaptive quiz pipeline: ${adaptiveQuizPhase2Enabled ? 'Phase 2 (BM25, 3-15 câu)' : 'Phase 1 (3 câu)'}`);
     if (quizAiMode === 'mock') console.log('Quiz AI: mock (development only, no external LLM calls)');
     else {
       console.log(`Quiz AI: ${quizAiProvider.name}/${quizAiProvider.model} [key: ${quizAiProvider.apiKeySource}]`);
