@@ -72,6 +72,10 @@ export class AdaptiveQuizApiError extends Error {
   }
 }
 
+export function canRenderAdaptiveQuizAttempt(status: AdaptiveQuizRecommendation['status']) {
+  return status === 'accepted' || status === 'completed';
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
 }

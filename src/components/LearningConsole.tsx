@@ -15,7 +15,7 @@ import { builtInSlidePdfUrl } from './pdfUrls';
 import { loadCloudLearningState } from '../utils/cloudClassroom';
 import { useActiveSlideDwell } from '../hooks/useActiveSlideDwell';
 import { addQuizDwell, addQuizKeyword, addQuizWrongKeywords, createQuizBehaviorState, deriveAdaptiveQuizContext, markQuizSlideUnclear } from '../utils/quizBehavior';
-import { AdaptiveQuizApiError, dismissAdaptiveQuiz, loadAdaptiveQuizHistory, loadAdaptiveQuizRecommendation, prepareAdaptiveQuiz, reportAdaptiveQuizQuestion, saveAdaptiveQuizProgress, startAdaptiveQuiz, submitAdaptiveQuiz, type AdaptiveQuizHistoryItem, type AdaptiveQuizMode, type AdaptiveQuizRecommendation, type AdaptiveQuizResult, type QuizSlotId } from '../utils/adaptiveQuiz';
+import { AdaptiveQuizApiError, canRenderAdaptiveQuizAttempt, dismissAdaptiveQuiz, loadAdaptiveQuizHistory, loadAdaptiveQuizRecommendation, prepareAdaptiveQuiz, reportAdaptiveQuizQuestion, saveAdaptiveQuizProgress, startAdaptiveQuiz, submitAdaptiveQuiz, type AdaptiveQuizHistoryItem, type AdaptiveQuizMode, type AdaptiveQuizRecommendation, type AdaptiveQuizResult, type QuizSlotId } from '../utils/adaptiveQuiz';
 import { AdaptiveQuizPanel } from './AdaptiveQuizPanel';
 import type { LessonKeyword } from '../utils/lessonSummary';
 import { generateLessonQuizIndex, LessonQuizIndexApiError } from '../utils/lessonQuizIndex';
@@ -594,11 +594,11 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
         <button className={tab === 'map' ? 'active' : ''} onClick={() => setTab('map')}>Sơ đồ <span>{map.nodes.length}</span></button>
         <button className={tab === 'community' ? 'active' : ''} onClick={() => setTab('community')}>Thảo luận</button>
         {adaptiveQuizEnabled && (quizRecommendation || quizHistory.length > 0) && <button className={tab === 'quiz' ? 'active' : ''} onClick={() => {
-          if (quizRecommendation && quizRecommendation.status !== 'completed') {
+          if (quizRecommendation?.status === 'accepted') {
             setSelectedQuizHistoryId(null);
             void openAdaptiveQuiz();
           } else setTab('quiz');
-        }}>Quiz <span>{quizHistory.length + (quizRecommendation && quizRecommendation.status !== 'completed' ? 1 : 0)}</span></button>}
+        }}>Quiz <span>{quizHistory.length + (quizRecommendation && quizRecommendation.status !== 'completed' ? 1 : 0)} lượt</span></button>}
       </nav>
 
       {adaptiveQuizFeatureEnabled && canManageLesson && quizIndexState.status === 'indexing' && <div className="adaptive-quiz-preparing" role="status">Đang lập chỉ mục PDF cho quiz (không dùng AI)…</div>}
@@ -726,7 +726,7 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
             onOpenSlide={(slideNumber) => { setSlideIndex(Math.max(0, Math.min(slides.length - 1, slideNumber - 1))); setTab('brief'); }}
             onReport={reportQuizQuestion}
             historyMode
-          /> : quizRecommendation ? <AdaptiveQuizPanel
+          /> : quizRecommendation && canRenderAdaptiveQuizAttempt(quizRecommendation.status) ? <AdaptiveQuizPanel
             recommendation={quizRecommendation}
             result={quizResult}
             submitting={quizSubmitting}
@@ -736,7 +736,9 @@ export function LearningConsole({ lesson, classId, summaryCacheScope, onClose, o
             onContinue={continueAfterQuiz}
             onOpenSlide={(slideNumber) => { setSlideIndex(Math.max(0, Math.min(slides.length - 1, slideNumber - 1))); setTab('brief'); }}
             onReport={reportQuizQuestion}
-          /> : <div className="adaptive-quiz-history-empty">Chọn một lượt quiz phía trên để xem lại.</div>}
+          /> : quizRecommendation?.status === 'pending'
+            ? <div className="adaptive-quiz-history-empty">Quiz đã sẵn sàng. Bấm “Làm ngay” trong thông báo phía trên để bắt đầu.</div>
+            : <div className="adaptive-quiz-history-empty">Chọn một lượt quiz phía trên để xem lại.</div>}
         </section>}
 
       </div>

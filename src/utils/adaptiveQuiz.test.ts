@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseAdaptiveQuizHistory, parseAdaptiveQuizRecommendation } from './adaptiveQuiz';
+import { canRenderAdaptiveQuizAttempt, parseAdaptiveQuizHistory, parseAdaptiveQuizRecommendation } from './adaptiveQuiz';
 
 const validQuestion = (slotId: `q${number}`) => ({
   slotId,
@@ -55,5 +55,14 @@ describe('parseAdaptiveQuizHistory', () => {
       completedAt: new Date().toISOString(),
     }]);
     expect(history[0].result.items[0]).toMatchObject({ explanation: expect.any(String), sourceSlides: [2] });
+  });
+});
+
+describe('canRenderAdaptiveQuizAttempt', () => {
+  it('keeps pending quiz questions hidden until the learner accepts the recommendation', () => {
+    expect(canRenderAdaptiveQuizAttempt('pending')).toBe(false);
+    expect(canRenderAdaptiveQuizAttempt('dismissed')).toBe(false);
+    expect(canRenderAdaptiveQuizAttempt('accepted')).toBe(true);
+    expect(canRenderAdaptiveQuizAttempt('completed')).toBe(true);
   });
 });

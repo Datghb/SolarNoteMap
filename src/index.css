@@ -536,11 +536,13 @@ body { margin: 0; overflow: hidden; }
 .adaptive-question-meta span { color:#ff9a72; }
 .adaptive-quiz-question h4 { margin:10px 0 13px; color:#eef0f6; font-size:14px; line-height:1.55; }
 .adaptive-quiz-question fieldset { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; padding:0; border:0; }
-.adaptive-quiz-question label { display:flex; align-items:center; gap:9px; padding:11px; border:1px solid #292e42; border-radius:9px; background:#101421; color:#c6cad6; font-size:11px; line-height:1.4; cursor:pointer; }
+.adaptive-quiz-question label { position:relative; display:flex; align-items:center; gap:9px; padding:11px; border:1px solid #292e42; border-radius:9px; background:#101421; color:#c6cad6; font-size:11px; line-height:1.4; cursor:pointer; }
 .adaptive-quiz-question label:hover,.adaptive-quiz-question label.selected { border-color:color-mix(in srgb,var(--lesson-color),transparent 40%); background:color-mix(in srgb,var(--lesson-color),transparent 91%); }
 .adaptive-quiz-question label.answer-correct { border-color:#4fc88b; background:#14382d; color:#c7f5dc; }
 .adaptive-quiz-question label.answer-wrong { border-color:#e7786d; background:#3b2023; color:#ffd4d4; }
-.adaptive-quiz-question label input { position:absolute; opacity:0; pointer-events:none; }
+.adaptive-quiz-question label input { position:absolute; inset:0; width:100%; height:100%; margin:0; opacity:0; cursor:pointer; }
+.adaptive-quiz-question label:has(input:focus-visible) { outline:2px solid color-mix(in srgb,var(--lesson-color),white 22%); outline-offset:2px; }
+.adaptive-quiz-question label > i,.adaptive-quiz-question label > span { pointer-events:none; }
 .adaptive-quiz-question label i { display:grid; place-items:center; flex:0 0 24px; height:24px; border-radius:6px; background:#242a3d; color:#aeb6cb; font-style:normal; font-size:9px; font-weight:800; }
 .adaptive-answer-feedback { margin-top:13px; padding:12px 13px; border-radius:9px; background:#111724; }
 .adaptive-answer-feedback b { color:#9ce5bd; font-size:11px; }
